@@ -1,0 +1,130 @@
+version: "3.9"
+
+services:
+  # ─────────────────────────────────────────────
+  # PostgreSQL Database
+  # ─────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: mrtracker_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mrtracker}
+      POSTGRES_USER: ${POSTGRES_USER:-mrtracker_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - mrtracker_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mrtracker_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # Apache Kafka & Zookeeper Event Broker
+  # ─────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: mrtracker_zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - mrtracker_net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: mrtracker_kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - mrtracker_net
+
+  # ─────────────────────────────────────────────
+  # Selenium Standalone Chrome
+  # ─────────────────────────────────────────────
+  selenium:
+    image: selenium/standalone-chrome:latest
+    container_name: mrtracker_selenium
+    restart: unless-stopped
+    ports:
+      - "4444:4444"
+      - "7900:7900"
+    shm_size: 2gb
+    networks:
+      - mrtracker_net
+
+  # ─────────────────────────────────────────────
+  # Next.js Application (Web + API)
+  # ─────────────────────────────────────────────
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: mrtracker_web
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mrtracker_user}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-mrtracker}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-changeme_nextauth_secret}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:5555}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-changeme_jwt_access}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-changeme_jwt_refresh}
+      UPLOAD_DIR: /app/uploads
+      NODE_ENV: ${NODE_ENV:-production}
+      KAFKA_BROKERS: kafka:29092
+      SELENIUM_URL: http://selenium:4444/wd/hub
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "5555:5555"
+    networks:
+      - mrtracker_net
+
+  # ─────────────────────────────────────────────
+  # Nginx Reverse Proxy
+  # ─────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: mrtracker_nginx
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/conf.d:/etc/nginx/conf.d:ro
+      - nginx_ssl:/etc/letsencrypt
+      - uploads_data:/var/www/uploads:ro
+    networks:
+      - mrtracker_net
+
+volumes:
+  postgres_data:
+  uploads_data:
+  nginx_ssl:
+
+networks:
+  mrtracker_net:
+    driver: bridge

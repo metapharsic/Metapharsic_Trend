@@ -1,0 +1,704 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  MD
+  NSM
+  ZSM
+  RM
+  ASM
+  MR
+  DISTRIBUTOR
+  DOCTOR
+  HR
+  FINANCE
+  WAREHOUSE
+  MARKETING
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum ExpenseStatus {
+  DRAFT
+  PENDING_ASM
+  PENDING_RM
+  PENDING_FINANCE
+  APPROVED
+  REJECTED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LEAVE
+}
+
+enum TourPlanStatus {
+  DRAFT
+  PENDING_ASM
+  APPROVED
+  REJECTED
+}
+
+enum ClaimStatus {
+  PENDING_MR
+  PENDING_ASM
+  APPROVED
+  COMPLETED
+  REJECTED
+}
+
+model User {
+  id             String          @id @default(uuid())
+  email          String          @unique
+  passwordHash   String
+  role           Role            @default(MR)
+  isActive       Boolean         @default(true)
+  deviceUuid     String?         @unique
+  lockedAt       DateTime?
+  lockedReason   String?
+  anomalyReviews AnomalyReview[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  employee       Employee?
+  distributor    Distributor?
+}
+
+model Employee {
+  id                String            @id @default(uuid())
+  userId            String            @unique
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName         String
+  lastName          String
+  phone             String
+  managerId         String?
+  manager           Employee?         @relation("ManagerToSubordinates", fields: [managerId], references: [id])
+  subordinates      Employee[]        @relation("ManagerToSubordinates")
+  territories       Territory[]
+  visits            Visit[]
+  orders            Order[]
+  expenses          Expense[]
+  attendances       Attendance[]
+  targets           Target[]
+  collections       Collection[]
+  tourPlans         TourPlan[]        @relation("EmployeePlans")
+  approvedPlans     TourPlan[]        @relation("ApprovedPlans")
+  locationLogs      LocationLog[]
+  claims            Claim[]
+  enrollments       LMSEnrollment[]
+  sampleInventories SampleInventory[]
+  leaveRequests     LeaveRequest[]
+  leaveApprovals    LeaveRequest[]    @relation("LeaveApprovals")
+  payrolls          Payroll[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+model Territory {
+  id           String        @id @default(uuid())
+  name         String        @unique
+  region       String
+  zone         String
+  priority     Int           @default(1) // 1 = Normal, 2 = High (DPS TerritoryPriority factor)
+  employeeId   String?
+  employee     Employee?     @relation(fields: [employeeId], references: [id])
+  doctors      Doctor[]
+  chemists     Chemist[]
+  hospitals    Hospital[]
+  distributors Distributor[]
+  targets      Target[]
+  tourPlanDays TourPlanDay[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Doctor {
+  id                         String                @id @default(uuid())
+  fullName                   String
+  primarySpecialty           String
+  secondarySpecialty         String?
+  qualification              String?
+  registrationNo             String?               @unique
+  experienceYears            Int?
+  practiceType               String?
+  clinicAddress              String
+  latitude                   Float
+  longitude                  Float
+  territoryId                String
+  territory                  Territory             @relation(fields: [territoryId], references: [id])
+  influencerLevel            Int                   @default(1)
+  isKol                      Boolean               @default(false)
+  isSpeaker                  Boolean               @default(false)
+  isClinicalTrialParticipant Boolean               @default(false)
+  relationshipTag            String?
+  patientFootfallDaily       Int                   @default(0)
+  avgPrescriptionsDaily      Int                   @default(0)
+  therapyArea                String?
+  mobile                     String?
+  email                      String?
+  assistantContact           String?
+  receptionContact           String?
+  whatsApp                   String?
+  prefCommMode               String?
+  visits                     Visit[]
+  tourPlanDays               TourPlanDay[]
+  crmProfile                 DoctorCRMProfile?
+  prescriptionHistories      PrescriptionHistory[]
+  intelligenceScore          Int                   @default(0)
+  dpsScore                   Float                 @default(0.0)
+  dpsTier                    String?
+  requiredMonthlyVisits      Int                   @default(0)
+  dpsCalculatedAt            DateTime?
+  createdAt                  DateTime              @default(now())
+  updatedAt                  DateTime              @updatedAt
+}
+
+model DoctorCRMProfile {
+  id                    String    @id @default(uuid())
+  doctorId              String    @unique
+  doctor                Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  prescriptionPotential Int       @default(0)
+  competitorIntensity   Int       @default(0)
+  salesConversionRate   Float     @default(0.0)
+  sampleRoi             Float     @default(0.0)
+  lastVisitDate         DateTime?
+  nextSuggestedVisit    DateTime?
+  updatedAt             DateTime  @updatedAt
+}
+
+model PrescriptionHistory {
+  id                 String   @id @default(uuid())
+  doctorId           String
+  doctor             Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  productId          String
+  product            Product  @relation(fields: [productId], references: [id])
+  month              DateTime @db.Date
+  unitsPrescribed    Int      @default(0)
+  growthPercent      Float    @default(0.0)
+  marketSharePercent Float    @default(0.0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([doctorId, productId, month])
+}
+
+model Chemist {
+  id            String       @id @default(uuid())
+  name          String
+  contactPerson String
+  address       String
+  latitude      Float
+  longitude     Float
+  territoryId   String
+  territory     Territory    @relation(fields: [territoryId], references: [id])
+  licenseNo     String?
+  type          String       @default("RETAIL")
+  mobile        String?
+  email         String?
+  orders        Order[]
+  collections   Collection[]
+  claims        Claim[]
+  visits        Visit[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Hospital {
+  id                    String              @id @default(uuid())
+  name                  String
+  address               String
+  latitude              Float
+  longitude             Float
+  territoryId           String
+  territory             Territory           @relation(fields: [territoryId], references: [id])
+  departments           String?
+  purchaseManager       String?
+  medicalSuperintendent String?
+  bedStrength           Int                 @default(0)
+  type                  String?
+  tenders               HospitalTender[]
+  formularyEntries      HospitalFormulary[]
+  visits                Visit[]
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+}
+
+enum TenderStatus {
+  DRAFT
+  SUBMITTED
+  WON
+  LOST
+  EXPIRED
+}
+
+model HospitalTender {
+  id           String       @id @default(uuid())
+  hospitalId   String
+  hospital     Hospital     @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product      @relation(fields: [productId], references: [id])
+  tenderNo     String       @unique
+  contractRate Decimal      @db.Decimal(10, 2)
+  quantity     Int          @default(0)
+  status       TenderStatus @default(DRAFT)
+  validFrom    DateTime     @db.Date
+  validTo      DateTime     @db.Date
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model HospitalFormulary {
+  id         String   @id @default(uuid())
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  included   Boolean  @default(false)
+  notes      String?
+  reviewedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([hospitalId, productId])
+}
+
+model DiscountScheme {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  productId    String?
+  product      Product? @relation(fields: [productId], references: [id])
+  minQuantity  Int      @default(1)
+  discountPct  Float    @default(0.0)
+  isActive     Boolean  @default(true)
+  validFrom    DateTime @db.Date
+  validTo      DateTime @db.Date
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Distributor {
+  id          String    @id @default(uuid())
+  // Nullable + unique: a Distributor record can exist before its portal account is
+  // provisioned (it's created from the field via /api/manager/entities), and at most
+  // one login maps to it, mirroring the Employee <-> User pattern used everywhere else.
+  userId      String?   @unique
+  user        User?     @relation(fields: [userId], references: [id])
+  name        String
+  address     String
+  territoryId String
+  territory   Territory @relation(fields: [territoryId], references: [id])
+  gstNo       String?
+  licenseNo   String?
+  creditLimit Decimal?  @db.Decimal(10, 2)
+  bankDetails String?
+  orders      Order[]
+  claims      Claim[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id                    String                @id @default(uuid())
+  name                  String                @unique
+  sku                   String                @unique
+  price                 Decimal               @db.Decimal(10, 2)
+  stockQty              Int                   @default(0)
+  composition           String?
+  strength              String?
+  packSize              String?
+  mrp                   Decimal?              @db.Decimal(10, 2)
+  ptr                   Decimal?              @db.Decimal(10, 2)
+  pts                   Decimal?              @db.Decimal(10, 2)
+  marginStructure       String?
+  therapySegment        String?
+  orderItems            OrderItem[]
+  samples               Sample[]
+  claims                Claim[]
+  prescriptionHistories PrescriptionHistory[]
+  visualAids            VisualAid[]
+  sampleInventories     SampleInventory[]
+  tenders               HospitalTender[]
+  formularyEntries      HospitalFormulary[]
+  discountSchemes       DiscountScheme[]
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+}
+
+model Order {
+  id            String       @id @default(uuid())
+  status        OrderStatus  @default(PENDING)
+  chemistId     String?
+  chemist       Chemist?     @relation(fields: [chemistId], references: [id])
+  distributorId String
+  distributor   Distributor  @relation(fields: [distributorId], references: [id])
+  // The MR who booked the order. Nullable because orders may also be raised
+  // centrally; without it, per-rep sales cannot be attributed.
+  employeeId    String?
+  employee      Employee?    @relation(fields: [employeeId], references: [id])
+  items         OrderItem[]
+  invoice       Invoice?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TourPlan {
+  id           String         @id @default(uuid())
+  employeeId   String
+  employee     Employee       @relation("EmployeePlans", fields: [employeeId], references: [id])
+  month        DateTime       @db.Date
+  status       TourPlanStatus @default(DRAFT)
+  approvedById String?
+  approvedBy   Employee?      @relation("ApprovedPlans", fields: [approvedById], references: [id])
+  days         TourPlanDay[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([employeeId, month])
+}
+
+model TourPlanDay {
+  id               String    @id @default(uuid())
+  tourPlanId       String
+  tourPlan         TourPlan  @relation(fields: [tourPlanId], references: [id], onDelete: Cascade)
+  date             DateTime  @db.Date
+  territoryId      String
+  territory        Territory @relation(fields: [territoryId], references: [id])
+  plannedDoctorId  String?
+  plannedDoctor    Doctor?   @relation(fields: [plannedDoctorId], references: [id])
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model LocationLog {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  latitude   Float
+  longitude  Float
+  isMocked   Boolean  @default(false)
+  recordedAt DateTime @default(now())
+}
+
+model Visit {
+  id                  String          @id @default(uuid())
+  employeeId          String
+  employee            Employee        @relation(fields: [employeeId], references: [id])
+  doctorId            String?
+  doctor              Doctor?         @relation(fields: [doctorId], references: [id])
+  chemistId           String?
+  chemist             Chemist?        @relation(fields: [chemistId], references: [id])
+  hospitalId          String?
+  hospital            Hospital?       @relation(fields: [hospitalId], references: [id])
+  purpose             String
+  feedback            String?
+  latitude            Float
+  longitude           Float
+  locationUnavailable Boolean         @default(false)
+  photoPath           String?
+  anomalyFlag         Boolean         @default(false)
+  anomalyDetails      String?
+  receptiveness       String?
+  durationMinutes     Int?
+  cqsScore            Float?
+  followUpDate        DateTime?
+  samples             Sample[]
+  gifts               Gift[]
+  competitorLogs      CompetitorLog[]
+  anomalyReviews      AnomalyReview[]
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+}
+
+model CompetitorLog {
+  id                String   @id @default(uuid())
+  visitId           String
+  visit             Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  brandName         String
+  activityIntensity String
+  notes             String?  @db.Text
+  createdAt         DateTime @default(now())
+}
+
+model Sample {
+  id        String   @id @default(uuid())
+  visitId   String
+  visit     Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SampleInventory {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity     Int      @default(0)
+  allocatedQty Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([employeeId, productId])
+}
+
+model VisualAid {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  title     String
+  fileUrl   String
+  fileType  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Gift {
+  id            String      @id @default(uuid())
+  visitId       String
+  visit         Visit       @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  giftCatalogId String
+  giftCatalog   GiftCatalog @relation(fields: [giftCatalogId], references: [id])
+  quantity      Int
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model GiftCatalog {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  value     Decimal  @db.Decimal(10, 2)
+  stockQty  Int      @default(0)
+  gifts     Gift[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Expense {
+  id          String        @id @default(uuid())
+  employeeId  String
+  employee    Employee      @relation(fields: [employeeId], references: [id])
+  amount      Decimal       @db.Decimal(10, 2)
+  category    String
+  description String?
+  receiptUrl  String?
+  receiptHash String?
+  status      ExpenseStatus @default(DRAFT)
+  auditNotes  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model ExpenseLimit {
+  id          String   @id @default(uuid())
+  role        Role
+  category    String
+  limitAmount Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([role, category])
+}
+
+model Claim {
+  id            String      @id @default(uuid())
+  chemistId     String
+  chemist       Chemist     @relation(fields: [chemistId], references: [id])
+  employeeId    String
+  employee      Employee    @relation(fields: [employeeId], references: [id])
+  distributorId String
+  distributor   Distributor @relation(fields: [distributorId], references: [id])
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id])
+  quantity      Int
+  reason        String
+  status        ClaimStatus @default(PENDING_MR)
+  creditNote    CreditNote?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model CreditNote {
+  id        String   @id @default(uuid())
+  claimId   String   @unique
+  claim     Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  number    String   @unique
+  amount    Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LMSCourse {
+  id          String          @id @default(uuid())
+  title       String          @unique
+  description String?         @db.Text
+  enrollments LMSEnrollment[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model LMSEnrollment {
+  id              String    @id @default(uuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  courseId        String
+  course          LMSCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  progressPercent Int       @default(0)
+  quizScore       Int?
+  completed       Boolean   @default(false)
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([employeeId, courseId])
+}
+
+model LeaveRequest {
+  id           String    @id @default(uuid())
+  employeeId   String
+  employee     Employee  @relation(fields: [employeeId], references: [id])
+  startDate    DateTime  @db.Date
+  endDate      DateTime  @db.Date
+  type         String
+  status       String    @default("PENDING")
+  reason       String?
+  approvedById String?
+  approvedBy   Employee? @relation("LeaveApprovals", fields: [approvedById], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Payroll {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  month        DateTime @db.Date
+  basicSalary  Decimal  @db.Decimal(10, 2)
+  incentives   Decimal  @db.Decimal(10, 2) @default(0.0)
+  pf           Decimal  @db.Decimal(10, 2) @default(0.0)
+  esic         Decimal  @db.Decimal(10, 2) @default(0.0)
+  tax          Decimal  @db.Decimal(10, 2) @default(0.0)
+  netPayable   Decimal  @db.Decimal(10, 2)
+  payslipUrl   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([employeeId, month])
+}
+
+model Attendance {
+  id         String           @id @default(uuid())
+  employeeId String
+  employee   Employee         @relation(fields: [employeeId], references: [id])
+  date       DateTime         @db.Date
+  status     AttendanceStatus @default(PRESENT)
+  checkIn    DateTime
+  checkOut   DateTime?
+  latitude   Float
+  longitude  Float
+  faceToken  String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([employeeId, date])
+}
+
+model Target {
+  id          String    @id @default(uuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  territoryId String
+  territory   Territory @relation(fields: [territoryId], references: [id])
+  value       Decimal   @db.Decimal(10, 2)
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Collection {
+  id         String    @id @default(uuid())
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+  chemistId  String
+  chemist    Chemist   @relation(fields: [chemistId], references: [id])
+  amount     Decimal   @db.Decimal(10, 2)
+  refNumber  String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Invoice {
+  id        String   @id @default(uuid())
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  invoiceNo String   @unique
+  amount    Decimal  @db.Decimal(10, 2)
+  paid      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum AnomalyReviewStatus {
+  PENDING
+  DISMISSED
+  CONFIRMED
+}
+
+model AnomalyReview {
+  id          String              @id @default(uuid())
+  visitId     String
+  reviewerId  String
+  status      AnomalyReviewStatus @default(PENDING)
+  reviewNotes String?
+  reviewedAt  DateTime            @default(now())
+
+  // Relations
+  visit    Visit @relation(fields: [visitId], references: [id])
+  reviewer User  @relation(fields: [reviewerId], references: [id])
+
+  @@index([visitId])
+  @@index([status])
+  @@index([reviewerId])
+  @@map("anomaly_reviews")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revoked   Boolean  @default(false)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
