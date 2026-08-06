@@ -27,6 +27,8 @@ export const RULE_THRESHOLDS = {
   lowSampleStock: 10,
   /** Coverage may lag the elapsed-month pace by this many points before flagging. */
   coverageTolerancePercent: 15,
+  /** Unpaid invoices older than this many days are flagged as aged billing. */
+  agedBillingDays: 30,
 } as const;
 
 export interface NotificationContext {
@@ -45,6 +47,8 @@ export interface NotificationContext {
   breachedCreditChemists: number;
   /** Chemists in this rep's territory approaching their credit limit. */
   warningCreditChemists: number;
+  /** Unpaid invoices older than the aged-billing threshold. */
+  agedInvoices: number;
 }
 
 const SEVERITY_ORDER: Record<NotificationSeverity, number> = {
@@ -165,6 +169,15 @@ export function buildNotifications(ctx: NotificationContext): Notification[] {
       severity: "WARNING",
       message: `${ctx.warningCreditChemists} chemist${ctx.warningCreditChemists === 1 ? " is" : "s are"} approaching their credit limit.`,
       action: "Plan a collection visit soon.",
+    });
+  }
+
+  if (ctx.agedInvoices > 0) {
+    notifications.push({
+      code: "AGED_BILLING",
+      severity: "ERROR",
+      message: `${ctx.agedInvoices} invoice${ctx.agedInvoices === 1 ? " is" : "s are"} unpaid for over ${RULE_THRESHOLDS.agedBillingDays} days.`,
+      action: "Follow up for collection before the account ages further.",
     });
   }
 

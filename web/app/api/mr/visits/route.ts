@@ -112,6 +112,9 @@ async function createVisit(req: AuthedRequest) {
       feedback: formData.get("feedback") || undefined,
       latitude: formData.get("latitude"),
       longitude: formData.get("longitude"),
+      startedAt: formData.get("startedAt") || undefined,
+      startLatitude: formData.get("startLatitude") || undefined,
+      startLongitude: formData.get("startLongitude") || undefined,
       durationMinutes: formData.get("durationMinutes") || undefined,
       boxesPlaced: formData.get("boxesPlaced") || undefined,
     };
@@ -121,7 +124,7 @@ async function createVisit(req: AuthedRequest) {
       return badRequest("Validation error", parsed.error.flatten());
     }
 
-    const { doctorId, chemistId, hospitalId, purpose, feedback, latitude, longitude, durationMinutes, boxesPlaced } =
+    const { doctorId, chemistId, hospitalId, purpose, feedback, latitude, longitude, startedAt, startLatitude, startLongitude, durationMinutes, boxesPlaced } =
       parsed.data;
 
     const leadJson = formData.get("lead");
@@ -260,6 +263,10 @@ async function createVisit(req: AuthedRequest) {
           feedback,
           latitude,
           longitude,
+          startedAt,
+          startLatitude,
+          startLongitude,
+          endedAt: new Date(),
           durationMinutes,
           boxesPlaced,
           cqsScore,

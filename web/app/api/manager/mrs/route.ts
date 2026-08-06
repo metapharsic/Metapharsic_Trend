@@ -37,6 +37,7 @@ async function getMRs(req: AuthedRequest) {
 
     const mrs = employees.map((emp) => ({
       id: emp.user.id,
+      employeeId: emp.id,
       email: emp.user.email,
       firstName: emp.firstName,
       lastName: emp.lastName,

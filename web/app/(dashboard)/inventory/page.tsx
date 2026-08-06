@@ -26,6 +26,19 @@ interface MySample {
   productId: string;
   productName: string;
   quantity: number;
+  unitValue: number;
+  estimatedValue: number;
+}
+
+interface MrStockRep {
+  employeeId: string;
+  employeeName: string;
+  items: { productId: string; productName: string; quantity: number; unitValue: number; estimatedValue: number }[];
+  totalEstimatedValue: number;
+}
+
+function currency(v: number) {
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v);
 }
 
 export default function InventoryPage() {
@@ -40,6 +53,16 @@ export default function InventoryPage() {
   const [success, setSuccess] = useState("");
   const [mySamples, setMySamples] = useState<MySample[]>([]);
   const [mySamplesLoading, setMySamplesLoading] = useState(false);
+  const [mrStock, setMrStock] = useState<MrStockRep[]>([]);
+  const [mrStockLoading, setMrStockLoading] = useState(false);
+  const [expandedRep, setExpandedRep] = useState<string | null>(null);
+  const [mrList, setMrList] = useState<{ id: string; employeeId: string; firstName: string; lastName: string }[]>([]);
+  const [allocEmployeeId, setAllocEmployeeId] = useState("");
+  const [allocProductId, setAllocProductId] = useState("");
+  const [allocQty, setAllocQty] = useState("");
+  const [allocSubmitting, setAllocSubmitting] = useState(false);
+  const [allocError, setAllocError] = useState("");
+  const [allocSuccess, setAllocSuccess] = useState("");
 
   // Form states for add/edit
   const [formData, setFormData] = useState({
@@ -92,7 +115,54 @@ export default function InventoryPage() {
         .catch((err) => console.error("Failed to fetch my sample stock", err))
         .finally(() => setMySamplesLoading(false));
     }
+    if (decodedRole === "ASM" || decodedRole === "ADMIN") {
+      setMrStockLoading(true);
+      apiClient
+        .get("/api/manager/mr-stock")
+        .then((res) => setMrStock(res.data.data.reps ?? []))
+        .catch((err) => console.error("Failed to fetch MR stock", err))
+        .finally(() => setMrStockLoading(false));
+      apiClient
+        .get("/api/manager/mrs")
+        .then((res) => setMrList(res.data.data?.mrs ?? []))
+        .catch((err) => console.error("Failed to fetch MR list", err));
+    }
   }, []);
+
+  const refreshMrStock = () => {
+    setMrStockLoading(true);
+    apiClient
+      .get("/api/manager/mr-stock")
+      .then((res) => setMrStock(res.data.data.reps ?? []))
+      .catch((err) => console.error("Failed to fetch MR stock", err))
+      .finally(() => setMrStockLoading(false));
+  };
+
+  const handleAllocate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAllocError("");
+    setAllocSuccess("");
+    if (!allocEmployeeId) return setAllocError("Select an MR.");
+    if (!allocProductId) return setAllocError("Select a product.");
+    const qty = Number(allocQty);
+    if (!qty || qty < 1) return setAllocError("Enter a valid quantity.");
+
+    setAllocSubmitting(true);
+    try {
+      await apiClient.post("/api/manager/mr-stock/allocate", {
+        employeeId: allocEmployeeId,
+        productId: allocProductId,
+        quantity: qty,
+      });
+      setAllocSuccess("Stock allocated to MR.");
+      setAllocQty("");
+      refreshMrStock();
+    } catch (err: any) {
+      setAllocError(err?.response?.data?.error?.message || "Failed to allocate stock.");
+    } finally {
+      setAllocSubmitting(false);
+    }
+  };
 
   const handleOpenEdit = (p: Product) => {
     setEditingProduct(p);
@@ -246,7 +316,7 @@ export default function InventoryPage() {
           <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
             <h2 className="text-xs font-bold text-slate-800">My Sample Stock (carried inventory)</h2>
             <span className="text-[11px] font-semibold text-slate-500">
-              {mySamples.length} product{mySamples.length === 1 ? "" : "s"} in hand
+              {mySamples.length} product{mySamples.length === 1 ? "" : "s"} in hand · {currency(mySamples.reduce((s, x) => s + x.estimatedValue, 0))} est. value
             </span>
           </div>
           <div className="overflow-x-auto">
@@ -255,18 +325,20 @@ export default function InventoryPage() {
                 <tr className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Product</th>
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Qty With Me</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Unit Value</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Est. Value</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {mySamplesLoading ? (
                   <tr>
-                    <td colSpan={2} className="px-4 py-8 text-center text-slate-400">
+                    <td colSpan={4} className="px-4 py-8 text-center text-slate-400">
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500 mx-auto" />
                     </td>
                   </tr>
                 ) : mySamples.length === 0 ? (
                   <tr>
-                    <td colSpan={2} className="px-4 py-8 text-center text-slate-400 font-medium">
+                    <td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-medium">
                       No sample stock allocated to you yet.
                     </td>
                   </tr>
@@ -281,11 +353,119 @@ export default function InventoryPage() {
                           {s.quantity}
                         </span>
                       </td>
+                      <td className="px-4 py-3 text-right text-slate-600">{currency(s.unitValue)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-slate-800">{currency(s.estimatedValue)}</td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Admin/ASM: give stock to an MR */}
+      {(role === "ASM" || role === "ADMIN") && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+            <h2 className="text-xs font-bold text-slate-800">Give Stock to MR</h2>
+          </div>
+          <form onSubmit={handleAllocate} className="p-4 flex flex-col sm:flex-row gap-3 items-end">
+            <div className="flex-1 w-full space-y-1">
+              <label className="text-xs font-semibold text-slate-600">MR</label>
+              <select
+                value={allocEmployeeId}
+                onChange={(e) => setAllocEmployeeId(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs"
+              >
+                <option value="">Select MR</option>
+                {mrList.map((m) => (
+                  <option key={m.employeeId} value={m.employeeId}>{m.firstName} {m.lastName}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1 w-full space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Product</label>
+              <select
+                value={allocProductId}
+                onChange={(e) => setAllocProductId(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs"
+              >
+                <option value="">Select product</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="w-full sm:w-28 space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Qty</label>
+              <input
+                type="number"
+                min={1}
+                value={allocQty}
+                onChange={(e) => setAllocQty(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={allocSubmitting}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-50 w-full sm:w-auto"
+            >
+              {allocSubmitting ? "Giving..." : "Give Stock"}
+            </button>
+          </form>
+          {allocError && <p className="px-4 pb-3 text-xs text-rose-600">{allocError}</p>}
+          {allocSuccess && <p className="px-4 pb-3 text-xs text-emerald-600">{allocSuccess}</p>}
+        </div>
+      )}
+
+      {/* Admin/ASM: per-MR stock value across the field force */}
+      {(role === "ASM" || role === "ADMIN") && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+            <h2 className="text-xs font-bold text-slate-800">MR Sample Stock &amp; Estimated Value</h2>
+            <span className="text-[11px] font-semibold text-slate-500">
+              {mrStock.length} rep{mrStock.length === 1 ? "" : "s"} · {currency(mrStock.reduce((s, r) => s + r.totalEstimatedValue, 0))} total
+            </span>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {mrStockLoading ? (
+              <div className="px-4 py-8 text-center text-slate-400">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500 mx-auto" />
+              </div>
+            ) : mrStock.length === 0 ? (
+              <div className="px-4 py-8 text-center text-slate-400 font-medium text-xs">No MR carrying stock currently.</div>
+            ) : (
+              mrStock.map((rep) => (
+                <div key={rep.employeeId}>
+                  <button
+                    onClick={() => setExpandedRep(expandedRep === rep.employeeId ? null : rep.employeeId)}
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
+                  >
+                    <span className="font-bold text-slate-800 text-xs">{rep.employeeName}</span>
+                    <span className="flex items-center gap-3 text-xs">
+                      <span className="text-slate-400">{rep.items.length} product{rep.items.length === 1 ? "" : "s"}</span>
+                      <span className="font-bold text-indigo-700">{currency(rep.totalEstimatedValue)}</span>
+                    </span>
+                  </button>
+                  {expandedRep === rep.employeeId && (
+                    <table className="w-full text-left text-xs border-collapse bg-slate-50/50">
+                      <tbody className="divide-y divide-slate-100">
+                        {rep.items.map((it) => (
+                          <tr key={it.productId}>
+                            <td className="px-4 py-2 pl-8 text-slate-600">{it.productName}</td>
+                            <td className="px-4 py-2 text-right text-slate-500">Qty {it.quantity}</td>
+                            <td className="px-4 py-2 text-right text-slate-500">{currency(it.unitValue)}/u</td>
+                            <td className="px-4 py-2 text-right font-semibold text-slate-700">{currency(it.estimatedValue)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}

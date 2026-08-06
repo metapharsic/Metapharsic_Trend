@@ -9,16 +9,24 @@ async function handler(req: AuthedRequest) {
 
     const samples = await db.sampleInventory.findMany({
       where: { employeeId: employee.id, quantity: { gt: 0 } },
-      include: { product: { select: { id: true, name: true } } },
+      include: { product: { select: { id: true, name: true, ptr: true, mrp: true, price: true } } },
       orderBy: { product: { name: "asc" } },
     });
 
-    return ok({
-      samples: samples.map((s) => ({
+    const withValue = samples.map((s) => {
+      const unitValue = Number(s.product.ptr ?? s.product.price ?? 0);
+      return {
         productId: s.productId,
         productName: s.product.name,
         quantity: s.quantity,
-      })),
+        unitValue,
+        estimatedValue: unitValue * s.quantity,
+      };
+    });
+
+    return ok({
+      samples: withValue,
+      totalEstimatedValue: withValue.reduce((sum, s) => sum + s.estimatedValue, 0),
     });
   } catch (err) {
     console.error("[GET /api/mr/samples]", err);

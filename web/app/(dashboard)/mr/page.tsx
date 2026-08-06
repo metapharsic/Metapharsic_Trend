@@ -31,6 +31,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { VisitDetailModal } from "@/components/mr/visit-detail-modal";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface Notification {
@@ -43,9 +44,9 @@ interface Notification {
 interface MrDashboard {
   todaysVisits: { planned: number; list: { doctorId: string; name: string; tier: string | null }[] };
   pendingVisits: { count: number };
-  completedVisits: { total: number; planned: number; unplanned: number };
+  completedVisits: { total: number; planned: number; unplanned: number; list: { id: string; name: string; createdAt: string }[] };
   salesToday: { amount: number };
-  collection: { amount: number };
+  collection: { amount: number; today: number; week: number; month: number; outstanding: number };
   samplesDistributed: { units: number };
   doctorCoverage: { visited: number; total: number; percent: number };
   chemistCoverage: { visited: number; total: number; percent: number };
@@ -109,6 +110,7 @@ export default function MrDashboardPage() {
   const [checkingOut, setCheckingOut] = useState(false);
   const [geoError, setGeoError]       = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [openVisitId, setOpenVisitId]  = useState<string | null>(null);
 
   const fetchData = useCallback(() => {
     setLoading(true);
@@ -365,8 +367,23 @@ export default function MrDashboardPage() {
       <Section label="Commercial">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <KpiTile icon={IndianRupee} tone="emerald" label="Sales Today" value={currency(data.salesToday.amount)} sub="Orders booked" />
-          <KpiTile icon={Wallet} tone="emerald" label="Collection" value={currency(data.collection.amount)} sub="Banked today" />
           <KpiTile icon={Package} tone="blue" label="Samples Distributed" value={data.samplesDistributed.units} sub="Units today" />
+          <KpiTile
+            icon={data.collection.outstanding > 0 ? AlertTriangle : Wallet}
+            tone={data.collection.outstanding > 0 ? "warn" : "emerald"}
+            label="Outstanding"
+            value={currency(data.collection.outstanding)}
+            sub="Territory receivable"
+          />
+        </div>
+      </Section>
+
+      {/* ─── Collection ───────────────────────────────────────────────────────── */}
+      <Section label="Collection">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <KpiTile icon={Wallet} tone="emerald" label="Collected Today" value={currency(data.collection.today)} sub="Banked today" />
+          <KpiTile icon={Wallet} tone="blue" label="Collected This Week" value={currency(data.collection.week)} sub="Mon – today" />
+          <KpiTile icon={Wallet} tone="blue" label="Collected This Month" value={currency(data.collection.month)} sub="Month to date" />
         </div>
       </Section>
 
@@ -471,6 +488,38 @@ export default function MrDashboardPage() {
           </div>
           <TrendingUp size={20} className="ml-auto text-emerald-500 flex-shrink-0" />
         </div>
+      )}
+
+      {/* ─── Completed Calls Today ────────────────────────────────────────────── */}
+      {data.completedVisits.list.length > 0 && (
+        <Section label="Completed Calls Today">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="divide-y divide-slate-100">
+              {data.completedVisits.list.map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => setOpenVisitId(v.id)}
+                  className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle2 size={16} className="text-blue-700" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 text-sm">{v.name}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{timeStr(v.createdAt)}</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={14} className="text-slate-400" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </Section>
+      )}
+
+      {openVisitId && (
+        <VisitDetailModal visitId={openVisitId} onClose={() => setOpenVisitId(null)} />
       )}
 
       {/* ─── Invoices Generated ────────────────────────────────────────────────── */}

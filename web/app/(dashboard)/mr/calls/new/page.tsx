@@ -67,6 +67,7 @@ function NewCallForm() {
   const [addEntityError, setAddEntityError] = useState<string | null>(null);
 
   const [gps, setGps] = useState<GpsState>({ status: "idle" });
+  const [callStart, setCallStart] = useState<{ startedAt: string; lat: number; lon: number } | null>(null);
   const [purpose, setPurpose] = useState("");
   const [feedback, setFeedback] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
@@ -151,6 +152,23 @@ function NewCallForm() {
     captureGps();
   }, []);
 
+  // Call "start" is the moment an entity is selected — auto-capture GPS + timestamp.
+  useEffect(() => {
+    if (!selected || callStart) return;
+    if (!navigator.geolocation) {
+      setCallStart({ startedAt: new Date().toISOString(), lat: NaN, lon: NaN });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setCallStart({
+        startedAt: new Date().toISOString(),
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude,
+      }),
+      () => setCallStart({ startedAt: new Date().toISOString(), lat: NaN, lon: NaN })
+    );
+  }, [selected, callStart]);
+
   const setSampleQty = (productId: string, quantity: number) => {
     setSamplesGiven((prev) => {
       const next = { ...prev };
@@ -227,6 +245,11 @@ function NewCallForm() {
     if (feedback) formData.append("feedback", feedback);
     formData.append("latitude", String(gps.lat));
     formData.append("longitude", String(gps.lon));
+    if (callStart) {
+      formData.append("startedAt", callStart.startedAt);
+      if (!Number.isNaN(callStart.lat)) formData.append("startLatitude", String(callStart.lat));
+      if (!Number.isNaN(callStart.lon)) formData.append("startLongitude", String(callStart.lon));
+    }
     if (durationMinutes) formData.append("durationMinutes", durationMinutes);
     if (boxesPlaced) formData.append("boxesPlaced", boxesPlaced);
     if (photo) formData.append("photo", photo);
@@ -441,6 +464,11 @@ function NewCallForm() {
             </p>
           )}
           <p className="text-xs text-slate-400 mt-1">You must be within {geofenceRadiusMeters}m of the consulted entity.</p>
+          {callStart && (
+            <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+              <MapPin size={12} /> Call started {new Date(callStart.startedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+            </p>
+          )}
         </div>
 
         {/* ── Purpose / Notes ── */}

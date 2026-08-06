@@ -45,6 +45,9 @@ export const CreateVisitSchema = z.object({
   feedback: z.string().optional(),
   latitude: z.coerce.number().min(-90).max(90),
   longitude: z.coerce.number().min(-180).max(180),
+  startedAt: z.coerce.date().optional(),
+  startLatitude: z.coerce.number().min(-90).max(90).optional(),
+  startLongitude: z.coerce.number().min(-180).max(180).optional(),
   durationMinutes: z.coerce.number().int().min(0).max(600).optional(),
   boxesPlaced: z.coerce.number().int().min(0).optional(),
   samples: z.array(z.object({

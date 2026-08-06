@@ -5,7 +5,7 @@ import { ok, unauthorized, forbidden, notFound, apiError } from "@/lib/api-respo
 import { startOfUtcDay, startOfUtcMonth, addUtcDays } from "@/lib/date";
 import { evaluateGpsStatus, travelDistanceKm, coveragePercent } from "@/lib/field-tracking";
 import { buildNotifications, monthElapsedFraction, RULE_THRESHOLDS } from "@/lib/notifications";
-import { outstandingBalance, creditStatus } from "@/lib/credit";
+import { outstandingBalance, creditStatus, round2 } from "@/lib/credit";
 
 
 /**
@@ -46,6 +46,8 @@ async function getMrDashboard(req: AuthedRequest) {
     const today = startOfUtcDay();
     const tomorrow = addUtcDays(today, 1);
     const monthStart = startOfUtcMonth();
+    const dow = today.getUTCDay();
+    const weekStart = addUtcDays(today, -((dow + 6) % 7)); // Monday
     const now = new Date();
 
     const [
@@ -53,6 +55,8 @@ async function getMrDashboard(req: AuthedRequest) {
       visitsToday,
       orderItemsToday,
       collectionsToday,
+      collectionsWeek,
+      collectionsMonth,
       samplesToday,
       doctorsInTerritory,
       chemistsInTerritory,
@@ -70,6 +74,7 @@ async function getMrDashboard(req: AuthedRequest) {
       territoryOrderItems,
       territoryCollections,
       invoicesList,
+      agedInvoicesCount,
     ] = await Promise.all([
       db.tourPlanDay.findMany({
         where: {
@@ -80,7 +85,16 @@ async function getMrDashboard(req: AuthedRequest) {
       }),
       db.visit.findMany({
         where: { employeeId: employee.id, createdAt: { gte: today, lt: tomorrow } },
-        select: { id: true, doctorId: true, chemistId: true, hospitalId: true, createdAt: true },
+        select: {
+          id: true,
+          doctorId: true,
+          chemistId: true,
+          hospitalId: true,
+          createdAt: true,
+          doctor: { select: { fullName: true } },
+          chemist: { select: { name: true } },
+        },
+        orderBy: { createdAt: "desc" },
       }),
       db.orderItem.findMany({
         where: {
@@ -90,6 +104,14 @@ async function getMrDashboard(req: AuthedRequest) {
       }),
       db.collection.aggregate({
         where: { employeeId: employee.id, createdAt: { gte: today, lt: tomorrow } },
+        _sum: { amount: true },
+      }),
+      db.collection.aggregate({
+        where: { employeeId: employee.id, createdAt: { gte: weekStart } },
+        _sum: { amount: true },
+      }),
+      db.collection.aggregate({
+        where: { employeeId: employee.id, createdAt: { gte: monthStart } },
         _sum: { amount: true },
       }),
       db.sample.findMany({
@@ -186,6 +208,13 @@ async function getMrDashboard(req: AuthedRequest) {
         orderBy: { createdAt: "desc" },
         take: 10,
       }),
+      db.invoice.count({
+        where: {
+          order: { employeeId: employee.id },
+          paid: false,
+          createdAt: { lt: addUtcDays(startOfUtcDay(now), -RULE_THRESHOLDS.agedBillingDays) },
+        },
+      }),
     ]);
 
     // A planned call counts as completed only when that specific doctor was visited today.
@@ -223,8 +252,10 @@ async function getMrDashboard(req: AuthedRequest) {
     }
     let breachedCreditChemists = 0;
     let warningCreditChemists = 0;
+    let totalOutstanding = 0;
     for (const chemist of territoryChemists) {
       const outstanding = outstandingBalance(orderedByChemist.get(chemist.id) ?? 0, collectedByChemist.get(chemist.id) ?? 0);
+      totalOutstanding += outstanding;
       const status = creditStatus({
         creditLimit: chemist.creditLimit !== null ? Number(chemist.creditLimit) : null,
         outstanding,
@@ -251,7 +282,22 @@ async function getMrDashboard(req: AuthedRequest) {
       monthElapsedFraction: monthElapsedFraction(now),
       breachedCreditChemists,
       warningCreditChemists,
+      agedInvoices: agedInvoicesCount,
     });
+
+    // Persist critical/error alerts so admins can see a cross-MR feed with read state.
+    const persistWorthy = notifications.filter((n) => n.severity === "CRITICAL" || n.severity === "ERROR");
+    if (persistWorthy.length > 0) {
+      await Promise.all(
+        persistWorthy.map((n) =>
+          db.notification.upsert({
+            where: { employeeId_code: { employeeId: employee.id, code: n.code } },
+            create: { employeeId: employee.id, code: n.code, severity: n.severity, message: n.message, action: n.action },
+            update: { severity: n.severity, message: n.message, action: n.action, read: false },
+          })
+        )
+      );
+    }
 
     return ok({
       todaysVisits: {
@@ -267,9 +313,20 @@ async function getMrDashboard(req: AuthedRequest) {
         total: visitsToday.length,
         planned: completedPlanned.length,
         unplanned: visitsToday.length - completedPlanned.length,
+        list: visitsToday.map((v) => ({
+          id: v.id,
+          name: v.doctor?.fullName ?? v.chemist?.name ?? "Unknown",
+          createdAt: v.createdAt.toISOString(),
+        })),
       },
       salesToday: { amount: salesToday },
-      collection: { amount: Number(collectionsToday._sum.amount ?? 0) },
+      collection: {
+        amount: Number(collectionsToday._sum.amount ?? 0),
+        today: Number(collectionsToday._sum.amount ?? 0),
+        week: Number(collectionsWeek._sum.amount ?? 0),
+        month: Number(collectionsMonth._sum.amount ?? 0),
+        outstanding: round2(totalOutstanding),
+      },
       samplesDistributed: { units: samplesDistributed },
       doctorCoverage: {
         visited: doctorsVisitedThisMonth.length,

@@ -38,6 +38,7 @@ const NAV_ITEMS = [
   { href: "/asm", label: "ASM Dashboard", icon: LayoutGrid, roles: ["ASM", "ADMIN"] },
   { href: "/mr", label: "MR Dashboard", icon: LayoutGrid, roles: ["MR", "ADMIN"] },
   { href: "/mr/calls", label: "My Calls", icon: ClipboardCheck, roles: ["MR", "ADMIN"] },
+  { href: "/mr/reports", label: "My Call Reports", icon: BarChart3, roles: ["MR", "ADMIN"] },
   { href: "/mr/leads", label: "My Leads", icon: Target, roles: ["MR", "ADMIN"] },
   { href: "/mr/attendance", label: "My Attendance", icon: Clock, roles: ["MR", "ADMIN"] },
   { href: "/collections", label: "Credit & Collections", icon: Wallet, roles: ["MR", "ASM", "ADMIN", "FINANCE"] },

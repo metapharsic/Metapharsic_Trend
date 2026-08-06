@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { apiClient } from "@/lib/api-client";
+import { NotificationFeed } from "@/components/admin/notification-feed";
 
 interface AdminKpis {
   totalEmployees: number;
@@ -75,6 +76,8 @@ export default function AdminDashboardPage() {
         <h1 className="text-2xl font-display font-bold text-gray-900">Admin Dashboard</h1>
         <p className="text-sm text-gray-500 mt-1">Workforce, coverage, commercial, and compliance KPIs.</p>
       </div>
+
+      <NotificationFeed />
 
       <section className="space-y-3">
         <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Workforce</h2>
