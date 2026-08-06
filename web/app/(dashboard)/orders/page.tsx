@@ -108,10 +108,21 @@ export default function OrdersDashboard() {
   const [history, setHistory] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
 
-  const load = () => {
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersTotal, setOrdersTotal] = useState(0);
+  const [ordersTotalPages, setOrdersTotalPages] = useState(1);
+  const [statusCounts, setStatusCounts] = useState({ PENDING: 0, CONFIRMED: 0, SHIPPED: 0, DELIVERED: 0, CANCELLED: 0 });
+
+  const load = (page = ordersPage) => {
+    setLoading(true);
     apiClient
-      .get("/api/orders/secondary")
-      .then((res) => setOrders(res.data.data.orders))
+      .get("/api/orders/secondary", { params: { page, limit: 20 } })
+      .then((res) => {
+        setOrders(res.data.data.orders);
+        setOrdersTotal(res.data.data.pagination.total);
+        setOrdersTotalPages(res.data.data.pagination.totalPages);
+        setStatusCounts(res.data.data.statusCounts);
+      })
       .catch((err) => console.error("Failed to load orders:", err))
       .finally(() => setLoading(false));
   };
@@ -136,8 +147,12 @@ export default function OrdersDashboard() {
 
   useEffect(() => {
     setRole(decodeRole());
-    load();
   }, []);
+
+  useEffect(() => {
+    load(ordersPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordersPage]);
 
   // MR is the first point of contact for a chemist — only they book orders.
   // ASM/ADMIN/MD oversee and advance fulfilment status but don't originate sales.
@@ -199,12 +214,7 @@ export default function OrdersDashboard() {
     );
   }
 
-  const counts = {
-    PENDING: orders.filter((o) => o.status === "PENDING").length,
-    CONFIRMED: orders.filter((o) => o.status === "CONFIRMED").length,
-    SHIPPED: orders.filter((o) => o.status === "SHIPPED").length,
-    DELIVERED: orders.filter((o) => o.status === "DELIVERED").length,
-  };
+  const counts = statusCounts;
 
   return (
     <div className="space-y-6">
@@ -243,7 +253,7 @@ export default function OrdersDashboard() {
           }`}
         >
           <ShoppingCart size={15} />
-          Sales Orders ({orders.length})
+          Sales Orders ({ordersTotal})
         </button>
         <button
           onClick={() => {
@@ -363,6 +373,28 @@ export default function OrdersDashboard() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {activeTab === "orders" && ordersTotalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 pt-2">
+          <button
+            disabled={ordersPage <= 1}
+            onClick={() => setOrdersPage((p) => p - 1)}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <span className="text-xs font-semibold text-slate-500 px-2 py-1.5">
+            Page {ordersPage} of {ordersTotalPages} · {ordersTotal} total
+          </span>
+          <button
+            disabled={ordersPage >= ordersTotalPages}
+            onClick={() => setOrdersPage((p) => p + 1)}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 disabled:opacity-40"
+          >
+            Next
+          </button>
         </div>
       )}
 

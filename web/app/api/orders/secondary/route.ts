@@ -19,23 +19,21 @@ async function getOrders(req: AuthedRequest) {
 
     const isManager = req.user.role === Role.ASM || req.user.role === Role.ADMIN || req.user.role === Role.MD;
 
-    let chemistFilter: Record<string, unknown> | undefined;
+    let employeeFilter: string | undefined;
     if (!isManager) {
-      const employee = await db.employee.findUnique({
-        where: { userId: req.user.sub },
-        include: { territories: true },
-      });
+      // "My Sales" — an MR sees their own bookings, same scope as their
+      // invoices and ledger history (see /api/invoices, /api/orders/history).
+      const employee = await db.employee.findUnique({ where: { userId: req.user.sub } });
       if (!employee) return unauthorized("Employee record not found");
-      const territoryIds = employee.territories.map((t) => t.id);
-      chemistFilter = { territoryId: { in: territoryIds } };
+      employeeFilter = employee.id;
     }
 
     const where = {
       ...(status ? { status: status as any } : {}),
-      ...(chemistFilter ? { chemist: chemistFilter } : {}),
+      ...(employeeFilter ? { employeeId: employeeFilter } : {}),
     };
 
-    const [orders, total] = await Promise.all([
+    const [orders, total, statusGroups] = await Promise.all([
       db.order.findMany({
         where,
         skip: (page - 1) * limit,
@@ -49,7 +47,18 @@ async function getOrders(req: AuthedRequest) {
         },
       }),
       db.order.count({ where }),
+      // Status tallies must reflect the full scope, not just the current page.
+      db.order.groupBy({
+        by: ["status"],
+        where: employeeFilter ? { employeeId: employeeFilter } : {},
+        _count: { _all: true },
+      }),
     ]);
+
+    const statusCounts = { PENDING: 0, CONFIRMED: 0, SHIPPED: 0, DELIVERED: 0, CANCELLED: 0 };
+    for (const g of statusGroups) {
+      statusCounts[g.status as keyof typeof statusCounts] = g._count._all;
+    }
 
     // Attach each order's chemist's current outstanding balance so the list
     // doubles as a running "what's left to collect" view, not just a log.
@@ -82,7 +91,7 @@ async function getOrders(req: AuthedRequest) {
         : null,
     }));
 
-    return ok({ orders: ordersWithBalance, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+    return ok({ orders: ordersWithBalance, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }, statusCounts });
   } catch (err) {
     console.error("[GET /api/orders/secondary]", err);
     return apiError("INTERNAL_SERVER_ERROR", "Failed to fetch orders", 500);
