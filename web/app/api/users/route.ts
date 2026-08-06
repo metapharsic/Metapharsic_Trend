@@ -13,6 +13,7 @@ const CreateUserSchema = z.object({
   lastName: z.string().min(1),
   phone: z.string().min(10),
   managerId: z.string().uuid().optional(),
+  territoryIds: z.array(z.string().uuid()).optional(),
 });
 
 async function getUsers(req: AuthedRequest) {
@@ -67,7 +68,7 @@ async function createUser(req: AuthedRequest) {
     const parsed = CreateUserSchema.safeParse(body);
     if (!parsed.success) return badRequest("Validation error", parsed.error.flatten());
 
-    const { email, password, role, firstName, lastName, phone, managerId } = parsed.data;
+    const { email, password, role, firstName, lastName, phone, managerId, territoryIds } = parsed.data;
 
     const passwordHash = await bcrypt.hash(password, 12);
 
@@ -80,13 +81,21 @@ async function createUser(req: AuthedRequest) {
         ...(role !== Role.DOCTOR && role !== Role.DISTRIBUTOR
           ? {
               employee: {
-                create: { firstName, lastName, phone, ...(managerId ? { managerId } : {}) },
+                create: {
+                  firstName,
+                  lastName,
+                  phone,
+                  ...(managerId ? { managerId } : {}),
+                  ...(territoryIds && territoryIds.length > 0
+                    ? { territories: { connect: territoryIds.map((id) => ({ id })) } }
+                    : {}),
+                },
               },
             }
           : {}),
       },
       include: {
-        employee: { select: { id: true, firstName: true, lastName: true, phone: true } },
+        employee: { select: { id: true, firstName: true, lastName: true, phone: true, territories: { select: { id: true, name: true } } } },
       },
     });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+
 import {
   Users,
   UserPlus,
@@ -410,16 +411,40 @@ function UserModal({ user, onClose, onSaved }: { user: UserRecord | null; onClos
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [territories, setTerritories] = useState<{ id: string; name: string }[]>([]);
+  const [territoryIds, setTerritoryIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    apiClient
+      .get("/api/manager/territories")
+      .then((res) => setTerritories(res.data.data.territories ?? []))
+      .catch((err) => console.error("Failed to load territories:", err));
+
+    if (user) {
+      apiClient
+        .get(`/api/users/${user.id}`)
+        .then((res) => {
+          const ids = (res.data.data.user.employee?.territories ?? []).map((t: { id: string }) => t.id);
+          setTerritoryIds(ids);
+        })
+        .catch((err) => console.error("Failed to load user territories:", err));
+    }
+  }, [user]);
+
+  const toggleTerritory = (id: string) => {
+    setTerritoryIds((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError("");
     try {
+      const payload = { ...form, territoryIds };
       if (user) {
-        await apiClient.put(`/api/users/${user.id}`, form);
+        await apiClient.put(`/api/users/${user.id}`, payload);
       } else {
-        await apiClient.post("/api/users", form);
+        await apiClient.post("/api/users", payload);
       }
       onSaved();
     } catch (err: any) {
@@ -457,6 +482,33 @@ function UserModal({ user, onClose, onSaved }: { user: UserRecord | null; onClos
             <p className="text-xs text-slate-500 mt-1">{ROLE_META[form.role]?.description}</p>
           </div>
           <FormField label={user ? "New Password (leave blank to keep)" : "Password"} value={form.password} onChange={(v) => setForm({ ...form, password: v })} type="password" required={!user} />
+          {form.role === "MR" && (
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">
+                Territories <span className="font-normal normal-case text-slate-400">— required for booking orders (distributor lookup depends on this)</span>
+              </label>
+              <div className="border border-slate-200 rounded-xl p-3 space-y-1.5 max-h-40 overflow-y-auto bg-slate-50">
+                {territories.length === 0 ? (
+                  <p className="text-xs text-slate-400">No territories exist yet.</p>
+                ) : (
+                  territories.map((t) => (
+                    <label key={t.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={territoryIds.includes(t.id)}
+                        onChange={() => toggleTerritory(t.id)}
+                        className="rounded border-slate-300"
+                      />
+                      {t.name}
+                    </label>
+                  ))
+                )}
+              </div>
+              {territoryIds.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">No territory selected — this MR won't see any distributor when booking orders.</p>
+              )}
+            </div>
+          )}
           {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors">Cancel</button>

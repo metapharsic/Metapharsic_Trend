@@ -13,6 +13,7 @@ const UpdateUserSchema = z.object({
   isActive: z.boolean().optional(),
   password: z.string().min(6).optional(),
   managerId: z.string().uuid().nullable().optional(),
+  territoryIds: z.array(z.string().uuid()).optional(),
 });
 
 async function getUser(req: AuthedRequest, context: { params: Record<string, string | string[] | undefined> }) {
@@ -70,14 +71,16 @@ async function updateUser(req: AuthedRequest, context: { params: Record<string, 
     const parsed = UpdateUserSchema.safeParse(body);
     if (!parsed.success) return badRequest("Validation error", parsed.error.flatten());
 
-    const { firstName, lastName, phone, role, isActive, password, managerId } = parsed.data;
+    const { firstName, lastName, phone, role, isActive, password, managerId, territoryIds } = parsed.data;
 
     const userUpdates: Record<string, unknown> = {};
     if (role !== undefined && (req.user.role === Role.ADMIN)) userUpdates.role = role;
     if (isActive !== undefined && req.user.role === Role.ADMIN) userUpdates.isActive = isActive;
     if (password) userUpdates.passwordHash = await bcrypt.hash(password, 12);
 
-    const hasEmployeeUpdate = firstName || lastName || phone || managerId !== undefined;
+    // territoryIds is only meaningful for ADMIN — same gate as role/isActive above.
+    const canSetTerritories = territoryIds !== undefined && req.user.role === Role.ADMIN;
+    const hasEmployeeUpdate = firstName || lastName || phone || managerId !== undefined || canSetTerritories;
 
     const user = await db.user.update({
       where: { id },
@@ -91,13 +94,14 @@ async function updateUser(req: AuthedRequest, context: { params: Record<string, 
                   ...(lastName ? { lastName } : {}),
                   ...(phone ? { phone } : {}),
                   ...(managerId !== undefined ? { managerId } : {}),
+                  ...(canSetTerritories ? { territories: { set: territoryIds.map((tid) => ({ id: tid })) } } : {}),
                 },
               },
             }
           : {}),
       },
       include: {
-        employee: { select: { id: true, firstName: true, lastName: true, phone: true } },
+        employee: { select: { id: true, firstName: true, lastName: true, phone: true, territories: { select: { id: true, name: true } } } },
       },
     });
 
