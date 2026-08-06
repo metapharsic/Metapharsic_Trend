@@ -41,16 +41,32 @@ export default function MyLeadsPage() {
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
+  const [reps, setReps] = useState<{ id: string; employeeId: string; firstName: string; lastName: string }[]>([]);
+  const [selectedRep, setSelectedRep] = useState<string>("");
+
+  useEffect(() => {
+    apiClient
+      .get("/api/manager/mrs")
+      .then((res) => setReps(res.data.data?.mrs ?? []))
+      .catch(() => setReps([]));
+  }, []);
+
   const load = () => {
     setLoading(true);
     apiClient
-      .get("/api/mr/leads", { params: { limit: 100, ...(statusFilter ? { status: statusFilter } : {}) } })
+      .get("/api/mr/leads", {
+        params: {
+          limit: 100,
+          ...(statusFilter ? { status: statusFilter } : {}),
+          ...(selectedRep ? { employeeId: selectedRep } : {}),
+        },
+      })
       .then((res) => setLeads(res.data.data.leads))
       .catch((err) => console.error("Failed to load leads:", err))
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [statusFilter]);
+  useEffect(load, [statusFilter, selectedRep]);
 
   const openEdit = (l: Lead) => {
     setEditing(l);
@@ -96,11 +112,25 @@ export default function MyLeadsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100 bg-gradient-to-r from-emerald-50 to-white">
-        <h1 className="text-2xl font-display font-bold text-slate-900 flex items-center gap-2">
-          <Target size={22} /> My Leads
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">Leads captured from your calls — track and follow up.</p>
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100 bg-gradient-to-r from-emerald-50 to-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-display font-bold text-slate-900 flex items-center gap-2">
+            <Target size={22} /> My Leads
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">Leads captured from your calls — track and follow up.</p>
+        </div>
+        {reps.length > 0 && (
+          <select
+            value={selectedRep}
+            onChange={(e) => setSelectedRep(e.target.value)}
+            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none"
+          >
+            <option value="">My own leads</option>
+            {reps.map((r) => (
+              <option key={r.employeeId} value={r.employeeId}>{r.firstName} {r.lastName}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2">
