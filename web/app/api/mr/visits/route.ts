@@ -53,6 +53,7 @@ async function getVisits(req: AuthedRequest) {
           doctor: { select: { id: true, fullName: true, clinicAddress: true, territory: { select: { id: true, name: true } } } },
           chemist: { select: { id: true, name: true, address: true, territory: { select: { id: true, name: true } } } },
           lead: true,
+          samples: { include: { product: { select: { id: true, name: true } } } },
         },
       }),
       db.visit.count({ where }),

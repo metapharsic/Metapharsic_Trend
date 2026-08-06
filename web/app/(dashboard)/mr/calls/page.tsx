@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Stethoscope, Store, Image as ImageIcon, Gauge, Edit2, ChevronLeft, ChevronRight, X, Check, CalendarDays, Target, Boxes, MapPin } from "lucide-react";
+import { Plus, Stethoscope, Store, Image as ImageIcon, Gauge, Edit2, Trash2, ChevronLeft, ChevronRight, X, Check, CalendarDays, Target, Boxes, MapPin, Clock } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 
 interface Territory {
@@ -19,9 +19,17 @@ interface Visit {
   cqsScore: number | null;
   boxesPlaced: number | null;
   photoUrl: string | null;
+  latitude: number;
+  longitude: number;
+  locationUnavailable: boolean;
+  startedAt: string | null;
+  startLatitude: number | null;
+  startLongitude: number | null;
+  endedAt: string | null;
   doctor: { id: string; fullName: string; clinicAddress: string | null; territory?: Territory } | null;
   chemist: { id: string; name: string; address: string | null; territory?: Territory } | null;
-  lead: { id: string; status: "NEW" | "IN_PROGRESS" | "CONVERTED" | "LOST" } | null;
+  lead: { id: string; status: "NEW" | "IN_PROGRESS" | "CONVERTED" | "LOST"; details: string | null } | null;
+  samples: { id: string; quantity: number; product: { id: string; name: string } }[];
 }
 
 interface AreaCount {
@@ -62,6 +70,8 @@ export default function CallHistoryPage() {
   const [editBoxesPlaced, setEditBoxesPlaced] = useState("");
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -98,6 +108,31 @@ export default function CallHistoryPage() {
     setEditDuration(v.durationMinutes !== null ? String(v.durationMinutes) : "");
     setEditBoxesPlaced(v.boxesPlaced !== null ? String(v.boxesPlaced) : "");
     setEditError(null);
+    setConfirmDelete(false);
+  };
+
+  const closeEdit = () => {
+    setEditing(null);
+    setConfirmDelete(false);
+  };
+
+  const deleteVisit = async () => {
+    if (!editing) return;
+    setDeleting(true);
+    setEditError(null);
+    try {
+      await apiClient.delete(`/api/mr/visits/${editing.id}`);
+      setVisits((prev) => prev.filter((v) => v.id !== editing.id));
+      setEditing(null);
+      setConfirmDelete(false);
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
+        "Failed to delete call.";
+      setEditError(message);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const saveEdit = async () => {
@@ -310,7 +345,11 @@ export default function CallHistoryPage() {
             const target = v.doctor ?? v.chemist;
             const isDoctor = !!v.doctor;
             return (
-              <div key={v.id} className="px-6 py-4 flex items-start gap-4 hover:bg-slate-50 transition-colors">
+              <div
+                key={v.id}
+                onClick={() => openEdit(v)}
+                className="px-6 py-4 flex items-start gap-4 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDoctor ? "bg-emerald-100 text-emerald-600" : "bg-blue-100 text-blue-600"}`}>
                   {isDoctor ? <Stethoscope size={18} /> : <Store size={18} />}
                 </div>
@@ -319,7 +358,7 @@ export default function CallHistoryPage() {
                     <p className="font-bold text-slate-900 text-sm">{isDoctor ? v.doctor!.fullName : v.chemist!.name}</p>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <p className="text-xs text-slate-400">{new Date(v.createdAt).toLocaleString("en-IN")}</p>
-                      <button onClick={() => openEdit(v)} className="text-slate-400 hover:text-emerald-600 p-1 -m-1" title="Edit call">
+                      <button onClick={(e) => { e.stopPropagation(); openEdit(v); }} className="text-slate-400 hover:text-emerald-600 p-1 -m-1" title="View / edit call">
                         <Edit2 size={13} />
                       </button>
                     </div>
@@ -378,66 +417,159 @@ export default function CallHistoryPage() {
         </div>
       )}
 
-      {/* ── Edit modal ── */}
+      {/* ── Call detail / edit modal ── */}
       {editing && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-5 w-full max-w-md space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="font-bold text-slate-900 text-sm">Edit Call</p>
-              <button onClick={() => setEditing(null)} className="text-slate-400 hover:text-red-500 p-1 -m-1">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={closeEdit}>
+          <div
+            className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 pt-5">
+              <p className="font-bold text-slate-900 text-sm">Call Details</p>
+              <button onClick={closeEdit} className="text-slate-400 hover:text-red-500 p-1 -m-1">
                 <X size={18} />
               </button>
             </div>
-            <p className="text-xs text-slate-400">GPS location and photo are locked for audit — only notes are editable.</p>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Purpose *</label>
-              <input
-                value={editPurpose}
-                onChange={(e) => setEditPurpose(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
-              />
+
+            <div className="px-5 pt-3 space-y-3">
+              {/* ── Read-only info ── */}
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${editing.doctor ? "bg-emerald-100 text-emerald-600" : "bg-blue-100 text-blue-600"}`}>
+                  {editing.doctor ? <Stethoscope size={18} /> : <Store size={18} />}
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900 text-sm">{editing.doctor?.fullName ?? editing.chemist?.name}</p>
+                  <p className="text-xs text-slate-500">{editing.doctor?.clinicAddress ?? editing.chemist?.address ?? "—"}</p>
+                </div>
+              </div>
+
+              {(editing.startedAt || editing.endedAt) && (
+                <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 rounded-xl p-3">
+                  <div>
+                    <p className="font-bold text-slate-500 uppercase tracking-wider text-[10px] flex items-center gap-1"><Clock size={10} /> Started</p>
+                    <p className="text-slate-700 mt-0.5">{editing.startedAt ? new Date(editing.startedAt).toLocaleString("en-IN") : "—"}</p>
+                    {editing.startLatitude !== null && editing.startLongitude !== null && (
+                      <p className="text-slate-400 mt-0.5">{editing.startLatitude.toFixed(5)}, {editing.startLongitude.toFixed(5)}</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-500 uppercase tracking-wider text-[10px] flex items-center gap-1"><Clock size={10} /> Ended</p>
+                    <p className="text-slate-700 mt-0.5">{editing.endedAt ? new Date(editing.endedAt).toLocaleString("en-IN") : "—"}</p>
+                    {!editing.locationUnavailable && (
+                      <p className="text-slate-400 mt-0.5">{editing.latitude.toFixed(5)}, {editing.longitude.toFixed(5)}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {editing.samples.length > 0 && (
+                <div className="text-xs">
+                  <p className="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1">Samples Given</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {editing.samples.map((s) => (
+                      <span key={s.id} className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold">{s.product.name} × {s.quantity}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {editing.lead && (
+                <div className="text-xs">
+                  <p className="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1">Lead</p>
+                  <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 font-semibold">{editing.lead.status.replace("_", " ")}</span>
+                  {editing.lead.details && <p className="text-slate-500 mt-1">{editing.lead.details}</p>}
+                </div>
+              )}
+
+              {editing.photoUrl && (
+                <div>
+                  <p className="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1">Photo</p>
+                  <img src={editing.photoUrl} alt="Visit proof" className="rounded-xl border border-slate-200 w-full max-h-56 object-cover" />
+                </div>
+              )}
+
+              <p className="text-xs text-slate-400 pt-1 border-t border-slate-100">GPS location and photo are locked for audit — fields below are editable.</p>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Duration (minutes)</label>
-              <input
-                type="number"
-                inputMode="numeric"
-                value={editDuration}
-                onChange={(e) => setEditDuration(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Boxes Placed</label>
-              <input
-                type="number"
-                inputMode="numeric"
-                value={editBoxesPlaced}
-                onChange={(e) => setEditBoxesPlaced(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Notes / Feedback</label>
-              <textarea
-                value={editFeedback}
-                onChange={(e) => setEditFeedback(e.target.value)}
-                rows={3}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
-              />
-            </div>
-            {editError && <p className="text-sm text-red-600">{editError}</p>}
-            <div className="flex justify-end gap-2 pt-1">
-              <button onClick={() => setEditing(null)} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50">
-                Cancel
-              </button>
-              <button
-                onClick={saveEdit}
-                disabled={saving}
-                className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5"
-              >
-                <Check size={14} /> {saving ? "Saving..." : "Save"}
-              </button>
+
+            <div className="px-5 pb-5 pt-1 space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Purpose *</label>
+                <input
+                  value={editPurpose}
+                  onChange={(e) => setEditPurpose(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Duration (minutes)</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={editDuration}
+                  onChange={(e) => setEditDuration(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Boxes Placed</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={editBoxesPlaced}
+                  onChange={(e) => setEditBoxesPlaced(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Notes / Feedback</label>
+                <textarea
+                  value={editFeedback}
+                  onChange={(e) => setEditFeedback(e.target.value)}
+                  rows={3}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
+                />
+              </div>
+
+              {editError && <p className="text-sm text-red-600">{editError}</p>}
+
+              {confirmDelete ? (
+                <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 space-y-2">
+                  <p className="text-xs font-semibold text-rose-700">Delete this call permanently? Any samples given will be returned to your stock.</p>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-white">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={deleteVisit}
+                      disabled={deleting}
+                      className="bg-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-rose-700 disabled:opacity-50"
+                    >
+                      {deleting ? "Deleting..." : "Yes, delete"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                  >
+                    <Trash2 size={14} /> Delete
+                  </button>
+                  <div className="flex gap-2">
+                    <button onClick={closeEdit} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveEdit}
+                      disabled={saving}
+                      className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      <Check size={14} /> {saving ? "Saving..." : "Save"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

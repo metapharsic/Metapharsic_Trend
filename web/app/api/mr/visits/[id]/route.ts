@@ -60,5 +60,37 @@ async function updateHandler(
   }
 }
 
+async function deleteHandler(
+  req: AuthedRequest,
+  { params }: { params: Record<string, string | string[] | undefined> }
+) {
+  try {
+    const id = String(params.id ?? "");
+    const visit = await db.visit.findUnique({
+      where: { id },
+      include: { employee: { select: { userId: true } }, samples: true },
+    });
+    if (!visit) return notFound("Visit not found");
+    if (visit.employee?.userId !== req.user.sub) return forbidden();
+
+    await db.$transaction(async (tx) => {
+      // Restore sample stock consumed by this visit before removing it.
+      for (const sample of visit.samples) {
+        await tx.sampleInventory.updateMany({
+          where: { employeeId: visit.employeeId, productId: sample.productId },
+          data: { quantity: { increment: sample.quantity } },
+        });
+      }
+      await tx.visit.delete({ where: { id } });
+    });
+
+    return ok({ success: true });
+  } catch (err) {
+    console.error("[DELETE /api/mr/visits/[id]]", err);
+    return apiError("INTERNAL_SERVER_ERROR", "Failed to delete visit", 500);
+  }
+}
+
 export const GET = withAuth(handler, "MR");
 export const PUT = withAuth(updateHandler, "MR");
+export const DELETE = withAuth(deleteHandler, "MR");
