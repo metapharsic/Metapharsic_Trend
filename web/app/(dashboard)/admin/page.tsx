@@ -24,6 +24,8 @@ interface AdminKpis {
   missedCalls: { count: number };
   newDoctorsAdded: { count: number };
   stockStatus: { lowStock: number; total: number };
+  creditBreaches: { count: number };
+  agedBilling: { count: number };
 }
 
 function formatCurrency(amount: number): string {
@@ -143,6 +145,8 @@ export default function AdminDashboardPage() {
             sub={`Anomalous visits ${kpis.gpsViolations.anomalousVisits} · Mocked GPS ${kpis.gpsViolations.mockedLocations}`}
           />
           <KpiCard label="Missed Calls" value={kpis.missedCalls.count} sub="Planned but not visited" />
+          <KpiCard label="Credit Breaches" value={kpis.creditBreaches.count} sub="Chemists over their limit" />
+          <KpiCard label="Aged Billing" value={kpis.agedBilling.count} sub="Unpaid invoices over 30 days" />
         </div>
       </section>
 

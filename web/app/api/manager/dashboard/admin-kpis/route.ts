@@ -2,7 +2,9 @@ import { db } from "@/lib/db";
 import { Role, TourPlanStatus, ExpenseStatus, ClaimStatus } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, apiError } from "@/lib/api-response";
-import { startOfUtcDay, startOfUtcMonth } from "@/lib/date";
+import { startOfUtcDay, startOfUtcMonth, addUtcDays } from "@/lib/date";
+import { outstandingBalance, creditStatus } from "@/lib/credit";
+import { RULE_THRESHOLDS } from "@/lib/notifications";
 
 
 const LOW_STOCK_THRESHOLD = 50;
@@ -39,6 +41,8 @@ async function getAdminKpis(req: AuthedRequest) {
       approvedTourPlanDaysDue,
       newDoctorsThisMonth,
       products,
+      chemistsForCredit,
+      agedInvoicesCount,
     ] = await Promise.all([
       db.employee.count(),
       db.employee.count({ where: { user: { role: Role.MR, isActive: true } } }),
@@ -108,6 +112,20 @@ async function getAdminKpis(req: AuthedRequest) {
       }),
       db.doctor.count({ where: { createdAt: { gte: monthStart } } }),
       db.product.findMany({ select: { stockQty: true } }),
+      db.chemist.findMany({
+        select: {
+          id: true,
+          creditLimit: true,
+          orders: {
+            where: { status: { not: "CANCELLED" } },
+            select: { items: { select: { price: true, quantity: true } } },
+          },
+          collections: { select: { amount: true } },
+        },
+      }),
+      db.invoice.count({
+        where: { paid: false, createdAt: { lt: addUtcDays(today, -RULE_THRESHOLDS.agedBillingDays) } },
+      }),
     ]);
 
     // Top/low performers by visit count this month
@@ -153,6 +171,21 @@ async function getAdminKpis(req: AuthedRequest) {
 
     const lowStockProducts = products.filter((p) => p.stockQty < LOW_STOCK_THRESHOLD).length;
 
+    let breachedCreditChemists = 0;
+    for (const chemist of chemistsForCredit) {
+      const ordered = chemist.orders.reduce(
+        (sum, o) => sum + o.items.reduce((s, i) => s + Number(i.price) * i.quantity, 0),
+        0
+      );
+      const collected = chemist.collections.reduce((sum, c) => sum + Number(c.amount), 0);
+      const outstanding = outstandingBalance(ordered, collected);
+      const status = creditStatus({
+        creditLimit: chemist.creditLimit !== null ? Number(chemist.creditLimit) : null,
+        outstanding,
+      });
+      if (status === "BREACHED") breachedCreditChemists++;
+    }
+
     return ok({
       totalEmployees,
       activeMRs,
@@ -178,6 +211,8 @@ async function getAdminKpis(req: AuthedRequest) {
       missedCalls: { count: missedCalls },
       newDoctorsAdded: { count: newDoctorsThisMonth },
       stockStatus: { lowStock: lowStockProducts, total: products.length },
+      creditBreaches: { count: breachedCreditChemists },
+      agedBilling: { count: agedInvoicesCount },
     });
   } catch (err) {
     console.error("[GET /api/manager/dashboard/admin-kpis]", err);
