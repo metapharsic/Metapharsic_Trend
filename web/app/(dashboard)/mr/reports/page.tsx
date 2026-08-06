@@ -40,14 +40,22 @@ export default function MrReportsPage() {
   const [period, setPeriod] = useState<Period>("daily");
   const [report, setReport] = useState<CallReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reps, setReps] = useState<{ id: string; employeeId: string; firstName: string; lastName: string }[]>([]);
+  const [selectedRep, setSelectedRep] = useState<string>("");
+
+  useEffect(() => {
+    apiClient.get("/api/manager/mrs")
+      .then((res) => setReps(res.data.data?.mrs ?? []))
+      .catch(() => setReps([]));
+  }, []);
 
   const fetchReport = useCallback(() => {
     setLoading(true);
-    apiClient.get("/api/mr/reports/calls", { params: { period } })
+    apiClient.get("/api/mr/reports/calls", { params: { period, ...(selectedRep ? { employeeId: selectedRep } : {}) } })
       .then((res) => setReport(res.data.data))
       .catch(() => setReport(null))
       .finally(() => setLoading(false));
-  }, [period]);
+  }, [period, selectedRep]);
 
   useEffect(() => { fetchReport(); }, [fetchReport]);
 
@@ -58,10 +66,24 @@ export default function MrReportsPage() {
           <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
             <BarChart3 size={22} className="text-indigo-300" />
           </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">My Call Reports</h1>
+          <div className="flex-1">
+            <h1 className="text-xl font-bold tracking-tight">
+              {selectedRep && report ? `${report.employee.name}'s Call Reports` : "My Call Reports"}
+            </h1>
             <p className="text-slate-400 text-sm mt-0.5">Daily, weekly, or monthly call activity — on request</p>
           </div>
+          {reps.length > 0 && (
+            <select
+              value={selectedRep}
+              onChange={(e) => setSelectedRep(e.target.value)}
+              className="bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+            >
+              <option value="">My own report</option>
+              {reps.map((r) => (
+                <option key={r.employeeId} value={r.employeeId}>{r.firstName} {r.lastName}</option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="flex gap-2 mt-5">
           {PERIODS.map((p) => (
