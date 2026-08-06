@@ -28,8 +28,8 @@ interface Order {
   id: string;
   status: "PENDING" | "CONFIRMED" | "SHIPPED" | "DELIVERED" | "CANCELLED";
   createdAt: string;
-  chemist: { id: string; name: string };
-  distributor: { id: string; name: string };
+  chemist: { id: string; name: string } | null;
+  distributor: { id: string; name: string } | null;
   items: OrderItem[];
   invoice: { invoiceNo: string; amount: string; paid: boolean } | null;
   chemistOutstanding: number | null;
@@ -314,8 +314,8 @@ export default function OrdersDashboard() {
                     <p className="text-xs text-slate-500">{new Date(order.createdAt).toLocaleDateString()}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="font-semibold text-slate-800">{order.distributor.name}</p>
-                    <p className="text-xs text-slate-500">To: {order.chemist.name}</p>
+                    <p className="font-semibold text-slate-800">{order.distributor?.name ?? "—"}</p>
+                    <p className="text-xs text-slate-500">To: {order.chemist?.name ?? "—"}</p>
                   </td>
                   <td className="px-6 py-4">
                     {order.invoice ? (
