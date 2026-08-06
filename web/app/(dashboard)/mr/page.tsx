@@ -146,14 +146,24 @@ export default function MrDashboardPage() {
     );
   };
 
-  const handleCheckOut = async () => {
+  const handleCheckOut = () => {
+    setGeoError(null);
+    if (!navigator.geolocation) { setGeoError("Geolocation is not supported by your browser."); return; }
     setCheckingOut(true);
-    try {
-      await apiClient.post("/api/mr/attendance/check-out");
-      fetchData();
-    } catch (e: any) {
-      setGeoError(e?.response?.data?.error?.message ?? "Check-out failed.");
-    } finally { setCheckingOut(false); }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          await apiClient.post("/api/mr/attendance/check-out", {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+          fetchData();
+        } catch (e: any) {
+          setGeoError(e?.response?.data?.error?.message ?? "Check-out failed.");
+        } finally { setCheckingOut(false); }
+      },
+      (err) => { setGeoError(`GPS error: ${err.message}`); setCheckingOut(false); }
+    );
   };
 
   // ─── Loading ─────────────────────────────────────────────────────────────────

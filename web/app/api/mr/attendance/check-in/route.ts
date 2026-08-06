@@ -22,7 +22,7 @@ async function handler(req: AuthedRequest) {
     const employee = await db.employee.findUnique({ where: { userId } });
     if (!employee) return unauthorized("Employee record not found");
 
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     const parsed = CheckInBodySchema.safeParse(body);
     if (!parsed.success) {
       return badRequest("Validation error", parsed.error.flatten());
