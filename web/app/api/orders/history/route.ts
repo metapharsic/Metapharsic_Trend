@@ -23,16 +23,19 @@ async function getLedgerHistory(req: AuthedRequest) {
           items: true,
         },
         orderBy: { createdAt: "desc" },
+        take: 500,
       }),
       db.invoice.findMany({
         where: employeeId ? { order: { employeeId } } : {},
         include: { order: { include: { chemist: { select: { name: true } } } } },
         orderBy: { createdAt: "desc" },
+        take: 500,
       }),
       db.collection.findMany({
         where: employeeId ? { employeeId } : {},
         include: { chemist: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
+        take: 500,
       }),
     ]);
 

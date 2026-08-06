@@ -30,6 +30,7 @@ async function getInvoices(req: AuthedRequest) {
         },
       },
       orderBy: { createdAt: "desc" },
+      take: 500,
     });
 
     return ok({ invoices });

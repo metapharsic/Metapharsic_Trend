@@ -15,14 +15,17 @@ async function getCollections(req: AuthedRequest) {
     const employee = await db.employee.findUnique({ where: { userId: req.user.sub } });
     if (!employee) return unauthorized("Employee record not found");
 
-    const collections = await db.collection.findMany({
-      where: { employeeId: employee.id },
-      include: { chemist: { select: { id: true, name: true } } },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
+    const [collections, total] = await Promise.all([
+      db.collection.findMany({
+        where: { employeeId: employee.id },
+        include: { chemist: { select: { id: true, name: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      }),
+      db.collection.count({ where: { employeeId: employee.id } }),
+    ]);
 
-    return ok({ collections });
+    return ok({ collections, total });
   } catch (err) {
     console.error("[GET /api/mr/collections]", err);
     return apiError("INTERNAL_SERVER_ERROR", "Failed to fetch collections", 500);

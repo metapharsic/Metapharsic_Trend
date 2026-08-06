@@ -38,7 +38,7 @@ async function getCreditSummary(req: AuthedRequest) {
         _sum: { amount: true },
       }),
       db.collection.findMany({
-        where: { chemist: { territoryId: { in: territoryIds } } },
+        where: { employeeId: employee.id },
         include: { chemist: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
         take: 20,
