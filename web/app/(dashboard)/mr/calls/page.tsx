@@ -73,11 +73,28 @@ export default function CallHistoryPage() {
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  const [reps, setReps] = useState<{ id: string; employeeId: string; firstName: string; lastName: string }[]>([]);
+  const [selectedRep, setSelectedRep] = useState<string>("");
+
+  useEffect(() => {
+    apiClient
+      .get("/api/manager/mrs")
+      .then((res) => setReps(res.data.data?.mrs ?? []))
+      .catch(() => setReps([]));
+  }, []);
+
   useEffect(() => {
     setLoading(true);
     setLoadError(null);
     apiClient
-      .get("/api/mr/visits", { params: { page, limit: 20, ...(areaFilter ? { territoryId: areaFilter } : {}) } })
+      .get("/api/mr/visits", {
+        params: {
+          page,
+          limit: 20,
+          ...(areaFilter ? { territoryId: areaFilter } : {}),
+          ...(selectedRep ? { employeeId: selectedRep } : {}),
+        },
+      })
       .then((res) => {
         setVisits(res.data.data.visits);
         setTotalPages(Math.max(1, Math.ceil(res.data.data.total / res.data.data.limit)));
@@ -92,14 +109,16 @@ export default function CallHistoryPage() {
         setVisits([]);
       })
       .finally(() => setLoading(false));
-  }, [page, areaFilter]);
+  }, [page, areaFilter, selectedRep]);
 
   useEffect(() => {
     apiClient
-      .get("/api/mr/visits/summary", { params: { month: monthKey(cursor) } })
+      .get("/api/mr/visits/summary", {
+        params: { month: monthKey(cursor), ...(selectedRep ? { employeeId: selectedRep } : {}) },
+      })
       .then((res) => setCounts(res.data.data.counts))
       .catch((err) => console.error("Failed to load call summary:", err));
-  }, [cursor]);
+  }, [cursor, selectedRep]);
 
   const openEdit = (v: Visit) => {
     setEditing(v);
@@ -196,6 +215,23 @@ export default function CallHistoryPage() {
           <Plus size={16} /> Complete a Call
         </button>
       </div>
+
+      {/* ── Rep picker (managers only) ── */}
+      {reps.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Viewing</span>
+          <select
+            value={selectedRep}
+            onChange={(e) => { setSelectedRep(e.target.value); setPage(1); }}
+            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none"
+          >
+            <option value="">My own calls</option>
+            {reps.map((r) => (
+              <option key={r.employeeId} value={r.employeeId}>{r.firstName} {r.lastName}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* ── Calendar trigger: small pill, opens cute popup ── */}
       <div className="flex items-center gap-2">

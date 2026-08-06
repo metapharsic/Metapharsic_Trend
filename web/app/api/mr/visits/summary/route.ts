@@ -1,14 +1,20 @@
 import { db } from "@/lib/db";
 import { Role } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
-import { ok, unauthorized, apiError, badRequest } from "@/lib/api-response";
+import { ok, unauthorized, forbidden, notFound, apiError, badRequest } from "@/lib/api-response";
 
 async function handler(req: AuthedRequest) {
   try {
-    const employee = await db.employee.findUnique({ where: { userId: req.user.sub } });
-    if (!employee) return unauthorized("Employee record not found");
-
     const { searchParams } = new URL(req.url);
+    const requestedEmployeeId = searchParams.get("employeeId");
+    const isManager = req.user.role === Role.ASM || req.user.role === Role.ADMIN;
+    if (requestedEmployeeId && !isManager) return forbidden("You may only view your own summary");
+
+    const employee = requestedEmployeeId
+      ? await db.employee.findUnique({ where: { id: requestedEmployeeId } })
+      : await db.employee.findUnique({ where: { userId: req.user.sub } });
+    if (!employee) return requestedEmployeeId ? notFound("Employee not found") : unauthorized("Employee record not found");
+
     const month = searchParams.get("month"); // YYYY-MM
     if (!month || !/^\d{4}-\d{2}$/.test(month)) return badRequest("month must be YYYY-MM");
 
@@ -34,4 +40,4 @@ async function handler(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(handler, [Role.MR]);
+export const GET = withAuth(handler, [Role.MR, Role.ASM, Role.ADMIN]);

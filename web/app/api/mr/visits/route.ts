@@ -6,17 +6,23 @@ import { CreateVisitSchema, PaginationSchema } from "@/lib/validators";
 import { saveVisitPhoto, photoUrl } from "@/lib/upload";
 import { checkVisitAnomaly, haversineDistanceKm } from "@/lib/gps";
 import { calculateCqs } from "@/lib/cqs";
-import { ok, badRequest, unauthorized, apiError, notFound } from "@/lib/api-response";
+import { ok, badRequest, unauthorized, forbidden, notFound, apiError } from "@/lib/api-response";
 import { getWorkflowSettings } from "@/lib/workflow-settings";
 import { startOfUtcDay, addUtcDays } from "@/lib/date";
 
 
 async function getVisits(req: AuthedRequest) {
   try {
-    const employee = await db.employee.findUnique({ where: { userId: req.user.sub } });
-    if (!employee) return unauthorized("Employee record not found");
-
     const url = new URL(req.url);
+    const requestedEmployeeId = url.searchParams.get("employeeId");
+    const isManager = req.user.role === Role.ASM || req.user.role === Role.ADMIN;
+    if (requestedEmployeeId && !isManager) return forbidden("You may only view your own calls");
+
+    const employee = requestedEmployeeId
+      ? await db.employee.findUnique({ where: { id: requestedEmployeeId } })
+      : await db.employee.findUnique({ where: { userId: req.user.sub } });
+    if (!employee) return requestedEmployeeId ? notFound("Employee not found") : unauthorized("Employee record not found");
+
     const rawParams = {
       page: url.searchParams.get("page") || "1",
       limit: url.searchParams.get("limit") || "20",
