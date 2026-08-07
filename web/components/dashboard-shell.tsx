@@ -77,6 +77,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [userInitial, setUserInitial] = useState<string>("U");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [navSearch, setNavSearch] = useState("");
+  const [navSearchOpen, setNavSearchOpen] = useState(false);
 
   useEffect(() => {
     setSidebarOpen(false);
@@ -111,6 +113,17 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     const override = userRole && "labelByRole" in item ? (item.labelByRole as Record<string, string>)[userRole] : undefined;
     return { ...item, label: override ?? item.label };
   });
+
+  const navSearchResults =
+    navSearch.trim().length === 0
+      ? []
+      : filteredNavItems.filter((item) => item.label.toLowerCase().includes(navSearch.trim().toLowerCase()));
+
+  const goToSearchResult = (href: string) => {
+    router.push(href);
+    setNavSearch("");
+    setNavSearchOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
@@ -222,13 +235,41 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <button onClick={() => setSidebarOpen(true)} className="text-gray-500 hover:text-primary-600 md:hidden shrink-0">
             <Menu size={22} />
           </button>
-          <div className="hidden sm:flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 w-full max-w-80">
-            <Search size={16} className="text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search..."
-              className="bg-transparent text-sm outline-none w-full placeholder:text-gray-400"
-            />
+          <div className="hidden sm:block relative w-full max-w-80">
+            <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+              <Search size={16} className="text-gray-400 shrink-0" />
+              <input
+                type="text"
+                placeholder="Search pages..."
+                value={navSearch}
+                onChange={(e) => { setNavSearch(e.target.value); setNavSearchOpen(true); }}
+                onFocus={() => setNavSearchOpen(true)}
+                onBlur={() => setTimeout(() => setNavSearchOpen(false), 150)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && navSearchResults.length > 0) goToSearchResult(navSearchResults[0].href);
+                  if (e.key === "Escape") { setNavSearch(""); setNavSearchOpen(false); }
+                }}
+                className="bg-transparent text-sm outline-none w-full placeholder:text-gray-400"
+              />
+            </div>
+            {navSearchOpen && navSearch.trim().length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50 max-h-80 overflow-y-auto">
+                {navSearchResults.length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-gray-400">No matching pages.</p>
+                ) : (
+                  navSearchResults.map(({ href, label, icon: Icon }) => (
+                    <button
+                      key={href}
+                      onMouseDown={() => goToSearchResult(href)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 text-left"
+                    >
+                      <Icon size={16} className="shrink-0 text-gray-400" />
+                      {label}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-3 sm:gap-4 ml-auto">
             <button className="w-9 h-9 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-500 hover:text-primary-600">
