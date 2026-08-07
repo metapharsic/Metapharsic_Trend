@@ -73,7 +73,20 @@ interface MrDashboard {
   }[];
 }
 
-interface MrOption { id: string; firstName: string; lastName: string; }
+interface MrOption { id: string; employeeId?: string; firstName: string; lastName: string; }
+
+interface TeamRow {
+  employeeId: string;
+  name: string;
+  territory: string;
+  checkedIn: boolean;
+  checkInTime: string | null;
+  checkedOut: boolean;
+  callsToday: number;
+  salesToday: number;
+  collectionToday: number;
+  gpsStatus: "ACTIVE" | "STALE" | "MOCKED" | "NO_SIGNAL";
+}
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 const GPS_STYLES: Record<string, { label: string; dot: string; badge: string }> = {
@@ -111,6 +124,11 @@ export default function MrDashboardPage() {
   const [geoError, setGeoError]       = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [openVisitId, setOpenVisitId]  = useState<string | null>(null);
+  const [team, setTeam]               = useState<TeamRow[]>([]);
+  const [teamLoading, setTeamLoading] = useState(true);
+
+  const isManager = reps.length > 0;
+  const showTeamView = isManager && !selectedRep;
 
   const fetchData = useCallback(() => {
     setLoading(true);
@@ -120,13 +138,24 @@ export default function MrDashboardPage() {
       .finally(() => { setLoading(false); setLastRefresh(new Date()); });
   }, [selectedRep]);
 
+  const fetchTeam = useCallback(() => {
+    setTeamLoading(true);
+    apiClient.get("/api/manager/dashboard/team-today")
+      .then((res) => setTeam(res.data.data?.team ?? []))
+      .catch(() => setTeam([]))
+      .finally(() => { setTeamLoading(false); setLastRefresh(new Date()); });
+  }, []);
+
   useEffect(() => {
     apiClient.get("/api/manager/mrs")
       .then((res) => setReps(res.data.data?.mrs ?? []))
       .catch(() => setReps([]));
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    if (showTeamView) fetchTeam();
+    else fetchData();
+  }, [showTeamView, fetchData, fetchTeam]);
 
   const handleCheckIn = () => {
     setGeoError(null);
@@ -167,6 +196,19 @@ export default function MrDashboardPage() {
       (err) => { setGeoError(`GPS error: ${err.message}`); setCheckingOut(false); }
     );
   };
+
+  // ─── Team view (admin/ASM default — everyone's activity, no picker) ────────────
+  if (showTeamView) {
+    return (
+      <TeamActivityView
+        team={team}
+        loading={teamLoading}
+        lastRefresh={lastRefresh}
+        onRefresh={fetchTeam}
+        onSelectRep={(employeeId) => setSelectedRep(employeeId)}
+      />
+    );
+  }
 
   // ─── Loading ─────────────────────────────────────────────────────────────────
   if (loading && !data) {
@@ -238,13 +280,14 @@ export default function MrDashboardPage() {
 
           {/* Actions */}
           <div className="flex flex-col gap-2 flex-shrink-0 items-end">
-            {/* Rep Picker (managers only) */}
-            {reps.length > 0 && (
-              <select value={selectedRep} onChange={(e) => setSelectedRep(e.target.value)}
-                className="bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none">
-                <option value="">My dashboard</option>
-                {reps.map((r) => <option key={r.id} value={r.id}>{r.firstName} {r.lastName}</option>)}
-              </select>
+            {/* Back to team (managers viewing one rep's dashboard) */}
+            {isManager && selectedRep && (
+              <button
+                onClick={() => setSelectedRep("")}
+                className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl px-3 py-2 text-xs font-bold text-white transition-colors"
+              >
+                ← Back to Team
+              </button>
             )}
             <div className="flex gap-2">
               {/* Refresh */}
@@ -638,6 +681,112 @@ function CoverageTile({ icon: Icon, label, visited, total, percent, sub, color }
         <div className={`h-full ${barColor} rounded-full transition-all duration-700`} style={{ width: `${Math.min(Math.max(percent, 0), 100)}%` }} />
       </div>
       <p className="text-xs text-slate-400 mt-1">{percent}% {sub}</p>
+    </div>
+  );
+}
+
+// ─── Team Activity View (admin/ASM default landing) ────────────────────────────
+const TEAM_GPS_STYLES: Record<string, { label: string; dot: string }> = {
+  ACTIVE:    { label: "Active",     dot: "bg-emerald-400" },
+  STALE:     { label: "Stale",      dot: "bg-amber-400" },
+  MOCKED:    { label: "Mocked",     dot: "bg-red-500" },
+  NO_SIGNAL: { label: "No signal",  dot: "bg-slate-400" },
+};
+
+function TeamActivityView({
+  team, loading, lastRefresh, onRefresh, onSelectRep,
+}: {
+  team: TeamRow[]; loading: boolean; lastRefresh: Date; onRefresh: () => void; onSelectRep: (employeeId: string) => void;
+}) {
+  const checkedInCount = team.filter((t) => t.checkedIn).length;
+  const totalCalls = team.reduce((sum, t) => sum + t.callsToday, 0);
+  const totalSales = team.reduce((sum, t) => sum + t.salesToday, 0);
+  const totalCollection = team.reduce((sum, t) => sum + t.collectionToday, 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 rounded-2xl p-6 text-white shadow-xl">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+              <UserCheck size={26} className="text-emerald-300" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">Team Activity Today</h1>
+              <p className="text-slate-400 text-sm mt-0.5">
+                {team.length} MR{team.length === 1 ? "" : "s"} · {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}
+              </p>
+            </div>
+          </div>
+          <button onClick={onRefresh} disabled={loading}
+            className="p-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl transition-colors" title="Refresh">
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <KpiTile icon={UserCheck} tone={checkedInCount > 0 ? "ok" : "warn"} label="Checked In" value={`${checkedInCount}/${team.length}`} sub="Today" />
+        <KpiTile icon={CalendarCheck} tone="blue" label="Calls Logged" value={totalCalls} sub="Today, whole team" />
+        <KpiTile icon={IndianRupee} tone="emerald" label="Sales" value={currency(totalSales)} sub="Today, whole team" />
+        <KpiTile icon={Wallet} tone="emerald" label="Collection" value={currency(totalCollection)} sub="Today, whole team" />
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+          <h2 className="text-xs font-bold text-slate-800">Every MR — click a row for full detail</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+                <th className="px-5 py-3 font-semibold uppercase tracking-wider text-[10px]">MR</th>
+                <th className="px-5 py-3 font-semibold uppercase tracking-wider text-[10px]">Territory</th>
+                <th className="px-5 py-3 font-semibold uppercase tracking-wider text-[10px]">Attendance</th>
+                <th className="px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Calls</th>
+                <th className="px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Sales</th>
+                <th className="px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Collection</th>
+                <th className="px-5 py-3 font-semibold uppercase tracking-wider text-[10px]">GPS</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-500 mx-auto" /></td></tr>
+              ) : team.length === 0 ? (
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400 font-medium">No MRs on the team yet.</td></tr>
+              ) : (
+                team.map((t) => {
+                  const gps = TEAM_GPS_STYLES[t.gpsStatus] ?? TEAM_GPS_STYLES.NO_SIGNAL;
+                  return (
+                    <tr key={t.employeeId} onClick={() => onSelectRep(t.employeeId)} className="hover:bg-slate-50 cursor-pointer transition-colors">
+                      <td className="px-5 py-3 font-bold text-slate-900">{t.name}</td>
+                      <td className="px-5 py-3 text-slate-500">{t.territory}</td>
+                      <td className="px-5 py-3">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                          t.checkedOut ? "bg-slate-100 text-slate-500" :
+                          t.checkedIn  ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                        }`}>
+                          {t.checkedOut ? "Checked out" : t.checkedIn ? `In · ${timeStr(t.checkInTime)}` : "Not checked in"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right font-semibold text-slate-700">{t.callsToday}</td>
+                      <td className="px-5 py-3 text-right font-semibold text-slate-700">{currency(t.salesToday)}</td>
+                      <td className="px-5 py-3 text-right font-semibold text-slate-700">{currency(t.collectionToday)}</td>
+                      <td className="px-5 py-3">
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-600">
+                          <span className={`w-1.5 h-1.5 rounded-full ${gps.dot}`} /> {gps.label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p className="text-[10px] text-slate-400 text-center">Refreshed at {timeStr(lastRefresh.toISOString())}</p>
     </div>
   );
 }
