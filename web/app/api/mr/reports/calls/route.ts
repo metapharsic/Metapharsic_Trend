@@ -39,15 +39,28 @@ async function handler(req: AuthedRequest) {
     const isManager = req.user.role === Role.ASM || req.user.role === Role.ADMIN;
     if (requestedEmployeeId && !isManager) return forbidden("You may only view your own report");
 
-    const employee = requestedEmployeeId
-      ? await db.employee.findUnique({ where: { id: requestedEmployeeId } })
-      : await db.employee.findUnique({ where: { userId: req.user.sub } });
-    if (!employee) return requestedEmployeeId ? notFound("Employee not found") : unauthorized("Employee record not found");
+    let scopeEmployeeId: string | undefined;
+    let employeeLabel = "All MRs";
+    if (requestedEmployeeId) {
+      const employee = await db.employee.findUnique({ where: { id: requestedEmployeeId } });
+      if (!employee) return notFound("Employee not found");
+      scopeEmployeeId = employee.id;
+      employeeLabel = `${employee.firstName} ${employee.lastName}`;
+    } else if (!isManager) {
+      const employee = await db.employee.findUnique({ where: { userId: req.user.sub } });
+      if (!employee) return unauthorized("Employee record not found");
+      scopeEmployeeId = employee.id;
+      employeeLabel = `${employee.firstName} ${employee.lastName}`;
+    }
+    // else: isManager && no requestedEmployeeId → all MRs combined
 
     const { start, end } = periodRange(period, anchor);
 
     const visits = await db.visit.findMany({
-      where: { employeeId: employee.id, createdAt: { gte: start, lt: end } },
+      where: {
+        ...(scopeEmployeeId ? { employeeId: scopeEmployeeId } : {}),
+        createdAt: { gte: start, lt: end },
+      },
       select: {
         id: true,
         purpose: true,
@@ -59,6 +72,7 @@ async function handler(req: AuthedRequest) {
         chemistId: true,
         doctor: { select: { fullName: true } },
         chemist: { select: { name: true } },
+        employee: { select: { firstName: true, lastName: true } },
       },
       orderBy: { createdAt: "asc" },
     });
@@ -81,7 +95,7 @@ async function handler(req: AuthedRequest) {
     return ok({
       period,
       range: { start: start.toISOString(), end: end.toISOString() },
-      employee: { id: employee.id, name: `${employee.firstName} ${employee.lastName}` },
+      employee: { id: scopeEmployeeId ?? null, name: employeeLabel },
       totals: {
         totalCalls: visits.length,
         doctorCalls,
@@ -98,6 +112,7 @@ async function handler(req: AuthedRequest) {
         createdAt: v.createdAt.toISOString(),
         durationMinutes: v.durationMinutes,
         boxesPlaced: v.boxesPlaced,
+        employeeName: `${v.employee.firstName} ${v.employee.lastName}`,
       })),
     });
   } catch (err) {

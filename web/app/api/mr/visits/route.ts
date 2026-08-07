@@ -18,10 +18,18 @@ async function getVisits(req: AuthedRequest) {
     const isManager = req.user.role === Role.ASM || req.user.role === Role.ADMIN;
     if (requestedEmployeeId && !isManager) return forbidden("You may only view your own calls");
 
-    const employee = requestedEmployeeId
-      ? await db.employee.findUnique({ where: { id: requestedEmployeeId } })
-      : await db.employee.findUnique({ where: { userId: req.user.sub } });
-    if (!employee) return requestedEmployeeId ? notFound("Employee not found") : unauthorized("Employee record not found");
+    // Managers with no employeeId filter see every MR's calls, not just their own.
+    let scopeEmployeeId: string | undefined;
+    if (requestedEmployeeId) {
+      const employee = await db.employee.findUnique({ where: { id: requestedEmployeeId } });
+      if (!employee) return notFound("Employee not found");
+      scopeEmployeeId = employee.id;
+    } else if (!isManager) {
+      const employee = await db.employee.findUnique({ where: { userId: req.user.sub } });
+      if (!employee) return unauthorized("Employee record not found");
+      scopeEmployeeId = employee.id;
+    }
+    // else: isManager && no requestedEmployeeId → scopeEmployeeId stays undefined (all MRs)
 
     const rawParams = {
       page: url.searchParams.get("page") || "1",
@@ -38,7 +46,7 @@ async function getVisits(req: AuthedRequest) {
     const territoryId = url.searchParams.get("territoryId") ?? undefined;
 
     const where = {
-      employeeId: employee.id,
+      ...(scopeEmployeeId ? { employeeId: scopeEmployeeId } : {}),
       ...(territoryId
         ? {
             OR: [
@@ -60,11 +68,12 @@ async function getVisits(req: AuthedRequest) {
           chemist: { select: { id: true, name: true, address: true, territory: { select: { id: true, name: true } } } },
           lead: true,
           samples: { include: { product: { select: { id: true, name: true } } } },
+          employee: { select: { firstName: true, lastName: true } },
         },
       }),
       db.visit.count({ where }),
       db.visit.findMany({
-        where: { employeeId: employee.id },
+        where: scopeEmployeeId ? { employeeId: scopeEmployeeId } : {},
         select: {
           doctor: { select: { territory: { select: { id: true, name: true } } } },
           chemist: { select: { territory: { select: { id: true, name: true } } } },
@@ -84,6 +93,7 @@ async function getVisits(req: AuthedRequest) {
       visits: visits.map((v) => ({
         ...v,
         photoUrl: v.photoPath ? photoUrl(v.photoPath) : null,
+        employeeName: v.employee ? `${v.employee.firstName} ${v.employee.lastName}` : null,
       })),
       total,
       page,

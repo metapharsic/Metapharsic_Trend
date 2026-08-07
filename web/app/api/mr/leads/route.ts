@@ -11,10 +11,17 @@ async function getLeads(req: AuthedRequest) {
     const isManager = req.user.role === Role.ASM || req.user.role === Role.ADMIN;
     if (requestedEmployeeId && !isManager) return forbidden("You may only view your own leads");
 
-    const employee = requestedEmployeeId
-      ? await db.employee.findUnique({ where: { id: requestedEmployeeId } })
-      : await db.employee.findUnique({ where: { userId: req.user.sub } });
-    if (!employee) return requestedEmployeeId ? notFound("Employee not found") : unauthorized("Employee record not found");
+    let scopeEmployeeId: string | undefined;
+    if (requestedEmployeeId) {
+      const employee = await db.employee.findUnique({ where: { id: requestedEmployeeId } });
+      if (!employee) return notFound("Employee not found");
+      scopeEmployeeId = employee.id;
+    } else if (!isManager) {
+      const employee = await db.employee.findUnique({ where: { userId: req.user.sub } });
+      if (!employee) return unauthorized("Employee record not found");
+      scopeEmployeeId = employee.id;
+    }
+    // else: isManager && no requestedEmployeeId → all MRs
 
     const status = url.searchParams.get("status") ?? undefined;
     const rawParams = {
@@ -26,7 +33,7 @@ async function getLeads(req: AuthedRequest) {
     const { page, limit } = parsed.data;
 
     const where = {
-      employeeId: employee.id,
+      ...(scopeEmployeeId ? { employeeId: scopeEmployeeId } : {}),
       ...(status ? { status: status as "NEW" | "IN_PROGRESS" | "CONVERTED" | "LOST" } : {}),
     };
 
@@ -45,12 +52,18 @@ async function getLeads(req: AuthedRequest) {
               chemist: { select: { id: true, name: true } },
             },
           },
+          employee: { select: { firstName: true, lastName: true } },
         },
       }),
       db.lead.count({ where }),
     ]);
 
-    return ok({ leads, total, page, limit });
+    return ok({
+      leads: leads.map((l) => ({ ...l, employeeName: `${l.employee.firstName} ${l.employee.lastName}` })),
+      total,
+      page,
+      limit,
+    });
   } catch (err) {
     console.error("[GET /api/mr/leads]", err);
     return apiError("INTERNAL_SERVER_ERROR", "Failed to fetch leads", 500);

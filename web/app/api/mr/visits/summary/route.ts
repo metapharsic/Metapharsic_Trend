@@ -10,10 +10,17 @@ async function handler(req: AuthedRequest) {
     const isManager = req.user.role === Role.ASM || req.user.role === Role.ADMIN;
     if (requestedEmployeeId && !isManager) return forbidden("You may only view your own summary");
 
-    const employee = requestedEmployeeId
-      ? await db.employee.findUnique({ where: { id: requestedEmployeeId } })
-      : await db.employee.findUnique({ where: { userId: req.user.sub } });
-    if (!employee) return requestedEmployeeId ? notFound("Employee not found") : unauthorized("Employee record not found");
+    let scopeEmployeeId: string | undefined;
+    if (requestedEmployeeId) {
+      const employee = await db.employee.findUnique({ where: { id: requestedEmployeeId } });
+      if (!employee) return notFound("Employee not found");
+      scopeEmployeeId = employee.id;
+    } else if (!isManager) {
+      const employee = await db.employee.findUnique({ where: { userId: req.user.sub } });
+      if (!employee) return unauthorized("Employee record not found");
+      scopeEmployeeId = employee.id;
+    }
+    // else: isManager && no requestedEmployeeId → all MRs
 
     const month = searchParams.get("month"); // YYYY-MM
     if (!month || !/^\d{4}-\d{2}$/.test(month)) return badRequest("month must be YYYY-MM");
@@ -23,7 +30,10 @@ async function handler(req: AuthedRequest) {
     end.setUTCMonth(end.getUTCMonth() + 1);
 
     const visits = await db.visit.findMany({
-      where: { employeeId: employee.id, createdAt: { gte: start, lt: end } },
+      where: {
+        ...(scopeEmployeeId ? { employeeId: scopeEmployeeId } : {}),
+        createdAt: { gte: start, lt: end },
+      },
       select: { createdAt: true },
     });
 

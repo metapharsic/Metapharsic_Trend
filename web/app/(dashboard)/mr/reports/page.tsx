@@ -9,7 +9,7 @@ type Period = "daily" | "weekly" | "monthly";
 interface CallReport {
   period: Period;
   range: { start: string; end: string };
-  employee: { id: string; name: string };
+  employee: { id: string | null; name: string };
   totals: {
     totalCalls: number;
     doctorCalls: number;
@@ -19,7 +19,7 @@ interface CallReport {
     avgCqsScore: number | null;
   };
   byDay: Record<string, number>;
-  calls: { id: string; name: string; purpose: string; createdAt: string; durationMinutes: number | null; boxesPlaced: number | null }[];
+  calls: { id: string; name: string; purpose: string; createdAt: string; durationMinutes: number | null; boxesPlaced: number | null; employeeName: string }[];
 }
 
 const PERIODS: { key: Period; label: string }[] = [
@@ -68,7 +68,7 @@ export default function MrReportsPage() {
           </div>
           <div className="flex-1">
             <h1 className="text-xl font-bold tracking-tight">
-              {selectedRep && report ? `${report.employee.name}'s Call Reports` : "My Call Reports"}
+              {report ? (selectedRep ? `${report.employee.name}'s Call Reports` : reps.length > 0 ? "All MRs — Call Reports" : "My Call Reports") : "My Call Reports"}
             </h1>
             <p className="text-slate-400 text-sm mt-0.5">Daily, weekly, or monthly call activity — on request</p>
           </div>
@@ -78,7 +78,7 @@ export default function MrReportsPage() {
               onChange={(e) => setSelectedRep(e.target.value)}
               className="bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
             >
-              <option value="">My own report</option>
+              <option value="">All MRs</option>
               {reps.map((r) => (
                 <option key={r.employeeId} value={r.employeeId}>{r.firstName} {r.lastName}</option>
               ))}
@@ -128,6 +128,9 @@ export default function MrReportsPage() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+                    {!selectedRep && reps.length > 0 && (
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">MR</th>
+                    )}
                     <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Name</th>
                     <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Purpose</th>
                     <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Date/Time</th>
@@ -137,10 +140,15 @@ export default function MrReportsPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {report.calls.length === 0 ? (
-                    <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400 font-medium">No calls logged in this period.</td></tr>
+                    <tr><td colSpan={!selectedRep && reps.length > 0 ? 6 : 5} className="px-4 py-10 text-center text-slate-400 font-medium">No calls logged in this period.</td></tr>
                   ) : (
                     report.calls.map((c) => (
                       <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                        {!selectedRep && reps.length > 0 && (
+                          <td className="px-4 py-3">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700">{c.employeeName}</span>
+                          </td>
+                        )}
                         <td className="px-4 py-3 font-bold text-slate-800">{c.name}</td>
                         <td className="px-4 py-3 text-slate-600">{c.purpose}</td>
                         <td className="px-4 py-3 text-slate-500">{dateStr(c.createdAt)} · {timeStr(c.createdAt)}</td>

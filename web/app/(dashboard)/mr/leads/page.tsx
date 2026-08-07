@@ -13,6 +13,7 @@ interface Lead {
   followUpAction: string | null;
   followUpDate: string | null;
   createdAt: string;
+  employeeName?: string;
   visit: {
     purpose: string;
     createdAt: string;
@@ -125,7 +126,7 @@ export default function MyLeadsPage() {
             onChange={(e) => setSelectedRep(e.target.value)}
             className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none"
           >
-            <option value="">My own leads</option>
+            <option value="">All MRs</option>
             {reps.map((r) => (
               <option key={r.employeeId} value={r.employeeId}>{r.firstName} {r.lastName}</option>
             ))}
@@ -171,7 +172,12 @@ export default function MyLeadsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="font-bold text-slate-900 text-sm">{target}</p>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <p className="font-bold text-slate-900 text-sm truncate">{target}</p>
+                      {!selectedRep && reps.length > 0 && l.employeeName && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700 flex-shrink-0">{l.employeeName}</span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${STATUS_STYLES[l.status]}`}>{l.status.replace("_", " ")}</span>
                       <button onClick={() => openEdit(l)} className="text-slate-400 hover:text-emerald-600 p-1 -m-1" title="Edit lead">
