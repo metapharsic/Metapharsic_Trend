@@ -56,8 +56,44 @@ async function getProducts(req: AuthedRequest) {
       db.product.count({ where }),
     ]);
 
+    // Forecast: burn rate from the last 30 days of actual order deductions,
+    // projected forward against current stock. Also surface each product's
+    // most recent stock movement so "leftover quantity" has a visible
+    // as-of timestamp instead of looking like a static number.
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const productIds = products.map((p) => p.id);
+    const [recentDeductions, lastMovements] = await Promise.all([
+      db.inventoryMovement.groupBy({
+        by: ["productId"],
+        where: { productId: { in: productIds }, type: "ORDER_DEDUCTION", createdAt: { gte: thirtyDaysAgo } },
+        _sum: { delta: true },
+      }),
+      db.inventoryMovement.findMany({
+        where: { productId: { in: productIds } },
+        orderBy: { createdAt: "desc" },
+        distinct: ["productId"],
+        select: { productId: true, createdAt: true },
+      }),
+    ]);
+    const burnByProduct = new Map(recentDeductions.map((r) => [r.productId, Math.abs(r._sum.delta ?? 0) / 30]));
+    const lastMovementByProduct = new Map(lastMovements.map((m) => [m.productId, m.createdAt]));
+
+    const enriched = products.map((p) => {
+      const rate = burnByProduct.get(p.id) ?? 0;
+      const unitValue = Number(p.ptr ?? p.price);
+      return {
+        ...p,
+        stockValue: Math.round(p.stockQty * unitValue * 100) / 100,
+        lastMovementAt: lastMovementByProduct.get(p.id) ?? p.updatedAt,
+        forecast: {
+          burnRatePerDay: Math.round(rate * 100) / 100,
+          daysRemaining: rate > 0 ? Math.floor(p.stockQty / rate) : null,
+        },
+      };
+    });
+
     return ok({
-      products,
+      products: enriched,
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (err) {

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Search, Plus, Edit2, Package, RefreshCw, X, ShieldAlert, Trash2 } from "lucide-react";
+import { Search, Plus, Edit2, Package, RefreshCw, X, ShieldAlert, Trash2, History, TrendingDown } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 
 interface Product {
@@ -20,6 +20,9 @@ interface Product {
   currentBatchNo: string | null;
   currentMfgDate: string | null;
   currentExpDate: string | null;
+  stockValue?: number;
+  lastMovementAt?: string;
+  forecast?: { burnRatePerDay: number; daysRemaining: number | null };
 }
 
 interface MySample {
@@ -48,6 +51,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -505,21 +509,25 @@ export default function InventoryPage() {
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">PTR</th>
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">PTS</th>
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Stock level</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Stock Value</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Last Updated</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Forecast</th>
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Current Batch</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-center">Audit</th>
                   {canManage && <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-center">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={11} className="px-4 py-12 text-center text-slate-400">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500 mx-auto mb-2" />
                       Loading products...
                     </td>
                   </tr>
                 ) : filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-slate-400 font-medium">
+                    <td colSpan={11} className="px-4 py-12 text-center text-slate-400 font-medium">
                       No products found.
                     </td>
                   </tr>
@@ -546,6 +554,29 @@ export default function InventoryPage() {
                           {p.stockQty}
                         </span>
                       </td>
+                      <td className="px-4 py-3 text-right font-semibold text-slate-700">
+                        {p.stockValue !== undefined ? `₹${p.stockValue.toLocaleString("en-IN")}` : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">
+                        {p.lastMovementAt ? (
+                          <>
+                            <p className="text-slate-700">{new Date(p.lastMovementAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                            <p className="text-[10px] text-slate-400">{new Date(p.lastMovementAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>
+                          </>
+                        ) : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        {p.forecast?.daysRemaining !== null && p.forecast?.daysRemaining !== undefined ? (
+                          <span className={`inline-flex items-center gap-1 text-xs font-bold ${
+                            p.forecast.daysRemaining <= 7 ? "text-rose-600" : p.forecast.daysRemaining <= 21 ? "text-amber-600" : "text-slate-600"
+                          }`}>
+                            <TrendingDown size={12} />
+                            {p.forecast.daysRemaining}d left
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-300">No recent sales</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         {p.currentBatchNo ? (
                           <>
@@ -557,6 +588,15 @@ export default function InventoryPage() {
                         ) : (
                           <span className="text-slate-300">—</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => setHistoryProduct(p)}
+                          className="p-1.5 hover:bg-slate-100 hover:text-indigo-600 rounded-lg transition-colors cursor-pointer text-slate-400"
+                          title="View stock movement audit trail"
+                        >
+                          <History size={14} />
+                        </button>
                       </td>
                       {canManage && (
                         <td className="px-4 py-3 text-center flex items-center justify-center gap-1.5">
@@ -752,6 +792,100 @@ export default function InventoryPage() {
             </form>
           </div>
         )}
+      </div>
+
+      {historyProduct && (
+        <StockHistoryModal product={historyProduct} onClose={() => setHistoryProduct(null)} />
+      )}
+    </div>
+  );
+}
+
+interface Movement {
+  id: string;
+  type: "ORDER_DEDUCTION" | "MANUAL_ADJUSTMENT" | "RESTOCK";
+  delta: number;
+  quantityAfter: number;
+  note: string | null;
+  createdAt: string;
+  employee: { firstName: string; lastName: string } | null;
+}
+
+const MOVEMENT_LABEL: Record<Movement["type"], string> = {
+  ORDER_DEDUCTION: "Order Sold",
+  MANUAL_ADJUSTMENT: "Manual Edit",
+  RESTOCK: "Restock",
+};
+
+function StockHistoryModal({ product, onClose }: { product: Product; onClose: () => void }) {
+  const [movements, setMovements] = useState<Movement[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiClient
+      .get(`/api/products/${product.id}/movements`)
+      .then((res) => setMovements(res.data.data.movements ?? []))
+      .catch((err) => console.error("Failed to load stock history:", err))
+      .finally(() => setLoading(false));
+  }, [product.id]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <div>
+            <h2 className="text-sm font-bold text-slate-800">Stock Audit — {product.name}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Current leftover: {product.stockQty} units</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500"><X size={16} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500" />
+            </div>
+          ) : movements.length === 0 ? (
+            <p className="text-center text-slate-400 text-sm py-12">No stock movements recorded yet.</p>
+          ) : (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 sticky top-0">
+                  <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">Date/Time</th>
+                  <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">Type</th>
+                  <th className="px-4 py-2 text-right font-semibold uppercase tracking-wider text-[10px]">Change</th>
+                  <th className="px-4 py-2 text-right font-semibold uppercase tracking-wider text-[10px]">Balance</th>
+                  <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">By</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {movements.map((m) => (
+                  <tr key={m.id}>
+                    <td className="px-4 py-2.5 text-slate-600">
+                      {new Date(m.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                      {" "}
+                      {new Date(m.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        m.type === "ORDER_DEDUCTION" ? "bg-blue-50 text-blue-700" : m.type === "RESTOCK" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                      }`}>
+                        {MOVEMENT_LABEL[m.type]}
+                      </span>
+                      {m.note && <p className="text-[10px] text-slate-400 mt-0.5">{m.note}</p>}
+                    </td>
+                    <td className={`px-4 py-2.5 text-right font-bold ${m.delta < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                      {m.delta > 0 ? "+" : ""}{m.delta}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-slate-700">{m.quantityAfter}</td>
+                    <td className="px-4 py-2.5 text-slate-500">
+                      {m.employee ? `${m.employee.firstName} ${m.employee.lastName}` : "System"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );

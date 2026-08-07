@@ -116,6 +116,7 @@ model Employee {
   leaveApprovals    LeaveRequest[]    @relation("LeaveApprovals")
   payrolls          Payroll[]
   notifications     Notification[]
+  inventoryMovements InventoryMovement[]
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 }
@@ -385,8 +386,31 @@ model Product {
   tenders               HospitalTender[]
   formularyEntries      HospitalFormulary[]
   discountSchemes       DiscountScheme[]
+  movements             InventoryMovement[]
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
+}
+
+enum InventoryMovementType {
+  ORDER_DEDUCTION
+  MANUAL_ADJUSTMENT
+  RESTOCK
+}
+
+/// Full audit trail of every stock change — order bookings, manual edits,
+/// restocks. Without this, "leftover quantity" is just an unaudited raw
+/// int nobody can verify or explain after the fact.
+model InventoryMovement {
+  id         String                @id @default(uuid())
+  productId  String
+  product    Product               @relation(fields: [productId], references: [id])
+  type       InventoryMovementType
+  delta      Int
+  quantityAfter Int
+  note       String?
+  employeeId String?
+  employee   Employee?             @relation(fields: [employeeId], references: [id])
+  createdAt  DateTime              @default(now())
 }
 
 model Order {

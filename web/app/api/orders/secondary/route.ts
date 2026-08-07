@@ -255,6 +255,26 @@ async function createOrder(req: AuthedRequest) {
         },
       });
 
+      // Every booked line consumes warehouse stock — deduct it and log the
+      // movement so "leftover quantity" reflects real sales, not just the
+      // last manual stock-take.
+      for (const li of lineItems) {
+        const updatedProduct = await tx.product.update({
+          where: { id: li.productId },
+          data: { stockQty: { decrement: li.quantity } },
+        });
+        await tx.inventoryMovement.create({
+          data: {
+            productId: li.productId,
+            type: "ORDER_DEDUCTION",
+            delta: -li.quantity,
+            quantityAfter: updatedProduct.stockQty,
+            employeeId: bookingEmployee?.id ?? null,
+            note: `Order ${createdOrder.id.slice(0, 8).toUpperCase()}`,
+          },
+        });
+      }
+
       return { order: createdOrder, invoice: createdInvoice };
     });
 

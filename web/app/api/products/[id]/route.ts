@@ -36,6 +36,23 @@ async function updateProduct(
     if (!existing) return notFound("Product not found");
 
     const product = await db.product.update({ where: { id }, data: parsed.data });
+
+    // Log manual stock corrections/restocks — same audit trail as order
+    // deductions, so every change to "leftover quantity" is explained.
+    if (parsed.data.stockQty !== undefined && parsed.data.stockQty !== existing.stockQty) {
+      const employee = await db.employee.findUnique({ where: { userId: req.user.sub } });
+      await db.inventoryMovement.create({
+        data: {
+          productId: id,
+          type: "MANUAL_ADJUSTMENT",
+          delta: parsed.data.stockQty - existing.stockQty,
+          quantityAfter: parsed.data.stockQty,
+          employeeId: employee?.id ?? null,
+          note: "Manual stock edit via Inventory",
+        },
+      });
+    }
+
     return ok({ product });
   } catch (err) {
     console.error("[PUT /api/products/[id]]", err);

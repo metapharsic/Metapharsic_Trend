@@ -106,7 +106,7 @@ async function updateOrderItems(req: AuthedRequest, id: string, body: unknown) {
   const parsed = UpdateOrderItemsSchema.safeParse(body);
   if (!parsed.success) return badRequest("Validation error", parsed.error.flatten());
 
-  const existing = await db.order.findUnique({ where: { id }, include: { invoice: true } });
+  const existing = await db.order.findUnique({ where: { id }, include: { invoice: true, items: true } });
   if (!existing) return notFound("Order not found");
   if (LOCKED_STATUSES.includes(existing.status)) {
     return badRequest(`Order is ${existing.status.toLowerCase()} and can no longer be edited.`);
@@ -175,6 +175,30 @@ async function updateOrderItems(req: AuthedRequest, id: string, body: unknown) {
   const orderItemsData = lineItems.map(({ listPrice, ...rest }) => rest);
 
   const updated = await db.$transaction(async (tx) => {
+    // Restore stock for the old line quantities before applying the new
+    // ones — otherwise editing an order silently double-deducts stock.
+    for (const oldItem of existing.items) {
+      await tx.product.update({
+        where: { id: oldItem.productId },
+        data: { stockQty: { increment: oldItem.quantity } },
+      });
+    }
+    for (const li of lineItems) {
+      const updatedProduct = await tx.product.update({
+        where: { id: li.productId },
+        data: { stockQty: { decrement: li.quantity } },
+      });
+      await tx.inventoryMovement.create({
+        data: {
+          productId: li.productId,
+          type: "ORDER_DEDUCTION",
+          delta: -li.quantity,
+          quantityAfter: updatedProduct.stockQty,
+          note: `Order ${id.slice(0, 8).toUpperCase()} edited`,
+        },
+      });
+    }
+
     await tx.orderItem.deleteMany({ where: { orderId: id } });
     const order = await tx.order.update({
       where: { id },
@@ -207,7 +231,7 @@ async function deleteOrder(
 ) {
   try {
     const id = String(params.id ?? "");
-    const existing = await db.order.findUnique({ where: { id } });
+    const existing = await db.order.findUnique({ where: { id }, include: { items: true } });
     if (!existing) return notFound("Order not found");
     if (LOCKED_STATUSES.includes(existing.status)) {
       return badRequest(`Order is ${existing.status.toLowerCase()} and can no longer be deleted.`);
@@ -221,7 +245,26 @@ async function deleteOrder(
     }
 
     // Cascades to OrderItem and Invoice (both onDelete: Cascade in schema).
-    await db.order.delete({ where: { id } });
+    // Restore the stock this order consumed first, or a deleted order
+    // permanently loses that quantity from the warehouse count.
+    await db.$transaction(async (tx) => {
+      for (const item of existing.items) {
+        const updatedProduct = await tx.product.update({
+          where: { id: item.productId },
+          data: { stockQty: { increment: item.quantity } },
+        });
+        await tx.inventoryMovement.create({
+          data: {
+            productId: item.productId,
+            type: "MANUAL_ADJUSTMENT",
+            delta: item.quantity,
+            quantityAfter: updatedProduct.stockQty,
+            note: `Order ${id.slice(0, 8).toUpperCase()} deleted — stock restored`,
+          },
+        });
+      }
+      await tx.order.delete({ where: { id } });
+    });
     return ok({ message: "Order deleted" });
   } catch (err) {
     console.error("[DELETE /api/orders/[id]]", err);
