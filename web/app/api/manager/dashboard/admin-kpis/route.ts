@@ -220,4 +220,4 @@ async function getAdminKpis(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getAdminKpis, [Role.ADMIN]);
+export const GET = withAuth(getAdminKpis, [Role.ADMIN, Role.MD]);

@@ -51,5 +51,5 @@ async function patchHandler(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getHandler, [Role.ASM, Role.ADMIN]);
-export const PATCH = withAuth(patchHandler, [Role.ASM, Role.ADMIN]);
+export const GET = withAuth(getHandler, [Role.ASM, Role.ADMIN, Role.MD]);
+export const PATCH = withAuth(patchHandler, [Role.ASM, Role.ADMIN, Role.MD]);
