@@ -73,16 +73,9 @@ export default function MrReportsPage() {
             <p className="text-slate-400 text-sm mt-0.5">Daily, weekly, or monthly call activity — on request</p>
           </div>
           {reps.length > 0 && (
-            <select
-              value={selectedRep}
-              onChange={(e) => setSelectedRep(e.target.value)}
-              className="bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
-            >
-              <option value="">All MRs</option>
-              {reps.map((r) => (
-                <option key={r.employeeId} value={r.employeeId}>{r.firstName} {r.lastName}</option>
-              ))}
-            </select>
+            <span className="text-xs font-bold text-indigo-200 uppercase tracking-wider bg-white/10 border border-white/20 px-3 py-2 rounded-xl">
+              All {reps.length} MRs
+            </span>
           )}
         </div>
         <div className="flex gap-2 mt-5">

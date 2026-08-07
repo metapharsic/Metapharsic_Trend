@@ -217,20 +217,12 @@ export default function CallHistoryPage() {
         </button>
       </div>
 
-      {/* ── Rep picker (managers only) ── */}
+      {/* ── Viewing everyone's calls (admin/ASM) — no picker, always all MRs ── */}
       {reps.length > 0 && (
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Viewing</span>
-          <select
-            value={selectedRep}
-            onChange={(e) => { setSelectedRep(e.target.value); setPage(1); }}
-            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none"
-          >
-            <option value="">All MRs</option>
-            {reps.map((r) => (
-              <option key={r.employeeId} value={r.employeeId}>{r.firstName} {r.lastName}</option>
-            ))}
-          </select>
+          <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+            Viewing all {reps.length} MRs
+          </span>
         </div>
       )}
 
