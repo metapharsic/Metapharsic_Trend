@@ -24,11 +24,18 @@ async function handler(req: AuthedRequest) {
     if (!employee) return notFound("MR not found");
     if (!product) return notFound("Product not found");
 
-    const inventory = await db.sampleInventory.upsert({
-      where: { employeeId_productId: { employeeId, productId } },
-      create: { employeeId, productId, quantity, allocatedQty: quantity },
-      update: { quantity: { increment: quantity }, allocatedQty: { increment: quantity } },
-    });
+    const allocatingManager = await db.employee.findUnique({ where: { userId: req.user.sub } });
+
+    const [inventory] = await db.$transaction([
+      db.sampleInventory.upsert({
+        where: { employeeId_productId: { employeeId, productId } },
+        create: { employeeId, productId, quantity, allocatedQty: quantity },
+        update: { quantity: { increment: quantity }, allocatedQty: { increment: quantity } },
+      }),
+      db.sampleAllocationLog.create({
+        data: { employeeId, productId, quantity, allocatedById: allocatingManager?.id ?? null },
+      }),
+    ]);
 
     return ok({ inventory });
   } catch (err) {

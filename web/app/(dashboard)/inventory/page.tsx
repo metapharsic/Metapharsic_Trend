@@ -31,12 +31,13 @@ interface MySample {
   quantity: number;
   unitValue: number;
   estimatedValue: number;
+  lastGivenAt: string;
 }
 
 interface MrStockRep {
   employeeId: string;
   employeeName: string;
-  items: { productId: string; productName: string; quantity: number; unitValue: number; estimatedValue: number }[];
+  items: { productId: string; productName: string; quantity: number; unitValue: number; estimatedValue: number; lastGivenAt: string }[];
   totalEstimatedValue: number;
 }
 
@@ -331,18 +332,19 @@ export default function InventoryPage() {
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Qty With Me</th>
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Unit Value</th>
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Est. Value</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Last Given</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {mySamplesLoading ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-slate-400">
+                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500 mx-auto" />
                     </td>
                   </tr>
                 ) : mySamples.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-medium">
+                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400 font-medium">
                       No sample stock allocated to you yet.
                     </td>
                   </tr>
@@ -359,6 +361,11 @@ export default function InventoryPage() {
                       </td>
                       <td className="px-4 py-3 text-right text-slate-600">{currency(s.unitValue)}</td>
                       <td className="px-4 py-3 text-right font-bold text-slate-800">{currency(s.estimatedValue)}</td>
+                      <td className="px-4 py-3 text-slate-500">
+                        {new Date(s.lastGivenAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                        {" "}
+                        <span className="text-[10px] text-slate-400">{new Date(s.lastGivenAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -462,6 +469,10 @@ export default function InventoryPage() {
                             <td className="px-4 py-2 text-right text-slate-500">Qty {it.quantity}</td>
                             <td className="px-4 py-2 text-right text-slate-500">{currency(it.unitValue)}/u</td>
                             <td className="px-4 py-2 text-right font-semibold text-slate-700">{currency(it.estimatedValue)}</td>
+                            <td className="px-4 py-2 text-right text-slate-400 text-[10px]">
+                              {new Date(it.lastGivenAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}{" "}
+                              {new Date(it.lastGivenAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

@@ -21,6 +21,7 @@ async function handler(req: AuthedRequest) {
         quantity: s.quantity,
         unitValue,
         estimatedValue: unitValue * s.quantity,
+        lastGivenAt: s.updatedAt,
       };
     });
 

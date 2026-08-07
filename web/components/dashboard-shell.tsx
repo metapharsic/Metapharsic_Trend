@@ -33,41 +33,52 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 
+// Fixed display order for sidebar sections — grouped by what the item is
+// actually for, not alphabetically or by when it was added.
+const NAV_CATEGORY_ORDER = ["Overview", "Field Force", "Sales & Inventory", "Portals", "Finance & HR", "Reports & Tools", "Admin Settings", "Account"] as const;
+
 const NAV_ITEMS = [
-  { href: "/md", label: "MD Dashboard", icon: LayoutGrid, roles: ["MD", "ADMIN"] },
-  { href: "/asm", label: "ASM Dashboard", icon: LayoutGrid, roles: ["ASM", "ADMIN"] },
-  { href: "/mr", label: "MR Dashboard", icon: LayoutGrid, roles: ["MR", "ADMIN"] },
-  { href: "/mr/calls", label: "My Calls", icon: ClipboardCheck, roles: ["MR", "ADMIN"] },
-  { href: "/mr/reports", label: "My Call Reports", icon: BarChart3, roles: ["MR", "ADMIN"] },
-  { href: "/mr/leads", label: "My Leads", icon: Target, roles: ["MR", "ADMIN"] },
-  { href: "/mr/attendance", label: "My Attendance", icon: Clock, roles: ["MR", "ADMIN"] },
-  { href: "/collections", label: "Credit & Collections", icon: Wallet, roles: ["MR", "ASM", "ADMIN", "FINANCE"] },
-  { href: "/distributor", label: "Distributor Portal", icon: Package, roles: ["DISTRIBUTOR", "ADMIN", "MD"] },
-  { href: "/doctor", label: "Doctor Portal", icon: Stethoscope, roles: ["DOCTOR", "ADMIN"] },
-  { href: "/hr", label: "HR Dashboard", icon: Users2, roles: ["HR", "ADMIN"] },
-  { href: "/finance", label: "Finance Dashboard", icon: Calculator, roles: ["FINANCE", "ADMIN"] },
-  { href: "/warehouse", label: "Warehouse Dashboard", icon: Package, roles: ["WAREHOUSE", "ADMIN"] },
-  { href: "/marketing", label: "Marketing Dashboard", icon: BarChart3, roles: ["MARKETING", "ADMIN"] },
-  { href: "/territories", label: "Territories", icon: MapPinned, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"] },
-  { href: "/entities", label: "Master Profiles", icon: Contact, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"] },
-  { href: "/doctors", label: "Doctor Potential", icon: Stethoscope, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"] },
-  { href: "/tour-plans", label: "Tour Plans", icon: CalendarDays, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"] },
-  { href: "/orders", label: "Orders", icon: Package, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "MR", "DISTRIBUTOR"], labelByRole: { MR: "My Sales" } },
-  { href: "/inventory", label: "Inventory", icon: Package, roles: ["ADMIN", "WAREHOUSE", "ASM", "MR"] },
-  { href: "/admin/mr-activity", label: "MR Activity", icon: ClipboardCheck, roles: ["ADMIN", "ASM"] },
-  { href: "/admin/leads", label: "Leads Pipeline", icon: Target, roles: ["ADMIN", "ASM"] },
-  { href: "/admin/financials", label: "Entity Financials", icon: IndianRupee, roles: ["ADMIN", "ASM", "FINANCE"] },
-  { href: "/hospitals", label: "Institutional", icon: Building2, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"] },
-  { href: "/expenses", label: "Expense Claims", icon: Receipt, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "MR", "FINANCE"] },
-  { href: "/lms", label: "Training", icon: GraduationCap, roles: ["ADMIN", "HR", "ASM", "RM", "ZSM", "NSM", "MD"] },
-  { href: "/hrms", label: "HRMS", icon: Users2, roles: ["ADMIN", "HR"] },
-  { href: "/reports", label: "BI Reports", icon: BarChart3, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"] },
-  { href: "/simulator", label: "Scheme Simulator", icon: Calculator, roles: ["ADMIN", "MD", "NSM", "FINANCE", "MARKETING"] },
-  { href: "/admin", label: "Admin Dashboard", icon: ShieldCheck, roles: ["ADMIN"] },
-  { href: "/admin/company-settings", label: "Company Settings", icon: Building2, roles: ["ADMIN"] },
-  { href: "/admin/workflow-settings", label: "Workflow Settings", icon: Settings2, roles: ["ADMIN"] },
-  { href: "/users", label: "User Management", icon: UserCog, roles: ["ADMIN", "HR"] },
-  { href: "/profile", label: "My Profile", icon: UserCircle2, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "HR", "FINANCE", "WAREHOUSE", "MARKETING"] },
+  { href: "/md", label: "MD Dashboard", icon: LayoutGrid, roles: ["MD", "ADMIN"], category: "Overview" },
+  { href: "/asm", label: "ASM Dashboard", icon: LayoutGrid, roles: ["ASM", "ADMIN"], category: "Overview" },
+  { href: "/mr", label: "MR Dashboard", icon: LayoutGrid, roles: ["MR", "ADMIN"], category: "Overview" },
+  { href: "/admin", label: "Admin Dashboard", icon: ShieldCheck, roles: ["ADMIN"], category: "Overview" },
+
+  { href: "/mr/calls", label: "My Calls", icon: ClipboardCheck, roles: ["MR", "ADMIN"], category: "Field Force" },
+  { href: "/mr/reports", label: "My Call Reports", icon: BarChart3, roles: ["MR", "ADMIN"], category: "Field Force" },
+  { href: "/mr/leads", label: "My Leads", icon: Target, roles: ["MR", "ADMIN"], category: "Field Force" },
+  { href: "/mr/attendance", label: "My Attendance", icon: Clock, roles: ["MR", "ADMIN"], category: "Field Force" },
+  { href: "/tour-plans", label: "Tour Plans", icon: CalendarDays, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"], category: "Field Force" },
+  { href: "/admin/mr-activity", label: "MR Activity", icon: ClipboardCheck, roles: ["ADMIN", "ASM"], category: "Field Force" },
+  { href: "/admin/leads", label: "Leads Pipeline", icon: Target, roles: ["ADMIN", "ASM"], category: "Field Force" },
+  { href: "/territories", label: "Territories", icon: MapPinned, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"], category: "Field Force" },
+  { href: "/entities", label: "Master Profiles", icon: Contact, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"], category: "Field Force" },
+  { href: "/doctors", label: "Doctor Potential", icon: Stethoscope, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"], category: "Field Force" },
+  { href: "/hospitals", label: "Institutional", icon: Building2, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"], category: "Field Force" },
+
+  { href: "/orders", label: "Orders", icon: Package, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "MR", "DISTRIBUTOR"], labelByRole: { MR: "My Sales" }, category: "Sales & Inventory" },
+  { href: "/collections", label: "Credit & Collections", icon: Wallet, roles: ["MR", "ASM", "ADMIN", "FINANCE"], category: "Sales & Inventory" },
+  { href: "/inventory", label: "Inventory", icon: Package, roles: ["ADMIN", "WAREHOUSE", "ASM", "MR"], category: "Sales & Inventory" },
+  { href: "/admin/financials", label: "Entity Financials", icon: IndianRupee, roles: ["ADMIN", "ASM", "FINANCE"], category: "Sales & Inventory" },
+  { href: "/warehouse", label: "Warehouse Dashboard", icon: Package, roles: ["WAREHOUSE", "ADMIN"], category: "Sales & Inventory" },
+
+  { href: "/distributor", label: "Distributor Portal", icon: Package, roles: ["DISTRIBUTOR", "ADMIN", "MD"], category: "Portals" },
+  { href: "/doctor", label: "Doctor Portal", icon: Stethoscope, roles: ["DOCTOR", "ADMIN"], category: "Portals" },
+
+  { href: "/finance", label: "Finance Dashboard", icon: Calculator, roles: ["FINANCE", "ADMIN"], category: "Finance & HR" },
+  { href: "/expenses", label: "Expense Claims", icon: Receipt, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "MR", "FINANCE"], category: "Finance & HR" },
+  { href: "/hr", label: "HR Dashboard", icon: Users2, roles: ["HR", "ADMIN"], category: "Finance & HR" },
+  { href: "/hrms", label: "HRMS", icon: Users2, roles: ["ADMIN", "HR"], category: "Finance & HR" },
+  { href: "/users", label: "User Management", icon: UserCog, roles: ["ADMIN", "HR"], category: "Finance & HR" },
+  { href: "/lms", label: "Training", icon: GraduationCap, roles: ["ADMIN", "HR", "ASM", "RM", "ZSM", "NSM", "MD"], category: "Finance & HR" },
+
+  { href: "/reports", label: "BI Reports", icon: BarChart3, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"], category: "Reports & Tools" },
+  { href: "/simulator", label: "Scheme Simulator", icon: Calculator, roles: ["ADMIN", "MD", "NSM", "FINANCE", "MARKETING"], category: "Reports & Tools" },
+  { href: "/marketing", label: "Marketing Dashboard", icon: BarChart3, roles: ["MARKETING", "ADMIN"], category: "Reports & Tools" },
+
+  { href: "/admin/company-settings", label: "Company Settings", icon: Building2, roles: ["ADMIN"], category: "Admin Settings" },
+  { href: "/admin/workflow-settings", label: "Workflow Settings", icon: Settings2, roles: ["ADMIN"], category: "Admin Settings" },
+
+  { href: "/profile", label: "My Profile", icon: UserCircle2, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "HR", "FINANCE", "WAREHOUSE", "MARKETING"], category: "Account" },
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -119,6 +130,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       ? []
       : filteredNavItems.filter((item) => item.label.toLowerCase().includes(navSearch.trim().toLowerCase()));
 
+  const groupedNavItems = NAV_CATEGORY_ORDER.map((category) => ({
+    category,
+    items: filteredNavItems.filter((item) => item.category === category),
+  })).filter((group) => group.items.length > 0);
+
   const goToSearchResult = (href: string) => {
     router.push(href);
     setNavSearch("");
@@ -151,27 +167,31 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
-          <p className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Menu
-          </p>
-          {filteredNavItems.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href;
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                  active
-                    ? "bg-primary-600 text-white"
-                    : "text-gray-500 hover:bg-primary-50 hover:text-primary-700"
-                }`}
-              >
-                <Icon size={18} />
-                {label}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 px-4 space-y-4 overflow-y-auto">
+          {groupedNavItems.map((group) => (
+            <div key={group.category} className="space-y-1">
+              <p className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                {group.category}
+              </p>
+              {group.items.map(({ href, label, icon: Icon }) => {
+                const active = pathname === href;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                      active
+                        ? "bg-primary-600 text-white"
+                        : "text-gray-500 hover:bg-primary-50 hover:text-primary-700"
+                    }`}
+                  >
+                    <Icon size={18} />
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="px-4 pb-6 mt-4">
@@ -194,28 +214,32 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <span className="hidden xl:inline font-display font-bold text-lg text-gray-900">Trend MR</span>
         </div>
 
-        <nav className="flex-1 px-2 xl:px-4 space-y-1 overflow-y-auto">
-          <p className="hidden xl:block px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Menu
-          </p>
-          {filteredNavItems.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href;
-            return (
-              <Link
-                key={href}
-                href={href}
-                title={label}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors justify-center xl:justify-start ${
-                  active
-                    ? "bg-primary-600 text-white"
-                    : "text-gray-500 hover:bg-primary-50 hover:text-primary-700"
-                }`}
-              >
-                <Icon size={18} className="shrink-0" />
-                <span className="hidden xl:inline truncate">{label}</span>
-              </Link>
-            );
-          })}
+        <nav className="flex-1 px-2 xl:px-4 space-y-4 overflow-y-auto">
+          {groupedNavItems.map((group) => (
+            <div key={group.category} className="space-y-1">
+              <p className="hidden xl:block px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                {group.category}
+              </p>
+              {group.items.map(({ href, label, icon: Icon }) => {
+                const active = pathname === href;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    title={label}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors justify-center xl:justify-start ${
+                      active
+                        ? "bg-primary-600 text-white"
+                        : "text-gray-500 hover:bg-primary-50 hover:text-primary-700"
+                    }`}
+                  >
+                    <Icon size={18} className="shrink-0" />
+                    <span className="hidden xl:inline truncate">{label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="px-2 xl:px-4 pb-6 mt-4">
