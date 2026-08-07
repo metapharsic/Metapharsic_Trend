@@ -1,8 +1,19 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Users2, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users2, CalendarDays, X } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+
+interface DayVisit {
+  id: string;
+  time: string;
+  mrName: string;
+  target: string;
+  purpose: string;
+  feedback: string | null;
+  receptiveness: string | null;
+  durationMinutes: number | null;
+}
 
 interface MR {
   id: string;
@@ -26,8 +37,10 @@ export default function MrActivityPage() {
   const [cursor, setCursor] = useState(new Date());
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [byMr, setByMr] = useState<Record<string, { name: string; total: number }>>({});
+  const [byDay, setByDay] = useState<Record<string, DayVisit[]>>({});
   const [loading, setLoading] = useState(true);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   useEffect(() => {
     apiClient
@@ -43,6 +56,7 @@ export default function MrActivityPage() {
       .then((res) => {
         setCounts(res.data.data.counts);
         setByMr(res.data.data.byMr);
+        setByDay(res.data.data.byDay || {});
       })
       .catch((err) => console.error("Failed to load activity summary:", err))
       .finally(() => setLoading(false));
@@ -129,16 +143,20 @@ export default function MrActivityPage() {
                     const count = counts[iso] ?? 0;
                     const isToday = iso === todayIso;
                     return (
-                      <div
+                      <button
                         key={d}
+                        type="button"
                         title={`${iso}: ${count} call${count === 1 ? "" : "s"}`}
+                        onClick={() => count > 0 && setSelectedDay(iso)}
                         className={`aspect-square rounded-full flex flex-col items-center justify-center text-[11px] font-semibold border transition-all ${
-                          count > 0 ? "bg-primary-50 text-primary-700 border-primary-200 hover:scale-105" : "bg-gray-50 text-gray-400 border-gray-100"
+                          count > 0
+                            ? "bg-primary-50 text-primary-700 border-primary-200 hover:scale-105 cursor-pointer"
+                            : "bg-gray-50 text-gray-400 border-gray-100 cursor-default"
                         } ${isToday ? "ring-2 ring-primary-300" : ""}`}
                       >
                         <span>{d}</span>
                         {count > 0 && <span className="text-[8px]">{"●".repeat(Math.min(count, 3))}</span>}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -148,6 +166,60 @@ export default function MrActivityPage() {
           </div>
         )}
       </div>
+
+      {selectedDay && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setSelectedDay(null)}>
+          <div
+            className="bg-white rounded-2xl p-5 w-full max-w-lg max-h-[80vh] overflow-y-auto shadow-2xl border border-primary-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-gray-800">
+                Calls on {new Date(selectedDay + "T00:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+              </h3>
+              <button onClick={() => setSelectedDay(null)} className="text-gray-400 hover:text-gray-700 p-1 -m-1 rounded-full hover:bg-gray-100">
+                <X size={16} />
+              </button>
+            </div>
+            {(byDay[selectedDay] || []).length === 0 ? (
+              <p className="text-sm text-gray-400">No calls recorded.</p>
+            ) : (
+              <ul className="space-y-3">
+                {(byDay[selectedDay] || []).map((v) => (
+                  <li key={v.id} className="border border-gray-100 rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold text-gray-800">{v.target}</span>
+                      <span className="text-xs text-gray-400">
+                        {new Date(v.time).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    {!selectedMr && <p className="text-xs text-primary-600 font-medium mb-1">{v.mrName}</p>}
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{v.purpose}</p>
+                    {v.feedback && (
+                      <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap break-words">
+                        <span className="font-semibold">Feedback: </span>
+                        {v.feedback}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {v.receptiveness && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                          {v.receptiveness}
+                        </span>
+                      )}
+                      {v.durationMinutes != null && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                          {v.durationMinutes} min
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
 
       {!selectedMr && (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">

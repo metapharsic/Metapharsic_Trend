@@ -44,14 +44,17 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div
+      className="min-h-[100dvh] flex items-center justify-center bg-gray-50 px-4"
+      style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       <form
         onSubmit={handleSubmit}
-        className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 w-full max-w-sm space-y-4"
+        className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-100 w-full max-w-sm space-y-4"
       >
         <div>
           <h1 className="text-xl font-bold text-gray-900">Trend MR</h1>
-          <p className="text-sm text-gray-500 mt-1">Manager / Admin sign in</p>
+          <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
         </div>
 
         {error && (
@@ -66,8 +69,12 @@ export default function LoginPage() {
           </label>
           <input
             type="email"
+            inputMode="email"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
             required
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full border border-gray-200 rounded-lg px-3 py-3 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
@@ -79,8 +86,9 @@ export default function LoginPage() {
           </label>
           <input
             type="password"
+            autoComplete="current-password"
             required
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full border border-gray-200 rounded-lg px-3 py-3 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
@@ -89,7 +97,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-primary-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-primary-700 disabled:opacity-50"
+          className="w-full bg-primary-600 text-white rounded-lg py-3 text-sm font-semibold hover:bg-primary-700 disabled:opacity-50 active:scale-[0.99] transition-transform"
         >
           {loading ? "Signing in..." : "Sign in"}
         </button>

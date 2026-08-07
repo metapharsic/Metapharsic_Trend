@@ -26,20 +26,45 @@ async function handler(req: AuthedRequest) {
         ...(employeeId ? { employeeId } : {}),
         createdAt: { gte: start, lt: end },
       },
-      select: { createdAt: true, employeeId: true, employee: { select: { firstName: true, lastName: true } } },
+      select: {
+        id: true,
+        createdAt: true,
+        employeeId: true,
+        purpose: true,
+        feedback: true,
+        receptiveness: true,
+        durationMinutes: true,
+        employee: { select: { firstName: true, lastName: true } },
+        doctor: { select: { fullName: true } },
+        chemist: { select: { name: true } },
+        hospital: { select: { name: true } },
+      },
+      orderBy: { createdAt: "asc" },
     });
 
     const counts: Record<string, number> = {};
     const byMr: Record<string, { name: string; total: number }> = {};
+    const byDay: Record<string, any[]> = {};
     for (const v of visits) {
       const day = v.createdAt.toISOString().slice(0, 10);
       counts[day] = (counts[day] ?? 0) + 1;
       const name = `${v.employee.firstName} ${v.employee.lastName}`;
       if (!byMr[v.employeeId]) byMr[v.employeeId] = { name, total: 0 };
       byMr[v.employeeId].total += 1;
+      if (!byDay[day]) byDay[day] = [];
+      byDay[day].push({
+        id: v.id,
+        time: v.createdAt.toISOString(),
+        mrName: name,
+        target: v.doctor?.fullName || v.chemist?.name || v.hospital?.name || "—",
+        purpose: v.purpose,
+        feedback: v.feedback,
+        receptiveness: v.receptiveness,
+        durationMinutes: v.durationMinutes,
+      });
     }
 
-    return ok({ counts, byMr, total: visits.length });
+    return ok({ counts, byMr, byDay, total: visits.length });
   } catch (err) {
     console.error("[GET /api/manager/visits/summary]", err);
     return apiError("INTERNAL_SERVER_ERROR", "Failed to fetch call summary", 500);
