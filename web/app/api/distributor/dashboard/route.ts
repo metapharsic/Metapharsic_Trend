@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { Role, OrderStatus, ClaimStatus } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, unauthorized, notFound, forbidden, apiError } from "@/lib/api-response";
-import { startOfUtcMonth } from "@/lib/date";
+import { startOfIstMonth } from "@/lib/date";
 import { creditUtilizationPercent } from "@/lib/order-workflow";
 
 /**
@@ -27,7 +27,7 @@ async function getDistributorDashboard(req: AuthedRequest) {
     const distributor = requestedId
       ? await db.distributor.findUnique({ where: { id: requestedId }, ...territorySelect })
       : (isManager
-          ? await db.distributor.findFirst(territorySelect)
+          ? await db.distributor.findFirst({ orderBy: { createdAt: "asc" }, ...territorySelect })
           : await db.distributor.findUnique({ where: { userId: req.user.sub }, ...territorySelect }));
 
     if (!distributor) {
@@ -36,7 +36,7 @@ async function getDistributorDashboard(req: AuthedRequest) {
         : notFound("No distributor account is linked to this login");
     }
 
-    const monthStart = startOfUtcMonth();
+    const monthStart = startOfIstMonth();
 
     const [orders, pendingOrders, monthOrderItems, invoices, pendingClaims] = await Promise.all([
       db.order.count({ where: { distributorId: distributor.id } }),

@@ -3,7 +3,7 @@ import { Role } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, unauthorized, apiError } from "@/lib/api-response";
 import { outstandingBalance, creditStatus } from "@/lib/credit";
-import { startOfUtcDay } from "@/lib/date";
+import { startOfIstDay } from "@/lib/date";
 
 /**
  * MR's own credit/collections picture: per-chemist outstanding against limit,
@@ -18,7 +18,7 @@ async function getCreditSummary(req: AuthedRequest) {
     if (!employee) return unauthorized("Employee record not found");
 
     const territoryIds = employee.territories.map((t) => t.id);
-    const today = startOfUtcDay();
+    const today = startOfIstDay();
 
     const [chemists, orderItems, collections, todaysCollections, collectionsList] = await Promise.all([
       db.chemist.findMany({
@@ -26,7 +26,12 @@ async function getCreditSummary(req: AuthedRequest) {
         select: { id: true, name: true, creditLimit: true },
       }),
       db.orderItem.findMany({
-        where: { order: { chemist: { territoryId: { in: territoryIds } }, status: { not: "CANCELLED" } } },
+        where: {
+          order: {
+            chemist: { territoryId: { in: territoryIds } },
+            status: { in: ["CONFIRMED", "SHIPPED", "DELIVERED"] },
+          },
+        },
         select: { price: true, quantity: true, order: { select: { chemistId: true } } },
       }),
       db.collection.findMany({

@@ -3,7 +3,7 @@ import { Role } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, apiError } from "@/lib/api-response";
 import { outstandingBalance, creditStatus } from "@/lib/credit";
-import { startOfUtcDay } from "@/lib/date";
+import { startOfIstDay } from "@/lib/date";
 
 /**
  * Company-wide credit exposure — every chemist against every MR's collections.
@@ -12,7 +12,7 @@ import { startOfUtcDay } from "@/lib/date";
  */
 async function getCreditOverview(req: AuthedRequest) {
   try {
-    const today = startOfUtcDay();
+    const today = startOfIstDay();
 
     const [chemists, orderItems, collections, todaysCollections, collectionsList] = await Promise.all([
       db.chemist.findMany({
@@ -24,7 +24,7 @@ async function getCreditOverview(req: AuthedRequest) {
         },
       }),
       db.orderItem.findMany({
-        where: { order: { status: { not: "CANCELLED" } } },
+        where: { order: { status: { in: ["CONFIRMED", "SHIPPED", "DELIVERED"] } } },
         select: { price: true, quantity: true, order: { select: { chemistId: true } } },
       }),
       db.collection.findMany({
