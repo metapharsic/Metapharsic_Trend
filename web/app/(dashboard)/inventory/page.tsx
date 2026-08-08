@@ -37,7 +37,7 @@ interface MySample {
 interface MrStockRep {
   employeeId: string;
   employeeName: string;
-  items: { productId: string; productName: string; quantity: number; unitValue: number; estimatedValue: number; lastGivenAt: string }[];
+  items: { id: string; productId: string; productName: string; quantity: number; unitValue: number; estimatedValue: number; lastGivenAt: string }[];
   totalEstimatedValue: number;
 }
 
@@ -68,6 +68,10 @@ export default function InventoryPage() {
   const [allocSubmitting, setAllocSubmitting] = useState(false);
   const [allocError, setAllocError] = useState("");
   const [allocSuccess, setAllocSuccess] = useState("");
+  const [editingStockRow, setEditingStockRow] = useState<{ id: string; employeeId: string; productName: string; quantity: number } | null>(null);
+  const [editStockQty, setEditStockQty] = useState("");
+  const [editStockSubmitting, setEditStockSubmitting] = useState(false);
+  const [editStockError, setEditStockError] = useState("");
 
   // Form states for add/edit
   const [formData, setFormData] = useState({
@@ -166,6 +170,44 @@ export default function InventoryPage() {
       setAllocError(err?.response?.data?.error?.message || "Failed to allocate stock.");
     } finally {
       setAllocSubmitting(false);
+    }
+  };
+
+  const handleOpenStockEdit = (rep: MrStockRep, item: MrStockRep["items"][number]) => {
+    setEditingStockRow({ id: item.id, employeeId: rep.employeeId, productName: item.productName, quantity: item.quantity });
+    setEditStockQty(String(item.quantity));
+    setEditStockError("");
+  };
+
+  const handleSaveStockEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStockRow) return;
+    const qty = Number(editStockQty);
+    if (Number.isNaN(qty) || qty < 0) {
+      setEditStockError("Enter a valid quantity.");
+      return;
+    }
+    setEditStockSubmitting(true);
+    setEditStockError("");
+    try {
+      await apiClient.patch(`/api/manager/mr-stock/${editingStockRow.id}`, { quantity: qty });
+      setEditingStockRow(null);
+      refreshMrStock();
+    } catch (err: any) {
+      setEditStockError(err?.response?.data?.error?.message || "Failed to update stock.");
+    } finally {
+      setEditStockSubmitting(false);
+    }
+  };
+
+  const handleDeleteStockRow = async (item: MrStockRep["items"][number]) => {
+    if (!window.confirm(`Remove "${item.productName}" from this MR's sample stock entirely?`)) return;
+    try {
+      await apiClient.delete(`/api/manager/mr-stock/${item.id}`);
+      refreshMrStock();
+    } catch (err: any) {
+      console.error("Failed to delete MR stock row", err);
+      setError(err?.response?.data?.error?.message || "Failed to remove stock row.");
     }
   };
 
@@ -472,6 +514,24 @@ export default function InventoryPage() {
                             <td className="px-4 py-2 text-right text-slate-400 text-[10px]">
                               {new Date(it.lastGivenAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}{" "}
                               {new Date(it.lastGivenAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => handleOpenStockEdit(rep, it)}
+                                  className="p-1.5 hover:bg-slate-200 hover:text-indigo-600 rounded-lg transition-colors cursor-pointer text-slate-400"
+                                  title="Edit quantity"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteStockRow(it)}
+                                  className="p-1.5 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors cursor-pointer text-slate-400"
+                                  title="Remove from MR's stock"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -807,6 +867,40 @@ export default function InventoryPage() {
 
       {historyProduct && (
         <StockHistoryModal product={historyProduct} onClose={() => setHistoryProduct(null)} />
+      )}
+
+      {editingStockRow && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h2 className="text-sm font-bold text-slate-800">Edit MR Stock — {editingStockRow.productName}</h2>
+              <button onClick={() => setEditingStockRow(null)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500">
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleSaveStockEdit} className="p-5 space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-600">New Quantity</label>
+                <input
+                  type="number"
+                  min={0}
+                  autoFocus
+                  value={editStockQty}
+                  onChange={(e) => setEditStockQty(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              {editStockError && <p className="text-rose-600">{editStockError}</p>}
+              <button
+                type="submit"
+                disabled={editStockSubmitting}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl cursor-pointer transition-colors disabled:opacity-50"
+              >
+                {editStockSubmitting ? "Saving..." : "Save Quantity"}
+              </button>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

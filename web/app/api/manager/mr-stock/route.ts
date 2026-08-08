@@ -19,7 +19,7 @@ async function handler(req: AuthedRequest) {
 
     const byEmployee = new Map<
       string,
-      { employeeId: string; employeeName: string; items: { productId: string; productName: string; quantity: number; unitValue: number; estimatedValue: number; lastGivenAt: Date }[]; totalEstimatedValue: number }
+      { employeeId: string; employeeName: string; items: { id: string; productId: string; productName: string; quantity: number; unitValue: number; estimatedValue: number; lastGivenAt: Date }[]; totalEstimatedValue: number }
     >();
 
     for (const row of inventory) {
@@ -36,6 +36,7 @@ async function handler(req: AuthedRequest) {
       }
       const bucket = byEmployee.get(key)!;
       bucket.items.push({
+        id: row.id,
         productId: row.productId,
         productName: row.product.name,
         quantity: row.quantity,
