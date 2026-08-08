@@ -176,8 +176,10 @@ export default function InvoicePage() {
       <style>{`
         @media print {
           @page { size: A3 portrait; margin: 8mm; }
+          html, body { width: 297mm; height: 420mm; }
           .no-print { display: none !important; }
-          body { background: white !important; }
+          body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .invoice-card { border: 1.5pt solid #0f172a !important; }
         }
       `}</style>
 
@@ -193,7 +195,7 @@ export default function InvoicePage() {
         </button>
       </div>
 
-      <div className="relative max-w-5xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-6 text-[11px] leading-tight print:rounded-none print:border-none print:shadow-none print:p-0 print:max-w-full print:bg-transparent overflow-hidden">
+      <div className="invoice-card relative max-w-5xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-6 text-[11px] leading-tight print:rounded-none print:shadow-none print:p-6 print:max-w-full print:bg-transparent overflow-hidden">
         {/* Watermark — centered on the invoice card itself, not the viewport,
             so it lands dead-center on the printed A3 page regardless of scroll/zoom. */}
         <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none select-none">
