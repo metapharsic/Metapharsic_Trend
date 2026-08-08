@@ -4,6 +4,19 @@ import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, badRequest, apiError } from "@/lib/api-response";
 import { startOfUtcMonth } from "@/lib/date";
 
+// ADMIN/MD/NSM see company-wide data; ZSM/RM/ASM are scoped to their own
+// territories only — mirrors the scoping already enforced on api/mr/dashboard.
+const UNSCOPED_ROLES = new Set<Role>([Role.ADMIN, Role.MD, Role.NSM]);
+
+async function getScopeTerritoryIds(req: AuthedRequest): Promise<string[] | null> {
+  if (UNSCOPED_ROLES.has(req.user.role as Role)) return null;
+  const employee = await db.employee.findUnique({
+    where: { userId: req.user.sub },
+    include: { territories: { select: { id: true } } },
+  });
+  return employee ? employee.territories.map((t) => t.id) : [];
+}
+
 
 /**
  * BI Reports library — docs/08_backend/reporting_engine.md §3.
@@ -15,9 +28,15 @@ const REPORTS = {
     category: "Sales & Commercial",
     title: "Product-wise Profitability",
     description: "Units, revenue, cost, profit margins, and markup per product SKU.",
-    run: async () => {
+    run: async (territoryIds: string[] | null) => {
       const items = await db.orderItem.findMany({
-        where: { order: { createdAt: { gte: startOfUtcMonth() } } },
+        where: {
+          order: {
+            createdAt: { gte: startOfUtcMonth() },
+            status: OrderStatus.DELIVERED,
+            ...(territoryIds ? { employee: { territories: { some: { id: { in: territoryIds } } } } } : {}),
+          },
+        },
         include: { product: true },
       });
       const byProduct = new Map<string, {
@@ -71,15 +90,31 @@ const REPORTS = {
       }
       return [...byProduct.values()].sort((a, b) => b.ptrValue - a.ptrValue);
     },
+    // Real approved-expense total for the same scope/month — replaces what used
+    // to be a hardcoded "~2000" placeholder on the frontend summary tiles.
+    summary: async (territoryIds: string[] | null) => {
+      const expenses = await db.expense.aggregate({
+        where: {
+          createdAt: { gte: startOfUtcMonth() },
+          status: ExpenseStatus.APPROVED,
+          ...(territoryIds ? { employee: { territories: { some: { id: { in: territoryIds } } } } } : {}),
+        },
+        _sum: { amount: true },
+      });
+      return { totalExpenses: Number(expenses._sum.amount ?? 0) };
+    },
   },
 
   "mr-sales-profit": {
     category: "Sales & Commercial",
     title: "MR Track of Sales & Profit",
     description: "Analysis of sales revenue, gross profits, and expenses logged per MR.",
-    run: async () => {
+    run: async (territoryIds: string[] | null) => {
       const employees = await db.employee.findMany({
-        where: { user: { role: Role.MR, isActive: true } },
+        where: {
+          user: { role: Role.MR, isActive: true },
+          ...(territoryIds ? { territories: { some: { id: { in: territoryIds } } } } : {}),
+        },
         include: {
           user: { select: { id: true } },
           territories: { select: { name: true } },
@@ -135,12 +170,16 @@ const REPORTS = {
     category: "Sales & Commercial",
     title: "Territory Performance",
     description: "Target versus actual collections per territory.",
-    run: async () => {
+    run: async (territoryIds: string[] | null) => {
       const territories = await db.territory.findMany({
+        where: territoryIds ? { id: { in: territoryIds } } : undefined,
         include: { targets: { select: { value: true } } },
       });
       const collections = await db.collection.findMany({
-        where: { createdAt: { gte: startOfUtcMonth() } },
+        where: {
+          createdAt: { gte: startOfUtcMonth() },
+          ...(territoryIds ? { chemist: { territoryId: { in: territoryIds } } } : {}),
+        },
         include: { chemist: { select: { territoryId: true } } },
       });
       const achievedByTerritory = new Map<string, number>();
@@ -322,7 +361,14 @@ const REPORTS = {
         mr: `${v.employee.firstName} ${v.employee.lastName}`,
         entity: v.doctor?.fullName ?? "Chemist visit",
         loggedAt: v.createdAt,
-        details: v.anomalyDetails ? JSON.parse(v.anomalyDetails) : null,
+        details: (() => {
+          if (!v.anomalyDetails) return null;
+          try {
+            return JSON.parse(v.anomalyDetails);
+          } catch {
+            return v.anomalyDetails;
+          }
+        })(),
       }));
     },
   },
@@ -400,8 +446,11 @@ async function handleReports(req: AuthedRequest) {
     const report = REPORTS[key];
     if (!report) return badRequest(`Unknown report '${key}'`);
 
-    const rows = await report.run();
-    return ok({ id: key, title: report.title, category: report.category, rows });
+    const territoryIds = await getScopeTerritoryIds(req);
+    const run = report.run as (territoryIds: string[] | null) => Promise<any[]>;
+    const rows = await run(territoryIds);
+    const summary = "summary" in report ? await (report as any).summary(territoryIds) : undefined;
+    return ok({ id: key, title: report.title, category: report.category, rows, summary });
   } catch (err) {
     console.error("[GET /api/reports]", err);
     return apiError("INTERNAL_SERVER_ERROR", "Failed to run report", 500);

@@ -29,6 +29,7 @@ interface ReportData {
   title: string;
   category: string;
   rows: any[];
+  summary?: { totalExpenses?: number };
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -129,7 +130,9 @@ export default function ReportsDashboard() {
           { id: "territory-performance", category: "Sales & Commercial", title: "Territory Performance", description: "Target versus actual collections per territory." },
           { id: "doctor-coverage-index", category: "Activity & Field Force", title: "Doctor Coverage Index", description: "Percentage of each territory's doctors visited this month." },
           { id: "missed-visit-log", category: "Activity & Field Force", title: "Missed Visit Log", description: "Doctors below their DPS-mandated monthly visit frequency." },
+          { id: "call-average", category: "Activity & Field Force", title: "Call Average per MR", description: "Visits logged per MR this month, with daily average." },
           { id: "expense-claim-summary", category: "Financial & Outstanding", title: "Expense Claim Summary", description: "Expense totals per employee and category this month." },
+          { id: "outstanding-approvals", category: "Financial & Outstanding", title: "Outstanding Approvals", description: "Expense claims awaiting action, aged by days pending." },
           { id: "gps-violations", category: "Compliance & Audit", title: "GPS Violations", description: "Anomalous visits and spoofed-location logs this month." },
           { id: "tender-pipeline", category: "Institutional", title: "Tender Pipeline", description: "Hospital rate-contract tenders by status and contract value." },
           { id: "training-compliance", category: "HRMS", title: "Training Compliance", description: "LMS course completion rates per employee." },
@@ -170,8 +173,7 @@ export default function ReportsDashboard() {
         sales += r.ptrValue || 0;
         profit += r.profit || 0;
       });
-      // Match seed expenses (around 2000 total)
-      const expenses = 2000; 
+      const expenses = reportData.summary?.totalExpenses ?? 0;
       setMetrics({
         totalSales: sales,
         totalProfit: profit,
@@ -376,7 +378,7 @@ export default function ReportsDashboard() {
               {formatValue("profit", metrics.totalProfit)}
             </h3>
             <span className="text-xs text-emerald-400 flex items-center gap-1 mt-2">
-              Avg. margin: {metrics.totalSales > 0 ? ((metrics.totalProfit / metrics.totalSales) * 105).toFixed(2) : 0}%
+              Avg. margin: {metrics.totalSales > 0 ? ((metrics.totalProfit / metrics.totalSales) * 100).toFixed(2) : 0}%
             </span>
           </div>
 
