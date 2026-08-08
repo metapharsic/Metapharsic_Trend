@@ -58,4 +58,4 @@ async function handler(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(handler, [Role.ASM, Role.ADMIN]);
+export const GET = withAuth(handler, [Role.ASM, Role.ADMIN, Role.MD]);

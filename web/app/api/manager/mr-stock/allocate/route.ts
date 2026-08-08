@@ -44,4 +44,4 @@ async function handler(req: AuthedRequest) {
   }
 }
 
-export const POST = withAuth(handler, [Role.ASM, Role.ADMIN]);
+export const POST = withAuth(handler, [Role.ASM, Role.ADMIN, Role.MD]);

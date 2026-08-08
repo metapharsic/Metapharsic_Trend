@@ -120,7 +120,7 @@ export default function InventoryPage() {
         .catch((err) => console.error("Failed to fetch my sample stock", err))
         .finally(() => setMySamplesLoading(false));
     }
-    if (decodedRole === "ASM" || decodedRole === "ADMIN") {
+    if (decodedRole === "ASM" || decodedRole === "ADMIN" || decodedRole === "MD") {
       setMrStockLoading(true);
       apiClient
         .get("/api/manager/mr-stock")
@@ -376,7 +376,7 @@ export default function InventoryPage() {
       )}
 
       {/* Admin/ASM: give stock to an MR */}
-      {(role === "ASM" || role === "ADMIN") && (
+      {(role === "ASM" || role === "ADMIN" || role === "MD") && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-100 bg-slate-50/50">
             <h2 className="text-xs font-bold text-slate-800">Give Stock to MR</h2>
@@ -432,7 +432,7 @@ export default function InventoryPage() {
       )}
 
       {/* Admin/ASM: per-MR stock value across the field force */}
-      {(role === "ASM" || role === "ADMIN") && (
+      {(role === "ASM" || role === "ADMIN" || role === "MD") && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
             <h2 className="text-xs font-bold text-slate-800">MR Sample Stock &amp; Estimated Value</h2>
