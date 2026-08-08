@@ -69,6 +69,10 @@ export default function MrActivityPage() {
 
   const sortedByMr = Object.entries(byMr).sort((a, b) => b[1].total - a[1].total);
 
+  const allVisitsThisMonth = Object.values(byDay)
+    .flat()
+    .sort((a, b) => b.time.localeCompare(a.time));
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
@@ -234,6 +238,55 @@ export default function MrActivityPage() {
                     {data.name}
                   </button>
                   <span className="font-semibold text-primary-600">{data.total} calls</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {selectedMr && (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="font-bold text-gray-800 mb-4 text-sm">
+            All calls this month — full detail ({allVisitsThisMonth.length})
+          </h3>
+          {loading ? (
+            <div className="flex justify-center items-center py-16">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+            </div>
+          ) : allVisitsThisMonth.length === 0 ? (
+            <p className="text-sm text-gray-400">No call activity this month.</p>
+          ) : (
+            <ul className="space-y-3">
+              {allVisitsThisMonth.map((v) => (
+                <li key={v.id} className="border border-gray-100 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-semibold text-gray-800">{v.target}</span>
+                    <span className="text-xs text-gray-400">
+                      {new Date(v.time).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                      {" · "}
+                      {new Date(v.time).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{v.purpose}</p>
+                  {v.feedback && (
+                    <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap break-words">
+                      <span className="font-semibold">Feedback: </span>
+                      {v.feedback}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {v.receptiveness && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                        {v.receptiveness}
+                      </span>
+                    )}
+                    {v.durationMinutes != null && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                        {v.durationMinutes} min
+                      </span>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
