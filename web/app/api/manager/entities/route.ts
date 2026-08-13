@@ -27,7 +27,17 @@ const CreateEntityBodySchema = z.object({
   // Hospital specific fields
   departments: z.string().optional(),
   bedStrength: z.number().int().min(0).optional(),
+  confirmDuplicate: z.boolean().optional(),
 });
+
+function normalizeEntityName(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/\b(dr|mr|mrs|ms)\.?\b/g, "")
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 async function getEntities(req: AuthedRequest) {
   try {
@@ -214,6 +224,7 @@ async function createEntity(req: AuthedRequest) {
       gstNo,
       departments,
       bedStrength,
+      confirmDuplicate,
     } = parsed.data;
 
     if (req.user.role === Role.MR) {
@@ -227,6 +238,45 @@ async function createEntity(req: AuthedRequest) {
       const ownTerritoryIds = employee?.territories.map((t) => t.id) ?? [];
       if (!ownTerritoryIds.includes(territoryId)) {
         return badRequest("You may only add entities within your own assigned territories");
+      }
+    }
+
+    if ((type === "DOCTOR" || type === "CHEMIST") && !confirmDuplicate) {
+      const normalizedIncoming = normalizeEntityName(name);
+      const significantWord = name
+        .replace(/\b(dr|mr|mrs|ms)\.?\b/gi, "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .sort((a, b) => b.length - a.length)[0];
+
+      const candidates =
+        type === "DOCTOR"
+          ? await db.doctor.findMany({
+              where: {
+                territoryId,
+                ...(significantWord ? { fullName: { contains: significantWord, mode: "insensitive" as const } } : {}),
+              },
+              select: { id: true, fullName: true },
+            })
+          : await db.chemist.findMany({
+              where: {
+                territoryId,
+                ...(significantWord ? { name: { contains: significantWord, mode: "insensitive" as const } } : {}),
+              },
+              select: { id: true, name: true },
+            });
+
+      const match = candidates.find((c: any) => {
+        const candidateName = type === "DOCTOR" ? c.fullName : c.name;
+        return normalizeEntityName(candidateName) === normalizedIncoming;
+      });
+
+      if (match) {
+        const matchedName = type === "DOCTOR" ? (match as any).fullName : (match as any).name;
+        return apiError("DUPLICATE_ENTITY", "A similar entity already exists", 409, {
+          existing: { id: match.id, name: matchedName },
+        });
       }
     }
 

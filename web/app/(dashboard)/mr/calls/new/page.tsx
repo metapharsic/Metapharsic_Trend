@@ -65,6 +65,7 @@ function NewCallForm() {
   const [newTerritoryId, setNewTerritoryId] = useState("");
   const [addingEntity, setAddingEntity] = useState(false);
   const [addEntityError, setAddEntityError] = useState<string | null>(null);
+  const [duplicateMatch, setDuplicateMatch] = useState<{ id: string; name: string } | null>(null);
 
   const [gps, setGps] = useState<GpsState>({ status: "idle" });
   const [callStart, setCallStart] = useState<{ startedAt: string; lat: number; lon: number } | null>(null);
@@ -181,11 +182,13 @@ function NewCallForm() {
   const openAddEntity = () => {
     setNewName(search);
     setAddEntityError(null);
+    setDuplicateMatch(null);
     setShowAddEntity(true);
   };
 
-  const submitNewEntity = async () => {
+  const submitNewEntity = async (confirmDuplicate = false) => {
     setAddEntityError(null);
+    setDuplicateMatch(null);
 
     if (!newName.trim()) return setAddEntityError("Name is required.");
     if (!newAddress.trim()) return setAddEntityError("Address is required.");
@@ -207,6 +210,7 @@ function NewCallForm() {
         ...(entityType === "DOCTOR" ? { primarySpecialty: newSpecialty.trim() } : {}),
         ...(entityType === "CHEMIST" ? { contactPerson: newContactPerson.trim() || undefined } : {}),
         ...(newMobile.trim() ? { whatsApp: newMobile.trim() } : {}),
+        ...(confirmDuplicate ? { confirmDuplicate: true } : {}),
       });
       const created = res.data.data.entity;
       setSelected({ id: created.id, name: created.name, type: entityType, address: created.address });
@@ -219,13 +223,40 @@ function NewCallForm() {
       setNewAddress("");
       setNewMobile("");
     } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
-        "Failed to add entity.";
-      setAddEntityError(message);
+      const errResponse = (
+        err as { response?: { status?: number; data?: { error?: { code?: string; message?: string; details?: { id?: string; name?: string } } } } }
+      )?.response;
+      const errBody = errResponse?.data?.error;
+      const details = errBody?.details;
+      const isDuplicate =
+        !!details?.id &&
+        !!details?.name &&
+        (errResponse?.status === 409 || /duplicate|similar|already exists/i.test(errBody?.code ?? "") || /duplicate|similar|already exists/i.test(errBody?.message ?? ""));
+
+      if (isDuplicate && details?.id && details?.name) {
+        setDuplicateMatch({ id: details.id, name: details.name });
+        setAddEntityError(errBody?.message ?? `Similar ${entityType === "DOCTOR" ? "doctor" : "chemist"} already exists: ${details.name}`);
+      } else {
+        setAddEntityError(errBody?.message ?? "Failed to add entity.");
+      }
     } finally {
       setAddingEntity(false);
     }
+  };
+
+  const useExistingDuplicate = () => {
+    if (!duplicateMatch) return;
+    setSelected({ id: duplicateMatch.id, name: duplicateMatch.name, type: entityType, address: null });
+    setDuplicateMatch(null);
+    setAddEntityError(null);
+    setShowAddEntity(false);
+    setSearch("");
+    setResults([]);
+    setNewName("");
+    setNewSpecialty("");
+    setNewContactPerson("");
+    setNewAddress("");
+    setNewMobile("");
   };
 
   const handleSubmit = async () => {
@@ -314,7 +345,13 @@ function NewCallForm() {
                 <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider">
                   New {entityType === "DOCTOR" ? "Doctor" : "Chemist"}
                 </p>
-                <button onClick={() => setShowAddEntity(false)} className="text-slate-400 hover:text-red-500 p-2 -m-2">
+                <button
+                  onClick={() => {
+                    setShowAddEntity(false);
+                    setDuplicateMatch(null);
+                  }}
+                  className="text-slate-400 hover:text-red-500 p-2 -m-2"
+                >
                   <X size={16} />
                 </button>
               </div>
@@ -372,13 +409,36 @@ function NewCallForm() {
 
               {addEntityError && <p className="text-sm text-red-600">{addEntityError}</p>}
 
-              <button
-                onClick={submitNewEntity}
-                disabled={addingEntity}
-                className="w-full bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {addingEntity ? "Adding..." : `Add & Select`}
-              </button>
+              {duplicateMatch ? (
+                <div className="space-y-2 border border-amber-200 bg-amber-50 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
+                    <AlertTriangle size={13} /> Similar {entityType === "DOCTOR" ? "doctor" : "chemist"} already exists: {duplicateMatch.name} — did you mean to select that one instead?
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={useExistingDuplicate}
+                      className="flex-1 bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-700"
+                    >
+                      Use existing
+                    </button>
+                    <button
+                      onClick={() => submitNewEntity(true)}
+                      disabled={addingEntity}
+                      className="flex-1 bg-white border border-amber-300 text-amber-800 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-amber-100 disabled:opacity-50"
+                    >
+                      {addingEntity ? "Adding..." : "Create anyway, it's different"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => submitNewEntity(false)}
+                  disabled={addingEntity}
+                  className="w-full bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {addingEntity ? "Adding..." : `Add & Select`}
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
