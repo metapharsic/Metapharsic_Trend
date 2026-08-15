@@ -18,26 +18,42 @@ async function handler(req: AuthedRequest) {
 
     const records = await db.attendance.findMany({
       where: { employeeId: employee.id, date: { gte: start, lt: end } },
-      orderBy: { date: "asc" },
+      orderBy: { checkIn: "asc" },
     });
+
+    // Multiple check-in/out sessions can now exist per day — collapse them
+    // into one calendar entry per date, summing minutes across sessions.
+    const byDate = new Map<string, typeof records>();
+    for (const r of records) {
+      const key = r.date.toISOString().slice(0, 10);
+      if (!byDate.has(key)) byDate.set(key, []);
+      byDate.get(key)!.push(r);
+    }
 
     let totalMinutes = 0;
-    const days = records.map((r) => {
-      const minutes = r.checkOut ? Math.round((r.checkOut.getTime() - r.checkIn.getTime()) / 60000) : null;
-      if (minutes) totalMinutes += minutes;
-      return {
-        id: r.id,
-        date: r.date.toISOString().slice(0, 10),
-        status: r.status,
-        checkIn: r.checkIn,
-        checkOut: r.checkOut,
-        minutes,
-        latitude: r.latitude,
-        longitude: r.longitude,
-      };
-    });
+    const days = Array.from(byDate.entries())
+      .map(([date, sessions]) => {
+        const first = sessions[0];
+        const last = sessions[sessions.length - 1];
+        const dayMinutes = sessions.reduce((sum, s) => {
+          if (!s.checkOut) return sum;
+          return sum + Math.round((s.checkOut.getTime() - s.checkIn.getTime()) / 60000);
+        }, 0);
+        totalMinutes += dayMinutes;
+        return {
+          id: last.id,
+          date,
+          status: last.status,
+          checkIn: first.checkIn,
+          checkOut: last.checkOut, // null if the latest session today is still open
+          minutes: dayMinutes || null,
+          latitude: last.latitude,
+          longitude: last.longitude,
+        };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
 
-    return ok({ days, totalMinutes, daysPresent: records.filter((r) => r.status === "PRESENT").length });
+    return ok({ days, totalMinutes, daysPresent: days.filter((d) => d.status === "PRESENT").length });
   } catch (err) {
     console.error("[GET /api/mr/attendance/history]", err);
     return apiError("INTERNAL_SERVER_ERROR", "Failed to fetch attendance history", 500);

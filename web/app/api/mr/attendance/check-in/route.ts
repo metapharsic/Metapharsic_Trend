@@ -33,14 +33,15 @@ async function handler(req: AuthedRequest) {
     // Check if already checked in today
     const today = startOfUtcDay();
 
-    const existing = await db.attendance.findFirst({
+    const openSession = await db.attendance.findFirst({
       where: {
         employeeId: employee.id,
         date: today,
+        checkOut: null,
       },
     });
 
-    if (existing) {
+    if (openSession) {
       return badRequest("Already checked in for today");
     }
 

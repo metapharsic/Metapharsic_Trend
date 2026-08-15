@@ -58,6 +58,30 @@ async function handler(req: AuthedRequest) {
       }, 0);
       const location = locationByEmployee[emp.id] ?? null;
 
+      // Multiple check-in/out sessions can now exist per employee per day —
+      // collapse them into one cell per calendar date for the roster grid.
+      const byDate = new Map<string, typeof empAttendance>();
+      for (const a of empAttendance) {
+        const key = a.date.toISOString().slice(0, 10);
+        if (!byDate.has(key)) byDate.set(key, []);
+        byDate.get(key)!.push(a);
+      }
+      const dailyRecords = Array.from(byDate.entries())
+        .map(([date, sessions]) => {
+          const sorted = [...sessions].sort((a, b) => a.checkIn.getTime() - b.checkIn.getTime());
+          const first = sorted[0];
+          const last = sorted[sorted.length - 1];
+          return {
+            date,
+            status: last.status,
+            checkIn: first.checkIn,
+            checkOut: last.checkOut, // null if the latest session is still open
+            latitude: last.latitude,
+            longitude: last.longitude,
+          };
+        })
+        .sort((a, b) => a.date.localeCompare(b.date));
+
       return {
         employeeId: emp.id,
         name: `${emp.firstName} ${emp.lastName}`,
@@ -65,18 +89,11 @@ async function handler(req: AuthedRequest) {
         role: emp.user.role,
         isActive: emp.user.isActive,
         territory: emp.territories[0]?.name ?? "Unassigned",
-        daysPresent: empAttendance.filter((a) => a.status === "PRESENT").length,
-        daysAbsent: empAttendance.filter((a) => a.status === "ABSENT").length,
-        daysOnLeave: empAttendance.filter((a) => a.status === "LEAVE").length,
+        daysPresent: dailyRecords.filter((d) => d.status === "PRESENT").length,
+        daysAbsent: dailyRecords.filter((d) => d.status === "ABSENT").length,
+        daysOnLeave: dailyRecords.filter((d) => d.status === "LEAVE").length,
         totalHoursMinutes: totalMinutes,
-        attendanceDays: empAttendance.map((a) => ({
-          date: a.date.toISOString().slice(0, 10),
-          status: a.status,
-          checkIn: a.checkIn,
-          checkOut: a.checkOut,
-          latitude: a.latitude,
-          longitude: a.longitude,
-        })),
+        attendanceDays: dailyRecords,
         leaves: empLeaves.map((l) => ({
           id: l.id,
           startDate: l.startDate.toISOString().slice(0, 10),

@@ -143,7 +143,7 @@ async function getMrDashboard(req: AuthedRequest) {
         select: { latitude: true, longitude: true, isMocked: true, recordedAt: true },
         orderBy: { recordedAt: "asc" },
       }),
-      db.attendance.findFirst({ where: { employeeId: employee.id, date: today } }),
+      db.attendance.findFirst({ where: { employeeId: employee.id, date: today }, orderBy: { checkIn: "desc" } }),
       db.expense.aggregate({
         where: { employeeId: employee.id, createdAt: { gte: today, lt: tomorrow } },
         _sum: { amount: true },
@@ -266,7 +266,7 @@ async function getMrDashboard(req: AuthedRequest) {
 
     const notifications = buildNotifications({
       now,
-      checkedIn: Boolean(attendanceToday),
+      checkedIn: Boolean(attendanceToday) && !attendanceToday?.checkOut,
       gpsStatus: gps.status,
       pendingVisits: pendingPlanned.length,
       tourPlanStatus: (currentTourPlan?.status ?? "NONE") as
@@ -352,7 +352,7 @@ async function getMrDashboard(req: AuthedRequest) {
       },
       notifications,
       attendance: {
-        checkedIn: Boolean(attendanceToday),
+        checkedIn: Boolean(attendanceToday) && !attendanceToday?.checkOut,
         checkInTime: attendanceToday?.checkIn ?? null,
         checkedOut: Boolean(attendanceToday?.checkOut),
       },

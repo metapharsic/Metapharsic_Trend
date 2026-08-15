@@ -33,15 +33,13 @@ async function handler(req: AuthedRequest) {
       where: {
         employeeId: employee.id,
         date: today,
+        checkOut: null,
       },
+      orderBy: { checkIn: "desc" },
     });
 
     if (!existing) {
-      return badRequest("No check-in record found for today");
-    }
-
-    if (existing.checkOut) {
-      return badRequest("Already checked out for today");
+      return badRequest("No active check-in found for today");
     }
 
     const attendance = await db.attendance.update({

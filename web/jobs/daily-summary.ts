@@ -23,8 +23,8 @@ export async function runDailySummary() {
   let whatsappSentCount = 0;
 
   for (const mr of mrs) {
-    const [attendance, visits, leads, orderItems, collections, samples] = await Promise.all([
-      db.attendance.findFirst({ where: { employeeId: mr.id, date: todayStart } }),
+    const [attendanceSessions, visits, leads, orderItems, collections, samples] = await Promise.all([
+      db.attendance.findMany({ where: { employeeId: mr.id, date: todayStart }, orderBy: { checkIn: "asc" } }),
       db.visit.findMany({
         where: { employeeId: mr.id, createdAt: { gte: todayStart, lt: todayEnd } },
         select: { boxesPlaced: true, doctorId: true, chemistId: true },
@@ -44,9 +44,13 @@ export async function runDailySummary() {
       }),
     ]);
 
-    const hoursMinutes = attendance
-      ? Math.round(((attendance.checkOut ?? new Date()).getTime() - attendance.checkIn.getTime()) / 60000)
-      : 0;
+    // Multiple check-in/out sessions can now exist per day — sum across all of them.
+    const hoursMinutes = attendanceSessions.reduce(
+      (sum, a) => sum + Math.round(((a.checkOut ?? new Date()).getTime() - a.checkIn.getTime()) / 60000),
+      0
+    );
+    const latestSession = attendanceSessions[attendanceSessions.length - 1];
+    const stillCheckedIn = attendanceSessions.length > 0 && !latestSession.checkOut;
     const boxesPlaced = visits.reduce((s, v) => s + (v.boxesPlaced ?? 0), 0);
     const doctorCalls = visits.filter((v) => v.doctorId).length;
     const chemistCalls = visits.filter((v) => v.chemistId).length;
@@ -57,7 +61,7 @@ export async function runDailySummary() {
     const lines = [
       `EOD Report — ${mr.firstName} ${mr.lastName} — ${todayStart.toISOString().slice(0, 10)}`,
       ``,
-      `Logged in: ${attendance ? fmtHours(hoursMinutes) + (attendance.checkOut ? "" : " (still checked in)") : "Did not check in"}`,
+      `Logged in: ${attendanceSessions.length > 0 ? fmtHours(hoursMinutes) + (stillCheckedIn ? " (still checked in)" : "") : "Did not check in"}`,
       `Calls made: ${visits.length} (Doctors: ${doctorCalls}, Chemists: ${chemistCalls})`,
       `Boxes placed: ${boxesPlaced}`,
       `Samples given: ${samplesGiven}`,

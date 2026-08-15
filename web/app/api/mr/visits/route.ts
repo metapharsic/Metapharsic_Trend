@@ -199,13 +199,12 @@ async function createVisit(req: AuthedRequest) {
       targetLon = hospital.longitude;
     }
 
-    // 2. Perform Geofence calculation
+    // 2. Perform Geofence calculation — soft flag only, never blocks the visit.
+    // Stored doctor/chemist coordinates are often stale/missing and phone GPS can
+    // be briefly inaccurate, so a mismatch is recorded for audit review instead of
+    // rejecting a legitimate call outright.
     const distanceMeters = haversineDistanceKm(latitude, longitude, targetLat, targetLon) * 1000;
-    if (distanceMeters > settings.geofenceRadiusMeters) {
-      return badRequest(
-        `Geofence verification failed. You are ${Math.round(distanceMeters)}m away. Must be within ${settings.geofenceRadiusMeters}m.`
-      );
-    }
+    const geofenceViolation = distanceMeters > settings.geofenceRadiusMeters;
 
     const visitId = randomUUID();
 
@@ -267,6 +266,28 @@ async function createVisit(req: AuthedRequest) {
       );
     }
 
+    // Build a single merged anomaly record for the Visit — combines the geofence
+    // mismatch (recorded here) with the DCR travel-speed anomaly (recorded below),
+    // reusing the same anomalyFlag/anomalyDetails mechanism the BI "gps-violations"
+    // report and manager anomaly review screens already read.
+    const anomalyDetailsPayload: Record<string, unknown> = {};
+    if (geofenceViolation) {
+      anomalyDetailsPayload.geofence = {
+        type: "GEOFENCE",
+        distanceMeters: Math.round(distanceMeters),
+        allowedRadiusMeters: settings.geofenceRadiusMeters,
+      };
+    }
+    if (anomalyResult?.isAnomalous) {
+      anomalyDetailsPayload.travelSpeed = {
+        type: "TRAVEL_SPEED",
+        reason: anomalyResult.reason,
+        calculatedSpeed: anomalyResult.calculatedSpeed,
+      };
+    }
+    const visitAnomalyFlag = geofenceViolation || Boolean(anomalyResult?.isAnomalous);
+    const visitAnomalyDetails = visitAnomalyFlag ? JSON.stringify(anomalyDetailsPayload) : null;
+
     // 5. Create Visit record in Transaction
     const visit = await db.$transaction(async (tx) => {
       const createdVisit = await tx.visit.create({
@@ -287,6 +308,8 @@ async function createVisit(req: AuthedRequest) {
           durationMinutes,
           boxesPlaced,
           cqsScore,
+          anomalyFlag: visitAnomalyFlag,
+          anomalyDetails: visitAnomalyDetails,
         },
       });
 
@@ -338,11 +361,15 @@ async function createVisit(req: AuthedRequest) {
             },
           });
 
-          // Decrement from MR Sample Inventory
-          await tx.sampleInventory.updateMany({
-            where: { employeeId: employee.id, productId: sample.productId },
+          // Decrement from MR Sample Inventory — guarded so a DCR can never
+          // report more samples given than the MR was actually allocated.
+          const decremented = await tx.sampleInventory.updateMany({
+            where: { employeeId: employee.id, productId: sample.productId, quantity: { gte: sample.quantity } },
             data: { quantity: { decrement: sample.quantity } },
           });
+          if (decremented.count === 0) {
+            throw new Error(`Insufficient sample stock for product ${sample.productId}`);
+          }
         }
       }
 
@@ -359,11 +386,14 @@ async function createVisit(req: AuthedRequest) {
             },
           });
 
-          // Decrement from Gift Catalog Stock
-          await tx.giftCatalog.update({
-            where: { id: gift.giftCatalogId },
+          // Decrement from Gift Catalog Stock — same floor guard as samples.
+          const giftDecremented = await tx.giftCatalog.updateMany({
+            where: { id: gift.giftCatalogId, stockQty: { gte: gift.quantity } },
             data: { stockQty: { decrement: gift.quantity } },
           });
+          if (giftDecremented.count === 0) {
+            throw new Error(`Insufficient gift stock for ${gift.giftCatalogId}`);
+          }
         }
       }
 
@@ -372,6 +402,9 @@ async function createVisit(req: AuthedRequest) {
 
     return ok({ visitId: visit.id, success: true });
   } catch (err) {
+    if (err instanceof Error && (err.message.startsWith("Insufficient sample stock") || err.message.startsWith("Insufficient gift stock"))) {
+      return badRequest(err.message);
+    }
     console.error("[POST /api/mr/visits]", err);
     return apiError("INTERNAL_SERVER_ERROR", "DCR submission failed", 500);
   }

@@ -20,6 +20,7 @@ async function handler(req: AuthedRequest) {
         employeeId: employee.id,
         date: today,
       },
+      orderBy: { checkIn: "desc" },
     });
 
     if (!existing) {
@@ -27,7 +28,7 @@ async function handler(req: AuthedRequest) {
     }
 
     return ok({
-      checkedIn: true,
+      checkedIn: !existing.checkOut,
       checkedOut: !!existing.checkOut,
       checkInTime: existing.checkIn,
       checkOutTime: existing.checkOut,

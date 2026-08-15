@@ -29,7 +29,7 @@ async function handler(req: AuthedRequest) {
     const employeeIds = employees.map((e) => e.id);
 
     const [attendanceToday, visitsToday, orderItemsToday, collectionsToday, locationLogsToday] = await Promise.all([
-      db.attendance.findMany({ where: { employeeId: { in: employeeIds }, date: today } }),
+      db.attendance.findMany({ where: { employeeId: { in: employeeIds }, date: today }, orderBy: { checkIn: "asc" } }),
       db.visit.findMany({
         where: { employeeId: { in: employeeIds }, createdAt: { gte: today, lt: tomorrow } },
         select: { employeeId: true },
@@ -73,7 +73,7 @@ async function handler(req: AuthedRequest) {
         employeeId: emp.id,
         name: `${emp.firstName} ${emp.lastName}`,
         territory: emp.territories[0]?.name ?? "Unassigned",
-        checkedIn: Boolean(attendance),
+        checkedIn: Boolean(attendance) && !attendance?.checkOut,
         checkInTime: attendance?.checkIn ?? null,
         checkedOut: Boolean(attendance?.checkOut),
         callsToday: visitCountByEmp.get(emp.id) ?? 0,

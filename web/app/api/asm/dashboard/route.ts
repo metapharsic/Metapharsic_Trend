@@ -44,7 +44,7 @@ async function getAsmDashboard(req: AuthedRequest) {
               tourPlan: { employeeId: mr.id, status: "APPROVED" },
             },
           }),
-          db.attendance.findUnique({ where: { employeeId_date: { employeeId: mr.id, date: todayStart } } }),
+          db.attendance.findFirst({ where: { employeeId: mr.id, date: todayStart }, orderBy: { checkIn: "desc" } }),
           db.collection.aggregate({
             where: { employeeId: mr.id, createdAt: { gte: todayStart, lt: todayEnd } },
             _sum: { amount: true },
@@ -64,7 +64,7 @@ async function getAsmDashboard(req: AuthedRequest) {
           sales: { target, achieved, percentage: target > 0 ? Math.round((achieved / target) * 1000) / 10 : 0 },
           callsPlanned: plannedDay,
           callsCompleted,
-          isCheckedIn: !!attendance,
+          isCheckedIn: !!attendance && !attendance.checkOut,
           collected: Number(collections._sum.amount ?? 0),
         };
       })
