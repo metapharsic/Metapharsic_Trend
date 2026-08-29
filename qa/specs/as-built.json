@@ -6484,7 +6484,7 @@
       "fields": [
         {
           "tag": "input",
-          "name": "Search report rows...",
+          "name": "Filter records...",
           "type": "text",
           "required": false,
           "min": null,
@@ -6495,8 +6495,8 @@
       ],
       "validationMessages": [],
       "lengthDerivedCounts": [
-        "reportData.rows",
-        "filteredRows"
+        "displayRows",
+        "numericKeys"
       ],
       "countHeadings": [],
       "readsPaginationTotal": false
