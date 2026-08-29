@@ -5,7 +5,7 @@ import { ok, apiError, unauthorized } from "@/lib/api-response";
 
 async function getInvoices(req: AuthedRequest) {
   try {
-    const isManager = req.user.role === Role.ASM || req.user.role === Role.ADMIN;
+    const isManager = req.user.role === Role.ASM || req.user.role === Role.ADMIN || req.user.role === Role.MD;
     let whereClause = {};
 
     if (!isManager) {
@@ -40,4 +40,4 @@ async function getInvoices(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getInvoices, [Role.MR, Role.ASM, Role.ADMIN]);
+export const GET = withAuth(getInvoices, [Role.MR, Role.ASM, Role.ADMIN, Role.MD]);

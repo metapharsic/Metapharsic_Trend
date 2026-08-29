@@ -15,6 +15,8 @@ interface Product {
   mrp: number | null;
   ptr: number | null;
   pts: number | null;
+  hsnCode?: string | null;
+  gstPct?: number | null;
   stockQty: number;
   therapySegment: string | null;
   currentBatchNo: string | null;
@@ -47,7 +49,7 @@ function currency(v: number) {
 
 export default function InventoryPage() {
   const [role, setRole] = useState<string | null>(null);
-  const canManage = role !== "MR";
+  const canManage = role === "ADMIN" || role === "MD" || role === "ASM" || role === "WAREHOUSE" || (role !== "MR" && role !== "DOCTOR" && role !== "DISTRIBUTOR");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -83,6 +85,8 @@ export default function InventoryPage() {
     mrp: 0,
     ptr: 0,
     pts: 0,
+    hsnCode: "",
+    gstPct: 5,
     stockQty: 0,
     therapySegment: "",
     currentBatchNo: "",
@@ -92,6 +96,7 @@ export default function InventoryPage() {
 
   const fetchProducts = () => {
     setLoading(true);
+    setError("");
     apiClient
       .get("/api/products", { params: { limit: 100 } })
       .then((res) => {
@@ -99,7 +104,8 @@ export default function InventoryPage() {
       })
       .catch((err) => {
         console.error("Failed to fetch products", err);
-        setError("Could not load inventory catalog.");
+        const msg = err?.response?.data?.error?.message || err?.response?.data?.message || "Could not load inventory catalog.";
+        setError(msg);
       })
       .finally(() => setLoading(false));
   };
@@ -124,7 +130,7 @@ export default function InventoryPage() {
         .catch((err) => console.error("Failed to fetch my sample stock", err))
         .finally(() => setMySamplesLoading(false));
     }
-    if (decodedRole === "ASM" || decodedRole === "ADMIN" || decodedRole === "MD") {
+    if (decodedRole === "ASM" || decodedRole === "ADMIN" || decodedRole === "MD" || decodedRole === "WAREHOUSE") {
       setMrStockLoading(true);
       apiClient
         .get("/api/manager/mr-stock")
@@ -167,7 +173,7 @@ export default function InventoryPage() {
       setAllocQty("");
       refreshMrStock();
     } catch (err: any) {
-      setAllocError(err?.response?.data?.error?.message || "Failed to allocate stock.");
+      setAllocError(err?.response?.data?.error?.message || err?.response?.data?.message || "Failed to allocate stock.");
     } finally {
       setAllocSubmitting(false);
     }
@@ -194,7 +200,7 @@ export default function InventoryPage() {
       setEditingStockRow(null);
       refreshMrStock();
     } catch (err: any) {
-      setEditStockError(err?.response?.data?.error?.message || "Failed to update stock.");
+      setEditStockError(err?.response?.data?.error?.message || err?.response?.data?.message || "Failed to update stock.");
     } finally {
       setEditStockSubmitting(false);
     }
@@ -207,7 +213,7 @@ export default function InventoryPage() {
       refreshMrStock();
     } catch (err: any) {
       console.error("Failed to delete MR stock row", err);
-      setError(err?.response?.data?.error?.message || "Failed to remove stock row.");
+      setError(err?.response?.data?.error?.message || err?.response?.data?.message || "Failed to remove stock row.");
     }
   };
 
@@ -222,6 +228,8 @@ export default function InventoryPage() {
       mrp: Number(p.mrp || 0),
       ptr: Number(p.ptr || 0),
       pts: Number(p.pts || 0),
+      hsnCode: p.hsnCode || "",
+      gstPct: Number(p.gstPct || 5),
       stockQty: p.stockQty,
       therapySegment: p.therapySegment || "",
       currentBatchNo: p.currentBatchNo || "",
@@ -245,6 +253,8 @@ export default function InventoryPage() {
       mrp: 0,
       ptr: 0,
       pts: 0,
+      hsnCode: "",
+      gstPct: 5,
       stockQty: 0,
       therapySegment: "",
       currentBatchNo: "",
@@ -262,13 +272,25 @@ export default function InventoryPage() {
 
     try {
       const payload = {
-        ...formData,
-        price: formData.ptr,
-        currentMfgDate: formData.currentMfgDate || undefined,
-        currentExpDate: formData.currentExpDate || undefined,
+        name: formData.name.trim(),
+        sku: formData.sku.trim(),
+        price: Number(formData.ptr) || Number(formData.mrp) || 0,
+        composition: formData.composition.trim() || null,
+        strength: formData.strength.trim() || null,
+        packSize: formData.packSize.trim() || null,
+        mrp: Number(formData.mrp) || 0,
+        ptr: Number(formData.ptr) || 0,
+        pts: Number(formData.pts) || 0,
+        hsnCode: formData.hsnCode.trim() || null,
+        gstPct: Number(formData.gstPct) || null,
+        stockQty: Number(formData.stockQty) || 0,
+        therapySegment: formData.therapySegment.trim() || null,
+        currentBatchNo: formData.currentBatchNo.trim() || null,
+        currentMfgDate: formData.currentMfgDate ? formData.currentMfgDate : null,
+        currentExpDate: formData.currentExpDate ? formData.currentExpDate : null,
       };
+
       if (isAdding) {
-        // Price is set to PTR for general orders compatibility
         await apiClient.post("/api/products", payload);
         setSuccess("Product added to catalog successfully.");
         setIsAdding(false);
@@ -280,7 +302,8 @@ export default function InventoryPage() {
       fetchProducts();
     } catch (err: any) {
       console.error(err);
-      setError(err?.response?.data?.message || "Failed to save product details.");
+      const msg = err?.response?.data?.error?.message || err?.response?.data?.message || "Failed to save product details.";
+      setError(msg);
     }
   };
 
@@ -296,7 +319,8 @@ export default function InventoryPage() {
       fetchProducts();
     } catch (err: any) {
       console.error(err);
-      setError(err?.response?.data?.message || `Failed to delete product "${name}".`);
+      const msg = err?.response?.data?.error?.message || err?.response?.data?.message || `Failed to delete product "${name}".`;
+      setError(msg);
     }
   };
 
@@ -805,6 +829,32 @@ export default function InventoryPage() {
                     required
                     value={formData.pts}
                     onChange={(e) => setFormData({ ...formData, pts: Number(e.target.value) })}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-600">HSN Code</label>
+                  <input
+                    type="text"
+                    value={formData.hsnCode}
+                    onChange={(e) => setFormData({ ...formData, hsnCode: e.target.value })}
+                    placeholder="e.g. 30049099"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-600">GST Rate (%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    max={100}
+                    value={formData.gstPct}
+                    onChange={(e) => setFormData({ ...formData, gstPct: Number(e.target.value) })}
+                    placeholder="e.g. 5"
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500"
                   />
                 </div>

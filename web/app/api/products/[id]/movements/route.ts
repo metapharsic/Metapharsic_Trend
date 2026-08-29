@@ -29,4 +29,4 @@ async function getMovements(
   }
 }
 
-export const GET = withAuth(getMovements, [Role.MR, Role.ASM, Role.ADMIN, Role.WAREHOUSE]);
+export const GET = withAuth(getMovements, [Role.MR, Role.ASM, Role.ADMIN, Role.MD, Role.WAREHOUSE]);

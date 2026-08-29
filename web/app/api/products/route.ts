@@ -6,22 +6,27 @@ import { PaginationSchema } from "@/lib/validators";
 import { z } from "zod";
 
 
+const emptyToNull = (val: unknown) => (val === "" || val === null || val === undefined ? null : val);
+
 const CreateProductSchema = z.object({
   name: z.string().min(1),
   sku: z.string().min(1),
   price: z.coerce.number().min(0),
-  composition: z.string().optional(),
-  strength: z.string().optional(),
-  packSize: z.string().optional(),
+  composition: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  strength: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  packSize: z.preprocess(emptyToNull, z.string().nullable().optional()),
   mrp: z.coerce.number().min(0).optional(),
   ptr: z.coerce.number().min(0).optional(),
   pts: z.coerce.number().min(0).optional(),
-  marginStructure: z.string().optional(),
-  therapySegment: z.string().optional(),
+  marginStructure: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  therapySegment: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  hsnCode: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  manufacturer: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  gstPct: z.coerce.number().min(0).max(100).nullable().optional(),
   stockQty: z.coerce.number().int().min(0).optional().default(0),
-  currentBatchNo: z.string().optional(),
-  currentMfgDate: z.coerce.date().optional(),
-  currentExpDate: z.coerce.date().optional(),
+  currentBatchNo: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  currentMfgDate: z.preprocess(emptyToNull, z.coerce.date().nullable().optional()),
+  currentExpDate: z.preprocess(emptyToNull, z.coerce.date().nullable().optional()),
 });
 
 async function getProducts(req: AuthedRequest) {
@@ -108,7 +113,27 @@ async function createProduct(req: AuthedRequest) {
     const parsed = CreateProductSchema.safeParse(body);
     if (!parsed.success) return badRequest("Validation error", parsed.error.flatten());
 
-    const product = await db.product.create({ data: parsed.data });
+    const employee = await db.employee.findUnique({ where: { userId: req.user.sub } });
+
+    const product = await db.$transaction(async (tx) => {
+      const createdRecord = await tx.product.create({ data: parsed.data });
+
+      if (parsed.data.stockQty && parsed.data.stockQty > 0) {
+        await tx.inventoryMovement.create({
+          data: {
+            productId: createdRecord.id,
+            type: "RESTOCK",
+            delta: parsed.data.stockQty,
+            quantityAfter: parsed.data.stockQty,
+            employeeId: employee?.id ?? null,
+            note: "Initial stock intake",
+          },
+        });
+      }
+
+      return createdRecord;
+    });
+
     return created({ product });
   } catch (err: any) {
     if (err?.code === "P2002") return conflict("Product with this name or SKU already exists");
@@ -117,5 +142,16 @@ async function createProduct(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getProducts, [Role.MR, Role.ASM, Role.ADMIN]);
-export const POST = withAuth(createProduct, [Role.ASM, Role.ADMIN]);
+export const GET = withAuth(getProducts, [
+  Role.MR,
+  Role.ASM,
+  Role.ADMIN,
+  Role.MD,
+  Role.WAREHOUSE,
+  Role.FINANCE,
+  Role.NSM,
+  Role.ZSM,
+  Role.RM,
+  Role.DISTRIBUTOR,
+]);
+export const POST = withAuth(createProduct, [Role.ADMIN, Role.MD, Role.ASM, Role.WAREHOUSE]);
