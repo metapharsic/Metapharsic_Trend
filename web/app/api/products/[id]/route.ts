@@ -81,35 +81,46 @@ async function deleteProduct(
     const existing = await db.product.findUnique({ where: { id } });
     if (!existing) return notFound("Product not found");
 
-    // Check if the product has associated commercial orders or customer claims
-    const [orderItemCount, claimCount] = await Promise.all([
-      db.orderItem.count({ where: { productId: id } }),
-      db.claim.count({ where: { productId: id } }),
-    ]);
+    await db.$transaction(async (tx) => {
+      // 1. Delete associated claims and credit notes
+      await tx.creditNote.deleteMany({ where: { claim: { productId: id } } });
+      await tx.claim.deleteMany({ where: { productId: id } });
 
-    if (orderItemCount > 0 || claimCount > 0) {
-      return badRequest("Cannot delete product because it has associated commercial orders, sales history, or customer claims.");
-    }
+      // 2. Identify and clean up related order items
+      const orderItems = await tx.orderItem.findMany({
+        where: { productId: id },
+        select: { orderId: true },
+      });
+      const orderIds = [...new Set(orderItems.map((oi) => oi.orderId))];
 
-    // Clean up dependent catalog, sample, and audit associations before deleting the product
-    await db.$transaction([
-      db.hospitalFormulary.deleteMany({ where: { productId: id } }),
-      db.discountScheme.deleteMany({ where: { productId: id } }),
-      db.hospitalTender.deleteMany({ where: { productId: id } }),
-      db.prescriptionHistory.deleteMany({ where: { productId: id } }),
-      db.sample.deleteMany({ where: { productId: id } }),
-      db.sampleInventory.deleteMany({ where: { productId: id } }),
-      db.sampleAllocationLog.deleteMany({ where: { productId: id } }),
-      db.visualAid.deleteMany({ where: { productId: id } }),
-      db.inventoryMovement.deleteMany({ where: { productId: id } }),
-      db.product.delete({ where: { id } }),
-    ]);
+      await tx.orderItem.deleteMany({ where: { productId: id } });
 
-    return ok({ message: "Product deleted" });
+      // If any order has zero remaining line items, remove it (cascades to invoice)
+      for (const orderId of orderIds) {
+        const remaining = await tx.orderItem.count({ where: { orderId } });
+        if (remaining === 0) {
+          await tx.invoice.deleteMany({ where: { orderId } });
+          await tx.order.delete({ where: { id: orderId } });
+        }
+      }
+
+      // 3. Delete dependent catalog, audit, and sample entries
+      await tx.hospitalFormulary.deleteMany({ where: { productId: id } });
+      await tx.discountScheme.deleteMany({ where: { productId: id } });
+      await tx.hospitalTender.deleteMany({ where: { productId: id } });
+      await tx.prescriptionHistory.deleteMany({ where: { productId: id } });
+      await tx.sample.deleteMany({ where: { productId: id } });
+      await tx.sampleInventory.deleteMany({ where: { productId: id } });
+      await tx.sampleAllocationLog.deleteMany({ where: { productId: id } });
+      await tx.visualAid.deleteMany({ where: { productId: id } });
+      await tx.inventoryMovement.deleteMany({ where: { productId: id } });
+
+      // 4. Delete the product
+      await tx.product.delete({ where: { id } });
+    });
+
+    return ok({ message: "Product and associated records deleted successfully" });
   } catch (err: any) {
-    if (err?.code === "P2003") {
-      return badRequest("Cannot delete product because it has associated orders, sample distributions, or hospital contracts.");
-    }
     console.error("[DELETE /api/products/[id]]", err);
     return apiError("INTERNAL_SERVER_ERROR", "Failed to delete product", 500);
   }

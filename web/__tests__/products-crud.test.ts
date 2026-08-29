@@ -147,9 +147,9 @@ describe("Products CRUD operations", () => {
     expect(movement!.quantityAfter).toBe(150);
   });
 
-  it("prevents deleting a product that has associated commercial order items", async () => {
+  it("successfully deletes a product and cascade-cleans associated order items and catalog records", async () => {
     // Create an order associated with fx.productId
-    const order = await testDb.order.create({
+    await testDb.order.create({
       data: {
         distributorId: fx.distributorId,
         chemistId: fx.chemistId,
@@ -172,11 +172,14 @@ describe("Products CRUD operations", () => {
     });
 
     const res = await deleteProduct(req, { params: { id: fx.productId } });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
 
     const body = await readJson(res);
-    expect(body.success).toBe(false);
-    expect(body.error.message).toContain("Cannot delete product because it has associated commercial orders");
+    expect(body.success).toBe(true);
+    expect(body.data.message).toContain("deleted successfully");
+
+    const deleted = await testDb.product.findUnique({ where: { id: fx.productId } });
+    expect(deleted).toBeNull();
   });
 
   it("successfully deletes a product with catalog/formulary/sample associations", async () => {
@@ -203,7 +206,6 @@ describe("Products CRUD operations", () => {
 
     const body = await readJson(res);
     expect(body.success).toBe(true);
-    expect(body.data.message).toBe("Product deleted");
 
     const check = await testDb.product.findUnique({ where: { id: product!.id } });
     expect(check).toBeNull();
