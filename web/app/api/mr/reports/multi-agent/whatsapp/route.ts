@@ -12,11 +12,11 @@ import { sendEmail } from "@/lib/mailer";
 import { db } from "@/lib/db";
 
 const SendReportSchema = z.object({
-  targetType: z.enum(["INDIVIDUAL_MR", "ALL_MRS", "EXECUTIVE_FLEET", "CUSTOM_PHONE"]),
+  targetType: z.enum(["INDIVIDUAL_MR", "ALL_MRS", "ALL_MRS_INDIVIDUALLY", "EXECUTIVE_FLEET", "CUSTOM_PHONE"]),
   employeeId: z.string().optional(),
   customPhone: z.string().optional(),
   sendEmailToo: z.boolean().optional().default(false),
-  period: z.enum(["daily", "weekly", "monthly", "custom", "all"]).optional().default("all"),
+  period: z.enum(["daily", "weekly", "monthly", "custom", "all"]).optional().default("daily"),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   includeDoctorVisits: z.boolean().optional().default(true),
@@ -50,7 +50,7 @@ async function getMultiAgentWhatsAppPreview(req: AuthedRequest) {
     const url = new URL(req.url, "http://localhost");
     const employeeId = url.searchParams.get("employeeId") || url.searchParams.get("mrId");
     const customPhone = url.searchParams.get("customPhone");
-    const period = (url.searchParams.get("period") as any) || "all";
+    const period = (url.searchParams.get("period") as any) || "daily";
     const startDate = url.searchParams.get("startDate") || undefined;
     const endDate = url.searchParams.get("endDate") || undefined;
 
@@ -173,9 +173,15 @@ async function getMultiAgentWhatsAppPreview(req: AuthedRequest) {
 /**
  * POST /api/mr/reports/multi-agent/whatsapp
  * Dispatches Multi-Agent Council WhatsApp reports to MRs, Admins, or custom phone numbers.
+ * STRICT ACCESS CONTROL: Only ADMIN (and MD) is permitted to dispatch reports.
  */
 async function dispatchMultiAgentWhatsAppReport(req: AuthedRequest) {
   try {
+    // 1. STRICT RBAC CHECK: Only Admin (and MD) has permission to trigger report dispatch
+    if (req.user.role !== Role.ADMIN && req.user.role !== Role.MD) {
+      return forbidden("Access Denied: Only Administrator has permission to dispatch Multi-Agent Council Reports.");
+    }
+
     const body = await req.json();
     const parsed = SendReportSchema.safeParse(body);
     if (!parsed.success) return badRequest("Validation error", parsed.error.flatten());
@@ -185,7 +191,7 @@ async function dispatchMultiAgentWhatsAppReport(req: AuthedRequest) {
       employeeId,
       customPhone,
       sendEmailToo,
-      period,
+      period = "daily",
       startDate,
       endDate,
       ...selectiveOptions
@@ -204,8 +210,133 @@ async function dispatchMultiAgentWhatsAppReport(req: AuthedRequest) {
       ...selectiveOptions,
     };
 
-    const results: Array<{ recipient: string; phone?: string | null; sent: boolean; reason?: string; whatsappUrl?: string }> = [];
+    const startTime = Date.now();
 
+    // ─────────────────────────────────────────────────────────────
+    // CASE A: DISPATCH INDIVIDUAL DAILY REPORT TO ALL MRS
+    // ─────────────────────────────────────────────────────────────
+    if (targetType === "ALL_MRS_INDIVIDUALLY" || targetType === "ALL_MRS") {
+      const allReports = await multiAgentCouncil.generateAllMrReports(timeFilter);
+      const results: Array<{
+        mrId: string;
+        recipient: string;
+        phone: string | null;
+        territory: string;
+        doctorCalls: number;
+        chemistCalls: number;
+        salesTodayPtr: number;
+        collectionsToday: number;
+        dutyHours: number;
+        councilScore: number;
+        overallGrade: string;
+        sent: boolean;
+        reason?: string;
+        whatsappUrl?: string;
+      }> = [];
+
+      // Collect agent evaluation statistics across the fleet
+      const agentScoreMap = new Map<string, { totalScore: number; count: number; passCount: number; warnCount: number; failCount: number; domainScope: string; agentName: string }>();
+
+      for (const report of allReports) {
+        const messageText = formatMultiAgentCouncilWhatsAppReport(report, options);
+        const recipientPhone = report.phone;
+        const territoryName = report.territories?.map((t: any) => t.name).join(", ") || "General";
+
+        // Aggregate agent statuses
+        (report.councilEvaluation?.agentStatuses || []).forEach((ag) => {
+          const prev = agentScoreMap.get(ag.agentCode) || {
+            totalScore: 0,
+            count: 0,
+            passCount: 0,
+            warnCount: 0,
+            failCount: 0,
+            domainScope: (ag as any).domainScope || "Field Operations",
+            agentName: ag.agentName,
+          };
+          prev.totalScore += ag.score;
+          prev.count += 1;
+          if (ag.status === "ONLINE_PASS") prev.passCount += 1;
+          else if (ag.status === "ONLINE_WARNING") prev.warnCount += 1;
+          else prev.failCount += 1;
+          agentScoreMap.set(ag.agentCode, prev);
+        });
+
+        if (recipientPhone) {
+          const cleanPhone = sanitizePhoneForWhatsAppUrl(recipientPhone);
+          const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
+          const waRes = await sendWhatsAppMessage(recipientPhone, messageText);
+
+          results.push({
+            mrId: report.mrId,
+            recipient: report.fullName,
+            phone: recipientPhone,
+            territory: territoryName,
+            doctorCalls: report.dcrSummary?.doctorVisits || 0,
+            chemistCalls: report.dcrSummary?.chemistVisits || 0,
+            salesTodayPtr: report.commercialSummary?.totalRevenuePtr || 0,
+            collectionsToday: report.commercialSummary?.collections?.totalCollected || 0,
+            dutyHours: report.expenseHrmsSummary?.attendanceDaysLogged || 0,
+            councilScore: report.councilEvaluation?.councilScore || 0,
+            overallGrade: report.councilEvaluation?.overallGrade || "A",
+            sent: waRes.sent,
+            reason: waRes.reason,
+            whatsappUrl: waUrl,
+          });
+        } else {
+          results.push({
+            mrId: report.mrId,
+            recipient: report.fullName,
+            phone: null,
+            territory: territoryName,
+            doctorCalls: report.dcrSummary?.doctorVisits || 0,
+            chemistCalls: report.dcrSummary?.chemistVisits || 0,
+            salesTodayPtr: report.commercialSummary?.totalRevenuePtr || 0,
+            collectionsToday: report.commercialSummary?.collections?.totalCollected || 0,
+            dutyHours: report.expenseHrmsSummary?.attendanceDaysLogged || 0,
+            councilScore: report.councilEvaluation?.councilScore || 0,
+            overallGrade: report.councilEvaluation?.overallGrade || "A",
+            sent: false,
+            reason: "missing_phone_number",
+          });
+        }
+
+        if (sendEmailToo && report.email) {
+          await sendEmail(report.email, `Trend MR — Personalized Daily Audit Report (${report.fullName})`, messageText);
+        }
+      }
+
+      // Compile Fleet-wide Multi-Agent Council Domain Status Matrix
+      const councilAgentStatuses = Array.from(agentScoreMap.entries()).map(([code, data]) => {
+        const avgScore = data.count > 0 ? Math.round(data.totalScore / data.count) : 100;
+        const status = data.failCount > 0 ? "ONLINE_FAIL" : data.warnCount > 0 ? "ONLINE_WARNING" : "ONLINE_PASS";
+        return {
+          agentCode: code,
+          agentName: data.agentName,
+          domainScope: data.domainScope,
+          status,
+          score: avgScore,
+          latencyMs: Math.round((Date.now() - startTime) / allReports.length),
+          findings: [`Evaluated across ${data.count} field MRs.`, `${data.passCount} MRs achieved full compliance.`],
+          warnings: data.warnCount > 0 ? [`${data.warnCount} MRs flagged with advisory warnings.`] : [],
+        };
+      });
+
+      return ok({
+        success: true,
+        message: `Personalized Daily Multi-Agent Reports successfully dispatched to ${results.filter((r) => r.sent).length}/${allReports.length} MRs individually.`,
+        mode: "ALL_MRS_INDIVIDUALLY",
+        timeframe: options.period,
+        dispatchedCount: results.filter((r) => r.sent).length,
+        totalTargets: allReports.length,
+        executionLatencyMs: Date.now() - startTime,
+        agentStatuses: councilAgentStatuses,
+        details: results,
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // CASE B: DISPATCH TO A SINGLE INDIVIDUAL MR
+    // ─────────────────────────────────────────────────────────────
     if (targetType === "INDIVIDUAL_MR") {
       if (!employeeId) return badRequest("employeeId is required for INDIVIDUAL_MR");
       const report = await multiAgentCouncil.generateMrReport(employeeId, timeFilter);
@@ -222,68 +353,49 @@ async function dispatchMultiAgentWhatsAppReport(req: AuthedRequest) {
       const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
       const waRes = await sendWhatsAppMessage(recipientPhone, messageText);
 
-      results.push({
-        recipient: report.fullName,
-        phone: recipientPhone,
-        sent: waRes.sent,
-        reason: waRes.reason,
-        whatsappUrl: waUrl,
-      });
-
       if (sendEmailToo && report.email) {
-        await sendEmail(report.email, `Multi-Agent Council Audit Report — ${report.fullName}`, messageText);
+        await sendEmail(report.email, `Trend MR — Daily Audit Report (${report.fullName})`, messageText);
       }
 
       return ok({
         success: true,
-        dispatchedCount: results.filter((r) => r.sent).length,
+        message: `Personalized report dispatched to ${report.fullName} individually.`,
+        mode: "INDIVIDUAL_MR",
+        timeframe: options.period,
+        dispatchedCount: waRes.sent ? 1 : 0,
         totalTargets: 1,
-        details: results,
+        executionLatencyMs: Date.now() - startTime,
+        agentStatuses: report.councilEvaluation?.agentStatuses || [],
+        details: [
+          {
+            mrId: report.mrId,
+            recipient: report.fullName,
+            phone: recipientPhone,
+            territory: report.territories?.map((t: any) => t.name).join(", ") || "General",
+            doctorCalls: report.dcrSummary?.doctorVisits || 0,
+            chemistCalls: report.dcrSummary?.chemistVisits || 0,
+            salesTodayPtr: report.commercialSummary?.totalRevenuePtr || 0,
+            collectionsToday: report.commercialSummary?.collections?.totalCollected || 0,
+            dutyHours: report.expenseHrmsSummary?.attendanceDaysLogged || 0,
+            councilScore: report.councilEvaluation?.councilScore || 0,
+            overallGrade: report.councilEvaluation?.overallGrade || "A",
+            sent: waRes.sent,
+            reason: waRes.reason,
+            whatsappUrl: waUrl,
+          },
+        ],
         whatsappText: messageText,
         whatsappUrl: waUrl,
       });
     }
 
-    if (targetType === "ALL_MRS") {
-      const allReports = await multiAgentCouncil.generateAllMrReports(timeFilter);
-      for (const report of allReports) {
-        const messageText = formatMultiAgentCouncilWhatsAppReport(report, options);
-        if (report.phone) {
-          const cleanPhone = sanitizePhoneForWhatsAppUrl(report.phone);
-          const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
-          const waRes = await sendWhatsAppMessage(report.phone, messageText);
-          results.push({
-            recipient: report.fullName,
-            phone: report.phone,
-            sent: waRes.sent,
-            reason: waRes.reason,
-            whatsappUrl: waUrl,
-          });
-        } else {
-          results.push({
-            recipient: report.fullName,
-            phone: null,
-            sent: false,
-            reason: "missing_phone",
-          });
-        }
-
-        if (sendEmailToo && report.email) {
-          await sendEmail(report.email, `Multi-Agent Council Audit Report — ${report.fullName}`, messageText);
-        }
-      }
-
-      return ok({
-        success: true,
-        dispatchedCount: results.filter((r) => r.sent).length,
-        totalTargets: allReports.length,
-        details: results,
-      });
-    }
-
+    // ─────────────────────────────────────────────────────────────
+    // CASE C: DISPATCH EXECUTIVE FLEET DIGEST TO MANAGEMENT
+    // ─────────────────────────────────────────────────────────────
     if (targetType === "EXECUTIVE_FLEET") {
       const allReports = await multiAgentCouncil.generateAllMrReports(timeFilter);
       const messageText = formatMultiAgentCouncilExecutiveDigest(allReports);
+      const results: Array<{ recipient: string; phone?: string | null; sent: boolean; reason?: string; whatsappUrl?: string }> = [];
 
       if (customPhone) {
         const cleanPhone = sanitizePhoneForWhatsAppUrl(customPhone);
@@ -299,6 +411,7 @@ async function dispatchMultiAgentWhatsAppReport(req: AuthedRequest) {
 
         return ok({
           success: true,
+          message: "Executive Fleet Digest dispatched to custom phone.",
           dispatchedCount: waRes.sent ? 1 : 0,
           totalTargets: 1,
           details: results,
@@ -330,50 +443,50 @@ async function dispatchMultiAgentWhatsAppReport(req: AuthedRequest) {
         }
       }
 
-      const cleanPhone = management[0]?.phone ? sanitizePhoneForWhatsAppUrl(management[0].phone) : "";
-      const waUrl = cleanPhone
-        ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`
-        : `https://wa.me/?text=${encodeURIComponent(messageText)}`;
-
       return ok({
         success: true,
+        message: `Executive Fleet Digest dispatched to ${results.filter((r) => r.sent).length} executive management recipients.`,
         dispatchedCount: results.filter((r) => r.sent).length,
         totalTargets: management.length,
         details: results,
         whatsappText: messageText,
-        whatsappUrl: waUrl,
       });
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // CASE D: DISPATCH TO CUSTOM PHONE
+    // ─────────────────────────────────────────────────────────────
     if (targetType === "CUSTOM_PHONE") {
-      if (!customPhone) return badRequest("customPhone is required");
+      if (!customPhone) return badRequest("customPhone is required for CUSTOM_PHONE target");
       const cleanPhone = sanitizePhoneForWhatsAppUrl(customPhone);
 
       let messageText = "";
       if (employeeId) {
-        const report = await multiAgentCouncil.generateMrReport(employeeId);
+        const report = await multiAgentCouncil.generateMrReport(employeeId, timeFilter);
         if (!report) return notFound("MR report not found");
-        messageText = formatMultiAgentCouncilWhatsAppReport(report);
+        messageText = formatMultiAgentCouncilWhatsAppReport(report, options);
       } else {
-        const allReports = await multiAgentCouncil.generateAllMrReports();
+        const allReports = await multiAgentCouncil.generateAllMrReports(timeFilter);
         messageText = formatMultiAgentCouncilExecutiveDigest(allReports);
       }
 
       const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
       const waRes = await sendWhatsAppMessage(customPhone, messageText);
-      results.push({
-        recipient: "Custom Phone",
-        phone: customPhone,
-        sent: waRes.sent,
-        reason: waRes.reason,
-        whatsappUrl: waUrl,
-      });
 
       return ok({
         success: true,
+        message: `Report dispatched to ${customPhone}.`,
         dispatchedCount: waRes.sent ? 1 : 0,
         totalTargets: 1,
-        details: results,
+        details: [
+          {
+            recipient: "Custom Phone",
+            phone: customPhone,
+            sent: waRes.sent,
+            reason: waRes.reason,
+            whatsappUrl: waUrl,
+          },
+        ],
         whatsappText: messageText,
         whatsappUrl: waUrl,
       });
@@ -396,12 +509,8 @@ export const GET = withAuth(getMultiAgentWhatsAppPreview, [
   Role.MR,
 ]);
 
+// STRICT RBAC: Only ADMIN and MD have access to trigger WhatsApp report dispatch
 export const POST = withAuth(dispatchMultiAgentWhatsAppReport, [
   Role.ADMIN,
   Role.MD,
-  Role.NSM,
-  Role.ZSM,
-  Role.RM,
-  Role.ASM,
-  Role.MR,
 ]);

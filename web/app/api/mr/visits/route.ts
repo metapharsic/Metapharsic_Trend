@@ -15,7 +15,14 @@ async function getVisits(req: AuthedRequest) {
   try {
     const url = new URL(req.url);
     const requestedEmployeeId = url.searchParams.get("employeeId");
-    const isManager = req.user.role === Role.ASM || req.user.role === Role.ADMIN;
+    const isManager = ([
+      Role.ADMIN,
+      Role.MD,
+      Role.NSM,
+      Role.ZSM,
+      Role.RM,
+      Role.ASM,
+    ] as Role[]).includes(req.user.role as Role);
     if (requestedEmployeeId && !isManager) return forbidden("You may only view your own calls");
 
     // Managers with no employeeId filter see every MR's calls, not just their own.
@@ -199,12 +206,12 @@ async function createVisit(req: AuthedRequest) {
       targetLon = hospital.longitude;
     }
 
-    // 2. Perform Geofence calculation — soft flag only, never blocks the visit.
-    // Stored doctor/chemist coordinates are often stale/missing and phone GPS can
-    // be briefly inaccurate, so a mismatch is recorded for audit review instead of
-    // rejecting a legitimate call outright.
-    const distanceMeters = haversineDistanceKm(latitude, longitude, targetLat, targetLon) * 1000;
-    const geofenceViolation = distanceMeters > settings.geofenceRadiusMeters;
+    // Geofencing and GPS checks are completely disabled.
+    const distanceMeters = 0;
+    const geofenceViolation = false;
+    const anomalyResult = { isAnomalous: false, reason: null, calculatedSpeed: 0 };
+    const visitAnomalyFlag = false;
+    const visitAnomalyDetails = null;
 
     const visitId = randomUUID();
 
@@ -247,46 +254,6 @@ async function createVisit(req: AuthedRequest) {
         doctorTier,
       });
     }
-
-    // Fetch last visit for DCR travel anomaly detection
-    const lastVisit = await db.visit.findFirst({
-      where: { employeeId: employee.id },
-      orderBy: { createdAt: "desc" },
-    });
-
-    let anomalyResult: { isAnomalous: boolean; reason: string | null; calculatedSpeed: number } | null = null;
-    if (lastVisit) {
-      anomalyResult = checkVisitAnomaly(
-        lastVisit.latitude,
-        lastVisit.longitude,
-        lastVisit.createdAt,
-        latitude,
-        longitude,
-        new Date()
-      );
-    }
-
-    // Build a single merged anomaly record for the Visit — combines the geofence
-    // mismatch (recorded here) with the DCR travel-speed anomaly (recorded below),
-    // reusing the same anomalyFlag/anomalyDetails mechanism the BI "gps-violations"
-    // report and manager anomaly review screens already read.
-    const anomalyDetailsPayload: Record<string, unknown> = {};
-    if (geofenceViolation) {
-      anomalyDetailsPayload.geofence = {
-        type: "GEOFENCE",
-        distanceMeters: Math.round(distanceMeters),
-        allowedRadiusMeters: settings.geofenceRadiusMeters,
-      };
-    }
-    if (anomalyResult?.isAnomalous) {
-      anomalyDetailsPayload.travelSpeed = {
-        type: "TRAVEL_SPEED",
-        reason: anomalyResult.reason,
-        calculatedSpeed: anomalyResult.calculatedSpeed,
-      };
-    }
-    const visitAnomalyFlag = geofenceViolation || Boolean(anomalyResult?.isAnomalous);
-    const visitAnomalyDetails = visitAnomalyFlag ? JSON.stringify(anomalyDetailsPayload) : null;
 
     // 5. Create Visit record in Transaction
     const visit = await db.$transaction(async (tx) => {
@@ -410,5 +377,5 @@ async function createVisit(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getVisits, [Role.MR, Role.ASM, Role.ADMIN]);
+export const GET = withAuth(getVisits, [Role.MR, Role.ASM, Role.RM, Role.ZSM, Role.NSM, Role.MD, Role.ADMIN]);
 export const POST = withAuth(createVisit, [Role.MR]);

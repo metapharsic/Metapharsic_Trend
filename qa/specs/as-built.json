@@ -1,7 +1,7 @@
 {
   "generatedFrom": "source",
   "counts": {
-    "routes": 110,
+    "routes": 114,
     "screens": 49
   },
   "routes": [
@@ -38,6 +38,48 @@
         "rawNextResponse": false
       },
       "validators": []
+    },
+    {
+      "url": "/api/admin/company-settings",
+      "file": "app/api/admin/company-settings/route.ts",
+      "methods": {
+        "GET": {
+          "handler": "getCompanySettings",
+          "authenticated": true,
+          "roles": [
+            "ADMIN",
+            "MD"
+          ]
+        },
+        "PUT": {
+          "handler": "updateCompanySettings",
+          "authenticated": true,
+          "roles": [
+            "ADMIN",
+            "MD"
+          ]
+        }
+      },
+      "paginated": false,
+      "exposesPaginationTotal": false,
+      "exposesFlatTotal": false,
+      "hardTake": [],
+      "usesGroupBy": false,
+      "scope": {
+        "byEmployeeId": false,
+        "byOrderEmployeeId": false,
+        "byTerritory": false,
+        "resolvesEmployee": false,
+        "managerBypass": false,
+        "managerRoles": []
+      },
+      "envelope": {
+        "usesHelpers": true,
+        "rawNextResponse": false
+      },
+      "validators": [
+        "CompanySettingsSchema"
+      ]
     },
     {
       "url": "/api/admin/reports/whatsapp-eod",
@@ -1219,7 +1261,13 @@
           "roles": [
             "ADMIN",
             "ASM",
-            "MR"
+            "HR",
+            "MARKETING",
+            "MD",
+            "MR",
+            "NSM",
+            "RM",
+            "ZSM"
           ]
         },
         "POST": {
@@ -1227,7 +1275,9 @@
           "authenticated": true,
           "roles": [
             "ADMIN",
-            "ASM"
+            "ASM",
+            "HR",
+            "MD"
           ]
         }
       },
@@ -1237,10 +1287,10 @@
       "hardTake": [],
       "usesGroupBy": false,
       "scope": {
-        "byEmployeeId": false,
+        "byEmployeeId": true,
         "byOrderEmployeeId": false,
         "byTerritory": false,
-        "resolvesEmployee": false,
+        "resolvesEmployee": true,
         "managerBypass": false,
         "managerRoles": []
       },
@@ -1666,6 +1716,39 @@
       "validators": []
     },
     {
+      "url": "/api/manager/dashboard/nsm",
+      "file": "app/api/manager/dashboard/nsm/route.ts",
+      "methods": {
+        "GET": {
+          "handler": "getNsmDashboard",
+          "authenticated": true,
+          "roles": [
+            "ADMIN",
+            "MD",
+            "NSM"
+          ]
+        }
+      },
+      "paginated": false,
+      "exposesPaginationTotal": false,
+      "exposesFlatTotal": false,
+      "hardTake": [],
+      "usesGroupBy": false,
+      "scope": {
+        "byEmployeeId": false,
+        "byOrderEmployeeId": false,
+        "byTerritory": false,
+        "resolvesEmployee": false,
+        "managerBypass": false,
+        "managerRoles": []
+      },
+      "envelope": {
+        "usesHelpers": true,
+        "rawNextResponse": false
+      },
+      "validators": []
+    },
+    {
       "url": "/api/manager/dashboard/rm",
       "file": "app/api/manager/dashboard/rm/route.ts",
       "methods": {
@@ -1754,6 +1837,40 @@
       "scope": {
         "byEmployeeId": true,
         "byOrderEmployeeId": true,
+        "byTerritory": false,
+        "resolvesEmployee": false,
+        "managerBypass": false,
+        "managerRoles": []
+      },
+      "envelope": {
+        "usesHelpers": true,
+        "rawNextResponse": false
+      },
+      "validators": []
+    },
+    {
+      "url": "/api/manager/dashboard/zsm",
+      "file": "app/api/manager/dashboard/zsm/route.ts",
+      "methods": {
+        "GET": {
+          "handler": "getZsmDashboard",
+          "authenticated": true,
+          "roles": [
+            "ADMIN",
+            "MD",
+            "NSM",
+            "ZSM"
+          ]
+        }
+      },
+      "paginated": false,
+      "exposesPaginationTotal": false,
+      "exposesFlatTotal": false,
+      "hardTake": [],
+      "usesGroupBy": false,
+      "scope": {
+        "byEmployeeId": true,
+        "byOrderEmployeeId": false,
         "byTerritory": false,
         "resolvesEmployee": false,
         "managerBypass": false,
@@ -2574,6 +2691,39 @@
       "validators": [
         "UpdateSchema"
       ]
+    },
+    {
+      "url": "/api/marketing/dashboard",
+      "file": "app/api/marketing/dashboard/route.ts",
+      "methods": {
+        "GET": {
+          "handler": "getMarketingDashboard",
+          "authenticated": true,
+          "roles": [
+            "ADMIN",
+            "MARKETING",
+            "MD"
+          ]
+        }
+      },
+      "paginated": false,
+      "exposesPaginationTotal": false,
+      "exposesFlatTotal": false,
+      "hardTake": [],
+      "usesGroupBy": false,
+      "scope": {
+        "byEmployeeId": false,
+        "byOrderEmployeeId": false,
+        "byTerritory": false,
+        "resolvesEmployee": false,
+        "managerBypass": false,
+        "managerRoles": []
+      },
+      "envelope": {
+        "usesHelpers": true,
+        "rawNextResponse": false
+      },
+      "validators": []
     },
     {
       "url": "/api/mr/attendance/check-in",
@@ -5557,7 +5707,9 @@
       ],
       "dropdowns": [],
       "fields": [],
-      "validationMessages": [],
+      "validationMessages": [
+        "Failed to load courses from database."
+      ],
       "lengthDerivedCounts": [],
       "countHeadings": [],
       "readsPaginationTotal": false
@@ -5601,10 +5753,14 @@
       "url": "/marketing",
       "file": "app/(dashboard)/marketing/page.tsx",
       "roleFromPath": "marketing",
-      "apis": [],
+      "apis": [
+        "/api/marketing/dashboard"
+      ],
       "dropdowns": [],
       "fields": [],
-      "validationMessages": [],
+      "validationMessages": [
+        "Failed to load marketing data from database."
+      ],
       "lengthDerivedCounts": [],
       "countHeadings": [],
       "readsPaginationTotal": false
@@ -6093,10 +6249,14 @@
       "url": "/nsm",
       "file": "app/(dashboard)/nsm/page.tsx",
       "roleFromPath": "nsm",
-      "apis": [],
+      "apis": [
+        "/api/manager/dashboard/nsm"
+      ],
       "dropdowns": [],
       "fields": [],
-      "validationMessages": [],
+      "validationMessages": [
+        "Failed to load live national metrics. Please check network connection."
+      ],
       "lengthDerivedCounts": [],
       "countHeadings": [],
       "readsPaginationTotal": false
@@ -6716,13 +6876,17 @@
       "url": "/zsm",
       "file": "app/(dashboard)/zsm/page.tsx",
       "roleFromPath": "zsm",
-      "apis": [],
+      "apis": [
+        "/api/manager/dashboard/zsm"
+      ],
       "dropdowns": [],
       "fields": [],
-      "validationMessages": [],
+      "validationMessages": [
+        "Failed to load live regional metrics. Please check network connection."
+      ],
       "lengthDerivedCounts": [],
       "countHeadings": [],
-      "readsPaginationTotal": false
+      "readsPaginationTotal": true
     }
   ],
   "validators": {
