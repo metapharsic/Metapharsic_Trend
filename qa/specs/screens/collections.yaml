@@ -1,0 +1,72 @@
+# INTENDED specification for the Collections screen.
+# Sibling of orders.yaml -- the two must agree on MR scope, or the same
+# chemist shows a different outstanding balance on each screen.
+
+screen: collections
+title: Collections
+url: /collections
+module: orders
+owner: sales
+
+roles:
+  allowed: [MR]
+  denied: [DISTRIBUTOR, DOCTOR, WAREHOUSE]
+
+scope:
+  MR: employeeId
+
+apis:
+  - url: /api/mr/collections
+    purpose: Collection entries list + create
+    paginated: true
+    requiresPaginationTotal: true
+  - url: /api/mr/credit-summary
+    purpose: Per-chemist outstanding balances
+  - url: /api/manager/credit
+    purpose: Credit limits and exposure
+
+tables:
+  reads: [Collection, Chemist, Order, OrderItem]
+  writes: [Collection, LedgerTransaction, LedgerEntry]
+
+dropdowns:
+  - name: chemistId
+    label: Chemist
+    source: /api/mr/credit-summary
+    required: true
+    placeholder: true
+  - name: paymentMode
+    label: Payment Mode
+    source: static
+    options: [CASH, CHEQUE, NEFT, UPI]
+    required: true
+    placeholder: true
+
+fields:
+  - name: amount
+    label: Amount
+    type: number
+    required: true
+    min: 1
+    validation: Positive, must not exceed chemist outstanding
+  - name: referenceNo
+    label: Reference No
+    type: text
+    required: false
+    note: Required when paymentMode is CHEQUE or NEFT
+  - name: collectedOn
+    label: Collected On
+    type: date
+    required: true
+
+validations:
+  - trigger: submit with no chemist
+    message: Select a chemist.
+  - trigger: submit with non-positive amount
+    message: Enter a valid amount.
+  - trigger: amount exceeds outstanding
+    message: server-rejected
+    level: server
+
+testability:
+  requireSelectors: [name, data-testid]

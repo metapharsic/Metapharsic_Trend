@@ -5,6 +5,8 @@ import { ok, badRequest, notFound, forbidden, unauthorized, apiError } from "@/l
 import { UpdateOrderStatusSchema, UpdateOrderItemsSchema } from "@/lib/validators";
 import { bestSchemeFor, round2 } from "@/lib/scheme";
 import { computeInvoiceTotals } from "@/lib/gst";
+import { postAutoLedger, reverseAutoLedger, SYSTEM_ACCOUNT_CODES } from "@/lib/ledger";
+import { canTransitionOrder } from "@/lib/order-workflow";
 
 // Orders are only editable/deletable before dispatch — once SHIPPED or
 // DELIVERED the invoice is a real, physically-fulfilled transaction and
@@ -89,6 +91,14 @@ async function updateOrder(
     const existing = await db.order.findUnique({ where: { id } });
     if (!existing) return notFound("Order not found");
 
+    // Admins and MDs have full privileges to transition or override any status.
+    // Other roles follow the forward-only state machine.
+    const isAdminOrMd = req.user.role === Role.ADMIN || req.user.role === Role.MD;
+    if (!isAdminOrMd) {
+      const transition = canTransitionOrder(existing.status, parsed.data.status);
+      if (!transition.allowed) return badRequest(transition.reason ?? "Invalid status transition");
+    }
+
     const order = await db.order.update({
       where: { id },
       data: { status: parsed.data.status },
@@ -103,12 +113,25 @@ async function updateOrder(
 }
 
 async function updateOrderItems(req: AuthedRequest, id: string, body: unknown) {
+  try {
+    return await updateOrderItemsInner(req, id, body);
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("Insufficient stock")) {
+      return badRequest(err.message);
+    }
+    console.error("[PUT /api/orders/[id]] (items edit)", err);
+    return apiError("INTERNAL_SERVER_ERROR", "Failed to update order items", 500);
+  }
+}
+
+async function updateOrderItemsInner(req: AuthedRequest, id: string, body: unknown) {
   const parsed = UpdateOrderItemsSchema.safeParse(body);
   if (!parsed.success) return badRequest("Validation error", parsed.error.flatten());
 
   const existing = await db.order.findUnique({ where: { id }, include: { invoice: true, items: true } });
   if (!existing) return notFound("Order not found");
-  if (LOCKED_STATUSES.includes(existing.status)) {
+  const isAdminOrMd = req.user.role === Role.ADMIN || req.user.role === Role.MD;
+  if (!isAdminOrMd && LOCKED_STATUSES.includes(existing.status)) {
     return badRequest(`Order is ${existing.status.toLowerCase()} and can no longer be edited.`);
   }
 
@@ -184,10 +207,14 @@ async function updateOrderItems(req: AuthedRequest, id: string, body: unknown) {
       });
     }
     for (const li of lineItems) {
-      const updatedProduct = await tx.product.update({
-        where: { id: li.productId },
+      const decremented = await tx.product.updateMany({
+        where: { id: li.productId, stockQty: { gte: li.quantity } },
         data: { stockQty: { decrement: li.quantity } },
       });
+      if (decremented.count === 0) {
+        throw new Error(`Insufficient stock for product ${li.productId}`);
+      }
+      const updatedProduct = await tx.product.findUniqueOrThrow({ where: { id: li.productId } });
       await tx.inventoryMovement.create({
         data: {
           productId: li.productId,
@@ -200,13 +227,22 @@ async function updateOrderItems(req: AuthedRequest, id: string, body: unknown) {
     }
 
     await tx.orderItem.deleteMany({ where: { orderId: id } });
+    const orderData: any = { items: { create: orderItemsData } };
+    if (parsed.data.status) {
+      orderData.status = parsed.data.status;
+    }
     const order = await tx.order.update({
       where: { id },
-      data: { items: { create: orderItemsData } },
+      data: orderData,
       include: { items: { include: { product: { select: { id: true, name: true, sku: true } } } }, chemist: true, distributor: true },
     });
     if (existing.invoice) {
-      await tx.invoice.update({
+      // If already paid, the recorded payment amount is about to go stale
+      // against the new total — force it back to unpaid so the payment must
+      // be explicitly re-confirmed against the correct new amount, rather
+      // than silently keeping a "paid" flag that no longer matches the ledger.
+      const wasPaid = existing.invoice.paid;
+      const updatedInvoice = await tx.invoice.update({
         where: { orderId: id },
         data: {
           amount: newOrderValue,
@@ -216,8 +252,36 @@ async function updateOrderItems(req: AuthedRequest, id: string, body: unknown) {
           totalGst: gstTotals.totalGst,
           roundOff: gstTotals.roundOff,
           grandTotal: gstTotals.grandTotal,
+          ...(wasPaid ? { paid: false } : {}),
         },
       });
+
+      // Invoice total changed — the sale posting made at order-creation time
+      // is now stale. Reverse it and repost fresh off the new totals, same as
+      // the original create-time posting in orders/secondary/route.ts.
+      await reverseAutoLedger(tx, "INVOICE", updatedInvoice.id);
+      const gstAmount = Number(gstTotals.totalGst ?? 0);
+      const grandTotal = Number(gstTotals.grandTotal ?? newOrderValue);
+      const salesAmount = grandTotal - gstAmount;
+      await postAutoLedger(tx, {
+        sourceType: "INVOICE",
+        sourceId: updatedInvoice.id,
+        date: updatedInvoice.createdAt,
+        narration: `Invoice ${updatedInvoice.invoiceNo} — edited`,
+        lines: [
+          { accountCode: SYSTEM_ACCOUNT_CODES.accountsReceivable, debit: grandTotal },
+          { accountCode: SYSTEM_ACCOUNT_CODES.salesRevenue, credit: salesAmount },
+          ...(gstAmount > 0 ? [{ accountCode: SYSTEM_ACCOUNT_CODES.gstPayable, credit: gstAmount }] : []),
+        ],
+      });
+
+      // Payment posting (sourceId `${id}-payment`) reflected the OLD amount —
+      // reverse it now that `paid` has been forced back to false above; a
+      // fresh PUT /api/invoices/[id] { paid: true } will re-post correctly
+      // against the new total.
+      if (wasPaid) {
+        await reverseAutoLedger(tx, "INVOICE", `${updatedInvoice.id}-payment`);
+      }
     }
     return order;
   });
@@ -231,9 +295,10 @@ async function deleteOrder(
 ) {
   try {
     const id = String(params.id ?? "");
-    const existing = await db.order.findUnique({ where: { id }, include: { items: true } });
+    const existing = await db.order.findUnique({ where: { id }, include: { items: true, invoice: true } });
     if (!existing) return notFound("Order not found");
-    if (LOCKED_STATUSES.includes(existing.status)) {
+    const isAdminOrMd = req.user.role === Role.ADMIN || req.user.role === Role.MD;
+    if (!isAdminOrMd && LOCKED_STATUSES.includes(existing.status)) {
       return badRequest(`Order is ${existing.status.toLowerCase()} and can no longer be deleted.`);
     }
 
@@ -263,6 +328,16 @@ async function deleteOrder(
           },
         });
       }
+      // Order delete cascades to Invoice (schema onDelete: Cascade) — the
+      // ledger postings keyed off that invoice id must be cleared too, or
+      // they'd orphan as a sale/payment for an invoice that no longer exists.
+      if (existing.invoice) {
+        await reverseAutoLedger(tx, "INVOICE", existing.invoice.id);
+        if (existing.invoice.paid) {
+          await reverseAutoLedger(tx, "INVOICE", `${existing.invoice.id}-payment`);
+        }
+      }
+
       await tx.order.delete({ where: { id } });
     });
     return ok({ message: "Order deleted" });
@@ -274,4 +349,4 @@ async function deleteOrder(
 
 export const GET = withAuth(getOrder, [Role.MR, Role.ASM, Role.ADMIN, Role.DISTRIBUTOR, Role.MD]);
 export const PUT = withAuth(updateOrder, [Role.MR, Role.ASM, Role.ADMIN, Role.MD, Role.WAREHOUSE]);
-export const DELETE = withAuth(deleteOrder, [Role.MR, Role.ASM, Role.ADMIN]);
+export const DELETE = withAuth(deleteOrder, [Role.MR, Role.ASM, Role.ADMIN, Role.MD]);

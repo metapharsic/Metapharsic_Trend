@@ -1,0 +1,1216 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Trend_MR\\e2e\\node_modules\\@playwright\\test\\cli.js",
+      "test"
+    ],
+    "configFile": "C:\\Trend_MR\\e2e\\playwright.config.ts",
+    "rootDir": "C:/Trend_MR/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Trend_MR/qa/reports/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "setup",
+        "name": "setup",
+        "testDir": "C:/Trend_MR/e2e",
+        "testIgnore": [
+          "**/node_modules/**"
+        ],
+        "testMatch": [
+          "/fixtures[\\\\/]auth\\.setup\\.ts$/"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "C:/Trend_MR/qa/reports/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "C:/Trend_MR/e2e",
+        "testIgnore": [
+          "**/node_modules/**"
+        ],
+        "testMatch": [
+          "/specs[\\\\/].*\\.spec\\.ts$/"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "../qa/reports/playwright-results.json"
+        }
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "../qa/reports/playwright-html",
+          "open": "never"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "fixtures\\auth.setup.ts",
+      "file": "fixtures/auth.setup.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "authenticate as admin",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 17053,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-08-26T01:21:36.329Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6db7255f214771fc958b-7a4cb2f54c8cfab47e0d",
+          "file": "fixtures/auth.setup.ts",
+          "line": 13,
+          "column": 8
+        },
+        {
+          "title": "authenticate as md",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 33353,
+                  "error": {
+                    "message": "Error: Login as md (md@mrtracker.com) did not leave /login -- check the seed accounts exist (cd web && npm run db:seed) or set E2E_MD_EMAIL / _PASSWORD.\n\n\u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).not.\u001b[22mtoHaveURL\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nExpected pattern: not \u001b[32m/\\/login/\u001b[39m\nReceived string: \u001b[31m\"http://localhost:5555\u001b[7m/login\u001b[27m\"\u001b[39m\nTimeout: 20000ms\n\nCall log:\n\u001b[2m  - Login as md (md@mrtracker.com) did not leave /login -- check the seed accounts exist (cd web && npm run db:seed) or set E2E_MD_EMAIL / _PASSWORD. with timeout 20000ms\u001b[22m\n\u001b[2m    41 × locator resolved to <html lang=\"en\" class=\"__variable_f367f3 __variable_ed3508\">…</html>\u001b[22m\n\u001b[2m       - unexpected value \"http://localhost:5555/login\"\u001b[22m\n",
+                    "stack": "Error: Login as md (md@mrtracker.com) did not leave /login -- check the seed accounts exist (cd web && npm run db:seed) or set E2E_MD_EMAIL / _PASSWORD.\n\n\u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).not.\u001b[22mtoHaveURL\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nExpected pattern: not \u001b[32m/\\/login/\u001b[39m\nReceived string: \u001b[31m\"http://localhost:5555\u001b[7m/login\u001b[27m\"\u001b[39m\nTimeout: 20000ms\n\nCall log:\n\u001b[2m  - Login as md (md@mrtracker.com) did not leave /login -- check the seed accounts exist (cd web && npm run db:seed) or set E2E_MD_EMAIL / _PASSWORD. with timeout 20000ms\u001b[22m\n\u001b[2m    41 × locator resolved to <html lang=\"en\" class=\"__variable_f367f3 __variable_ed3508\">…</html>\u001b[22m\n\u001b[2m       - unexpected value \"http://localhost:5555/login\"\u001b[22m\n\n    at C:\\Trend_MR\\e2e\\fixtures\\auth.setup.ts:31:11",
+                    "location": {
+                      "file": "C:\\Trend_MR\\e2e\\fixtures\\auth.setup.ts",
+                      "column": 11,
+                      "line": 31
+                    },
+                    "snippet": "\u001b[0m \u001b[90m 29 |\u001b[39m       \u001b[32m`Login as ${role} (${email}) did not leave /login -- check the seed accounts exist `\u001b[39m \u001b[33m+\u001b[39m\n \u001b[90m 30 |\u001b[39m         \u001b[32m`(cd web && npm run db:seed) or set E2E_${role.toUpperCase()}_EMAIL / _PASSWORD.`\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 31 |\u001b[39m     )\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39mtoHaveURL(\u001b[35m/\\/login/\u001b[39m\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m20\u001b[39m_000 })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m           \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m     \u001b[90m// Some roles land on a shared dashboard rather than their canonical page,\u001b[39m\n \u001b[90m 34 |\u001b[39m     \u001b[90m// which is fine -- leaving /login is the real success signal.\u001b[39m\u001b[0m"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Trend_MR\\e2e\\fixtures\\auth.setup.ts",
+                        "column": 11,
+                        "line": 31
+                      },
+                      "message": "Error: Login as md (md@mrtracker.com) did not leave /login -- check the seed accounts exist (cd web && npm run db:seed) or set E2E_MD_EMAIL / _PASSWORD.\n\n\u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).not.\u001b[22mtoHaveURL\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nExpected pattern: not \u001b[32m/\\/login/\u001b[39m\nReceived string: \u001b[31m\"http://localhost:5555\u001b[7m/login\u001b[27m\"\u001b[39m\nTimeout: 20000ms\n\nCall log:\n\u001b[2m  - Login as md (md@mrtracker.com) did not leave /login -- check the seed accounts exist (cd web && npm run db:seed) or set E2E_MD_EMAIL / _PASSWORD. with timeout 20000ms\u001b[22m\n\u001b[2m    41 × locator resolved to <html lang=\"en\" class=\"__variable_f367f3 __variable_ed3508\">…</html>\u001b[22m\n\u001b[2m       - unexpected value \"http://localhost:5555/login\"\u001b[22m\n\n\n\u001b[0m \u001b[90m 29 |\u001b[39m       \u001b[32m`Login as ${role} (${email}) did not leave /login -- check the seed accounts exist `\u001b[39m \u001b[33m+\u001b[39m\n \u001b[90m 30 |\u001b[39m         \u001b[32m`(cd web && npm run db:seed) or set E2E_${role.toUpperCase()}_EMAIL / _PASSWORD.`\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 31 |\u001b[39m     )\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39mtoHaveURL(\u001b[35m/\\/login/\u001b[39m\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m20\u001b[39m_000 })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m           \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m     \u001b[90m// Some roles land on a shared dashboard rather than their canonical page,\u001b[39m\n \u001b[90m 34 |\u001b[39m     \u001b[90m// which is fine -- leaving /login is the real success signal.\u001b[39m\u001b[0m\n\u001b[2m    at C:\\Trend_MR\\e2e\\fixtures\\auth.setup.ts:31:11\u001b[22m"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-08-26T01:21:54.226Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\Trend_MR\\qa\\reports\\playwright-artifacts\\fixtures-auth.setup.ts-authenticate-as-md-setup\\test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\Trend_MR\\qa\\reports\\playwright-artifacts\\fixtures-auth.setup.ts-authenticate-as-md-setup\\video.webm"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Trend_MR\\qa\\reports\\playwright-artifacts\\fixtures-auth.setup.ts-authenticate-as-md-setup\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Trend_MR\\qa\\reports\\playwright-artifacts\\fixtures-auth.setup.ts-authenticate-as-md-setup\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Trend_MR\\e2e\\fixtures\\auth.setup.ts",
+                    "column": 11,
+                    "line": 31
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6db7255f214771fc958b-1c265215ae159dee6d97",
+          "file": "fixtures/auth.setup.ts",
+          "line": 13,
+          "column": 8
+        },
+        {
+          "title": "authenticate as asm",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 31502,
+                  "error": {
+                    "message": "Error: Login as asm (asm@mrtracker.com) did not leave /login -- check the seed accounts exist (cd web && npm run db:seed) or set E2E_ASM_EMAIL / _PASSWORD.\n\n\u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).not.\u001b[22mtoHaveURL\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nExpected pattern: not \u001b[32m/\\/login/\u001b[39m\nReceived string: \u001b[31m\"http://localhost:5555\u001b[7m/login\u001b[27m\"\u001b[39m\nTimeout: 20000ms\n\nCall log:\n\u001b[2m  - Login as asm (asm@mrtracker.com) did not leave /login -- check the seed accounts exist (cd web && npm run db:seed) or set E2E_ASM_EMAIL / _PASSWORD. with timeout 20000ms\u001b[22m\n\u001b[2m    42 × locator resolved to <html lang=\"en\" class=\"__variable_f367f3 __variable_ed3508\">…</html>\u001b[22m\n\u001b[2m       - unexpected value \"http://localhost:5555/login\"\u001b[22m\n",
+                    "stack": "Error: Login as asm (asm@mrtracker.com) did not leave /login -- check the seed accounts exist (cd web && npm run db:seed) or set E2E_ASM_EMAIL / _PASSWORD.\n\n\u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).not.\u001b[22mtoHaveURL\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nExpected pattern: not \u001b[32m/\\/login/\u001b[39m\nReceived string: \u001b[31m\"http://localhost:5555\u001b[7m/login\u001b[27m\"\u001b[39m\nTimeout: 20000ms\n\nCall log:\n\u001b[2m  - Login as asm (asm@mrtracker.com) did not leave /login -- check the seed accounts exist (cd web && npm run db:seed) or set E2E_ASM_EMAIL / _PASSWORD. with timeout 20000ms\u001b[22m\n\u001b[2m    42 × locator resolved to <html lang=\"en\" class=\"__variable_f367f3 __variable_ed3508\">…</html>\u001b[22m\n\u001b[2m       - unexpected value \"http://localhost:5555/login\"\u001b[22m\n\n    at C:\\Trend_MR\\e2e\\fixtures\\auth.setup.ts:31:11",
+                    "location": {
+                      "file": "C:\\Trend_MR\\e2e\\fixtures\\auth.setup.ts",
+                      "column": 11,
+                      "line": 31
+                    },
+                    "snippet": "\u001b[0m \u001b[90m 29 |\u001b[39m       \u001b[32m`Login as ${role} (${email}) did not leave /login -- check the seed accounts exist `\u001b[39m \u001b[33m+\u001b[39m\n \u001b[90m 30 |\u001b[39m         \u001b[32m`(cd web && npm run db:seed) or set E2E_${role.toUpperCase()}_EMAIL / _PASSWORD.`\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 31 |\u001b[39m     )\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39mtoHaveURL(\u001b[35m/\\/login/\u001b[39m\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m20\u001b[39m_000 })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m           \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m     \u001b[90m// Some roles land on a shared dashboard rather than their canonical page,\u001b[39m\n \u001b[90m 34 |\u001b[39m     \u001b[90m// which is fine -- leaving /login is the real success signal.\u001b[39m\u001b[0m"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Trend_MR\\e2e\\fixtures\\auth.setup.ts",
+                        "column": 11,
+                        "line": 31
+                      },
+                      "message": "Error: Login as asm (asm@mrtracker.com) did not leave /login -- check the seed accounts exist (cd web && npm run db:seed) or set E2E_ASM_EMAIL / _PASSWORD.\n\n\u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).not.\u001b[22mtoHaveURL\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nExpected pattern: not \u001b[32m/\\/login/\u001b[39m\nReceived string: \u001b[31m\"http://localhost:5555\u001b[7m/login\u001b[27m\"\u001b[39m\nTimeout: 20000ms\n\nCall log:\n\u001b[2m  - Login as asm (asm@mrtracker.com) did not leave /login -- check the seed accounts exist (cd web && npm run db:seed) or set E2E_ASM_EMAIL / _PASSWORD. with timeout 20000ms\u001b[22m\n\u001b[2m    42 × locator resolved to <html lang=\"en\" class=\"__variable_f367f3 __variable_ed3508\">…</html>\u001b[22m\n\u001b[2m       - unexpected value \"http://localhost:5555/login\"\u001b[22m\n\n\n\u001b[0m \u001b[90m 29 |\u001b[39m       \u001b[32m`Login as ${role} (${email}) did not leave /login -- check the seed accounts exist `\u001b[39m \u001b[33m+\u001b[39m\n \u001b[90m 30 |\u001b[39m         \u001b[32m`(cd web && npm run db:seed) or set E2E_${role.toUpperCase()}_EMAIL / _PASSWORD.`\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 31 |\u001b[39m     )\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39mtoHaveURL(\u001b[35m/\\/login/\u001b[39m\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m20\u001b[39m_000 })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m           \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 32 |\u001b[39m\n \u001b[90m 33 |\u001b[39m     \u001b[90m// Some roles land on a shared dashboard rather than their canonical page,\u001b[39m\n \u001b[90m 34 |\u001b[39m     \u001b[90m// which is fine -- leaving /login is the real success signal.\u001b[39m\u001b[0m\n\u001b[2m    at C:\\Trend_MR\\e2e\\fixtures\\auth.setup.ts:31:11\u001b[22m"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-08-26T01:22:31.186Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\Trend_MR\\qa\\reports\\playwright-artifacts\\fixtures-auth.setup.ts-authenticate-as-asm-setup\\test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\Trend_MR\\qa\\reports\\playwright-artifacts\\fixtures-auth.setup.ts-authenticate-as-asm-setup\\video.webm"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Trend_MR\\qa\\reports\\playwright-artifacts\\fixtures-auth.setup.ts-authenticate-as-asm-setup\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Trend_MR\\qa\\reports\\playwright-artifacts\\fixtures-auth.setup.ts-authenticate-as-asm-setup\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Trend_MR\\e2e\\fixtures\\auth.setup.ts",
+                    "column": 11,
+                    "line": 31
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6db7255f214771fc958b-2d0e64d698df24aeaeae",
+          "file": "fixtures/auth.setup.ts",
+          "line": 13,
+          "column": 8
+        },
+        {
+          "title": "authenticate as mr",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8208,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-08-26T01:23:06.288Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6db7255f214771fc958b-4331fe389d554f23eceb",
+          "file": "fixtures/auth.setup.ts",
+          "line": 13,
+          "column": 8
+        }
+      ]
+    },
+    {
+      "title": "specs\\cross-module-consistency.spec.ts",
+      "file": "specs/cross-module-consistency.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "orders / invoices / history agree for one MR",
+          "file": "specs/cross-module-consistency.spec.ts",
+          "line": 23,
+          "column": 6,
+          "specs": [
+            {
+              "title": "every invoice belongs to an order the MR can see",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b158f160b5be02918900-2dbaebc0a41cc2290d1b",
+              "file": "specs/cross-module-consistency.spec.ts",
+              "line": 24,
+              "column": 7
+            },
+            {
+              "title": "invoice count never exceeds order count for the same scope",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b158f160b5be02918900-a5ff7732ef09facb7d68",
+              "file": "specs/cross-module-consistency.spec.ts",
+              "line": 38,
+              "column": 7
+            },
+            {
+              "title": "status tallies are computed over the full scope, not the current page",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b158f160b5be02918900-be6da6a3a80bad0997e6",
+              "file": "specs/cross-module-consistency.spec.ts",
+              "line": 53,
+              "column": 7
+            }
+          ]
+        },
+        {
+          "title": "pagination totals are real",
+          "file": "specs/cross-module-consistency.spec.ts",
+          "line": 68,
+          "column": 6,
+          "specs": [
+            {
+              "title": "/api/orders/secondary reports a total larger than one page",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b158f160b5be02918900-b6f718e30c81931212d1",
+              "file": "specs/cross-module-consistency.spec.ts",
+              "line": 77,
+              "column": 9
+            },
+            {
+              "title": "/api/mr/claims reports a total larger than one page",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b158f160b5be02918900-2d416885f8881de3e85f",
+              "file": "specs/cross-module-consistency.spec.ts",
+              "line": 77,
+              "column": 9
+            },
+            {
+              "title": "/api/mr/leads reports a total larger than one page",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b158f160b5be02918900-f13a4b25ba9283c6bded",
+              "file": "specs/cross-module-consistency.spec.ts",
+              "line": 77,
+              "column": 9
+            },
+            {
+              "title": "/api/mr/ledgers reports a total larger than one page",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b158f160b5be02918900-52c73b8018175523fcb8",
+              "file": "specs/cross-module-consistency.spec.ts",
+              "line": 77,
+              "column": 9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "specs\\screen-conformance.spec.ts",
+      "file": "specs/screen-conformance.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Collections (/collections)",
+          "file": "specs/screen-conformance.spec.ts",
+          "line": 30,
+          "column": 8,
+          "specs": [
+            {
+              "title": "dropdown \"chemistId\" is present and populated",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-f1c414a4b519964fd4e5",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 39,
+              "column": 11
+            },
+            {
+              "title": "dropdown \"paymentMode\" is present and populated",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-cf378a586ffca3ee3270",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 39,
+              "column": 11
+            },
+            {
+              "title": "field \"amount\" is present and addressable",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-234ca2309c4a1e83fb39",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 71,
+              "column": 11
+            },
+            {
+              "title": "field \"referenceNo\" is present and addressable",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-0fb4df7669714dcd4ccb",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 71,
+              "column": 11
+            },
+            {
+              "title": "field \"collectedOn\" is present and addressable",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-27ad64b9467fb6b34f63",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 71,
+              "column": 11
+            },
+            {
+              "title": "validation fires: submit with no chemist",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-2f58ec902c01b1350215",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 85,
+              "column": 11
+            },
+            {
+              "title": "validation fires: submit with non-positive amount",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-d1a140531fdcd7cde4c9",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 85,
+              "column": 11
+            },
+            {
+              "title": "no role in the denied list can load the screen",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-dc5d07b5175a0e3d95fb",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 128,
+              "column": 9
+            }
+          ]
+        },
+        {
+          "title": "Expense Claims (/mr/claims)",
+          "file": "specs/screen-conformance.spec.ts",
+          "line": 30,
+          "column": 8,
+          "specs": [
+            {
+              "title": "dropdown \"form.chemistId\" is present and populated",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-2a1eaffd761a2601e048",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 39,
+              "column": 11
+            },
+            {
+              "title": "dropdown \"form.distributorId\" is present and populated",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-938851f8ab4f0112a8c1",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 39,
+              "column": 11
+            },
+            {
+              "title": "dropdown \"form.productId\" is present and populated",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-23988498bf39826442a5",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 39,
+              "column": 11
+            },
+            {
+              "title": "field \"amount\" is present and addressable",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-3d5952493c100071e213",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 71,
+              "column": 11
+            },
+            {
+              "title": "field \"quantity\" is present and addressable",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-0b6a3098b598eec6171d",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 71,
+              "column": 11
+            },
+            {
+              "title": "validation fires: submit with no product",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-edf40c07ded53a87f8eb",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 85,
+              "column": 11
+            },
+            {
+              "title": "validation fires: submit with non-positive amount",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-3f1013543942c1ba304f",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 85,
+              "column": 11
+            },
+            {
+              "title": "no role in the denied list can load the screen",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-5fa68973e67fefb4cb5e",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 128,
+              "column": 9
+            }
+          ]
+        },
+        {
+          "title": "Sales Orders (/orders)",
+          "file": "specs/screen-conformance.spec.ts",
+          "line": 30,
+          "column": 8,
+          "specs": [
+            {
+              "title": "dropdown \"chemistId\" is present and populated",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-4524f7bb783baf7f9c94",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 39,
+              "column": 11
+            },
+            {
+              "title": "dropdown \"distributorId\" is present and populated",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-b21089f71d7f5fcddf0f",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 39,
+              "column": 11
+            },
+            {
+              "title": "dropdown \"item.productId\" is present and populated",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-482fee3cd8a3dd52e196",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 39,
+              "column": 11
+            },
+            {
+              "title": "dropdown \"orderStatus\" is present and populated",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-5a124d02748cd97746b8",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 39,
+              "column": 11
+            },
+            {
+              "title": "field \"quantity\" is present and addressable",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-1b3eec68d0c044ce1437",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 71,
+              "column": 11
+            },
+            {
+              "title": "field \"freeQty\" is present and addressable",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-705ab9fcb7659ae99be2",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 71,
+              "column": 11
+            },
+            {
+              "title": "field \"discountPct\" is present and addressable",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-c20c4809f8ad31feeaf7",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 71,
+              "column": 11
+            },
+            {
+              "title": "field \"batchNo\" is present and addressable",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-8f9831043bc677726fdf",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 71,
+              "column": 11
+            },
+            {
+              "title": "field \"expDate\" is present and addressable",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-da65dbfa83b39cb02e13",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 71,
+              "column": 11
+            },
+            {
+              "title": "field \"lrNo\" is present and addressable",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-cf6a45a0e880ddba6033",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 71,
+              "column": 11
+            },
+            {
+              "title": "field \"dueDate\" is present and addressable",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-c546abd8adf0fec11737",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 71,
+              "column": 11
+            },
+            {
+              "title": "validation fires: submit with no chemist",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-8a88ca623a347999b431",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 85,
+              "column": 11
+            },
+            {
+              "title": "validation fires: submit with no distributor",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-ddc220c0b5eeb8419ab9",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 85,
+              "column": 11
+            },
+            {
+              "title": "validation fires: submit with zero product lines",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-eed045aaa444f7ed1a4d",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 85,
+              "column": 11
+            },
+            {
+              "title": "\"Sales Orders\" count matches the API total",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-4878d35b1ebc54125264",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 98,
+              "column": 11
+            },
+            {
+              "title": "\"Generated Invoices\" count matches the API total",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-38d6059c97bd2e36c67d",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 98,
+              "column": 11
+            },
+            {
+              "title": "\"Complete History\" count matches the API total",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-17f4bba76fdb6156f949",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 98,
+              "column": 11
+            },
+            {
+              "title": "no role in the denied list can load the screen",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "9262b4ee14a1059dfad4-233b8fc3aefd3fc534f0",
+              "file": "specs/screen-conformance.spec.ts",
+              "line": 128,
+              "column": 9
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-08-26T01:21:32.298Z",
+    "duration": 108792.9,
+    "expected": 2,
+    "skipped": 41,
+    "unexpected": 2,
+    "flaky": 0
+  }
+}

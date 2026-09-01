@@ -4,7 +4,6 @@ import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, apiError } from "@/lib/api-response";
 import { PaginationSchema } from "@/lib/validators";
 
-
 async function handler(req: AuthedRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -17,25 +16,37 @@ async function handler(req: AuthedRequest) {
       limit: searchParams.get("limit") ?? 20,
     });
 
-    // 1. Resolve employee territories if not admin/manager
-    let territoryIds: string[] = [];
+    const isManager =
+      req.user.role === Role.ADMIN ||
+      req.user.role === Role.ASM ||
+      req.user.role === Role.RM ||
+      req.user.role === Role.ZSM ||
+      req.user.role === Role.NSM ||
+      req.user.role === Role.MD;
+
+    let territoryFilter: { in: string[] } | undefined = undefined;
+
     if (territoryId) {
-      territoryIds = [territoryId];
-    } else {
+      territoryFilter = { in: [territoryId] };
+    } else if (!isManager) {
       const employee = await db.employee.findUnique({
         where: { userId: req.user.sub },
         include: { territories: true },
       });
-      territoryIds = employee?.territories.map((t) => t.id) || [];
+      const ids = employee?.territories.map((t) => t.id) || [];
+      // Only restrict if MR has explicitly assigned territories; otherwise allow broad search
+      if (ids.length > 0) {
+        territoryFilter = { in: ids };
+      }
     }
 
     const doctorWhere = {
-      territoryId: { in: territoryIds },
+      ...(territoryFilter ? { territoryId: territoryFilter } : {}),
       ...(search ? { fullName: { contains: search, mode: "insensitive" as const } } : {}),
     };
 
     const chemistWhere = {
-      territoryId: { in: territoryIds },
+      ...(territoryFilter ? { territoryId: territoryFilter } : {}),
       ...(search ? { name: { contains: search, mode: "insensitive" as const } } : {}),
     };
 
@@ -49,7 +60,14 @@ async function handler(req: AuthedRequest) {
           skip: (page - 1) * limit,
           take: limit,
           orderBy: { fullName: "asc" },
-          select: { id: true, fullName: true, clinicAddress: true, territoryId: true },
+          select: {
+            id: true,
+            fullName: true,
+            clinicAddress: true,
+            territoryId: true,
+            primarySpecialty: true,
+            territory: { select: { id: true, name: true } },
+          },
         }),
         db.doctor.count({ where: doctorWhere }),
       ]);
@@ -59,6 +77,8 @@ async function handler(req: AuthedRequest) {
         type: "DOCTOR",
         address: d.clinicAddress,
         territoryId: d.territoryId,
+        territoryName: d.territory?.name ?? null,
+        primarySpecialty: d.primarySpecialty,
       }));
       total = count;
     } else if (type === "CHEMIST") {
@@ -68,7 +88,14 @@ async function handler(req: AuthedRequest) {
           skip: (page - 1) * limit,
           take: limit,
           orderBy: { name: "asc" },
-          select: { id: true, name: true, address: true, territoryId: true },
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            territoryId: true,
+            contactPerson: true,
+            territory: { select: { id: true, name: true } },
+          },
         }),
         db.chemist.count({ where: chemistWhere }),
       ]);
@@ -78,13 +105,37 @@ async function handler(req: AuthedRequest) {
         type: "CHEMIST",
         address: c.address,
         territoryId: c.territoryId,
+        territoryName: c.territory?.name ?? null,
+        contactPerson: c.contactPerson,
       }));
       total = count;
     } else {
       // Fetch both and combine
       const [doctors, chemists] = await Promise.all([
-        db.doctor.findMany({ where: doctorWhere, orderBy: { fullName: "asc" } }),
-        db.chemist.findMany({ where: chemistWhere, orderBy: { name: "asc" } }),
+        db.doctor.findMany({
+          where: doctorWhere,
+          orderBy: { fullName: "asc" },
+          select: {
+            id: true,
+            fullName: true,
+            clinicAddress: true,
+            territoryId: true,
+            primarySpecialty: true,
+            territory: { select: { id: true, name: true } },
+          },
+        }),
+        db.chemist.findMany({
+          where: chemistWhere,
+          orderBy: { name: "asc" },
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            territoryId: true,
+            contactPerson: true,
+            territory: { select: { id: true, name: true } },
+          },
+        }),
       ]);
       const combined = [
         ...doctors.map((d) => ({
@@ -93,6 +144,8 @@ async function handler(req: AuthedRequest) {
           type: "DOCTOR",
           address: d.clinicAddress,
           territoryId: d.territoryId,
+          territoryName: d.territory?.name ?? null,
+          primarySpecialty: d.primarySpecialty,
         })),
         ...chemists.map((c) => ({
           id: c.id,
@@ -100,6 +153,8 @@ async function handler(req: AuthedRequest) {
           type: "CHEMIST",
           address: c.address,
           territoryId: c.territoryId,
+          territoryName: c.territory?.name ?? null,
+          contactPerson: c.contactPerson,
         })),
       ];
       total = combined.length;
@@ -116,4 +171,12 @@ async function handler(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(handler, [Role.MR, Role.ASM, Role.ADMIN]);
+export const GET = withAuth(handler, [
+  Role.MR,
+  Role.ASM,
+  Role.ADMIN,
+  Role.RM,
+  Role.ZSM,
+  Role.NSM,
+  Role.MD,
+]);

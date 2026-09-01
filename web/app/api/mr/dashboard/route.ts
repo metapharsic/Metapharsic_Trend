@@ -20,7 +20,14 @@ async function getMrDashboard(req: AuthedRequest) {
     // would otherwise see their own (empty) field activity, which is meaningless.
     const { searchParams } = new URL(req.url);
     const requestedEmployeeId = searchParams.get("employeeId");
-    const isManager = req.user.role === Role.ASM || req.user.role === Role.ADMIN;
+    const isManager = ([
+      Role.ADMIN,
+      Role.MD,
+      Role.NSM,
+      Role.ZSM,
+      Role.RM,
+      Role.ASM,
+    ] as Role[]).includes(req.user.role as Role);
 
     if (requestedEmployeeId && !isManager) {
       return forbidden("You may only view your own dashboard");
@@ -378,4 +385,12 @@ async function getMrDashboard(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getMrDashboard, [Role.MR, Role.ASM, Role.ADMIN]);
+export const GET = withAuth(getMrDashboard, [
+  Role.MR,
+  Role.ASM,
+  Role.RM,
+  Role.ZSM,
+  Role.NSM,
+  Role.MD,
+  Role.ADMIN,
+]);

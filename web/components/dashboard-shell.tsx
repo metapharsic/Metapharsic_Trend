@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -34,8 +34,16 @@ import {
   ChevronDown,
   ChevronRight,
   Sparkles,
+  BookOpen,
+  FileSpreadsheet,
+  Download,
+  ShieldAlert,
+  Activity,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { exportCurrentPageToExcel } from "@/lib/excel-export";
+import { systemHealth, SystemErrorRecord } from "@/lib/system-health";
+import { SystemDiagnosticsModal } from "@/components/system-diagnostics-modal";
 
 // Structured navigation categories
 const NAV_CATEGORY_ORDER = [
@@ -82,6 +90,7 @@ const NAV_ITEMS = [
   { href: "/doctor", label: "Doctor Portal", icon: Stethoscope, roles: ["DOCTOR", "ADMIN"], category: "Commercial & Channels" },
 
   // ── Finance, HR & People ─────────────────────────────────────
+  { href: "/admin/accounts-jotter", label: "Admin Accounts Jotter", icon: BookOpen, roles: ["ADMIN", "FINANCE", "MD"], category: "Finance, HR & People" },
   { href: "/finance", label: "Finance & General Ledger", icon: Calculator, roles: ["FINANCE", "ADMIN"], category: "Finance, HR & People" },
   { href: "/finance/accounts", label: "Chart of Accounts", icon: IndianRupee, roles: ["FINANCE", "ADMIN", "MD"], category: "Finance, HR & People" },
   { href: "/finance/journal", label: "Journal Entries", icon: IndianRupee, roles: ["FINANCE", "ADMIN"], category: "Finance, HR & People" },
@@ -94,10 +103,13 @@ const NAV_ITEMS = [
 
   // ── Analytics & Marketing ────────────────────────────────────
   { href: "/reports", label: "Executive BI Reports", icon: BarChart3, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"], category: "Analytics & Marketing" },
+  { href: "/reports/mr-daily-calls", label: "MR Daily Calls Report", icon: BarChart3, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "MR"], category: "Analytics & Marketing" },
   { href: "/simulator", label: "Scheme Margin Simulator", icon: Calculator, roles: ["ADMIN", "MD", "NSM", "FINANCE", "MARKETING"], category: "Analytics & Marketing" },
   { href: "/marketing", label: "Marketing Campaigns", icon: BarChart3, roles: ["MARKETING", "ADMIN"], category: "Analytics & Marketing" },
 
   // ── Administration & Profile ─────────────────────────────────
+  { href: "/admin/accounts-jotter", label: "Quick Accounts Jotter", icon: BookOpen, roles: ["ADMIN", "FINANCE"], category: "Administration & Profile" },
+  { href: "/admin/diagnostics", label: "System Health & Diagnostics", icon: ShieldAlert, roles: ["ADMIN", "MD"], category: "Administration & Profile" },
   { href: "/admin/company-settings", label: "Company Settings", icon: Building2, roles: ["ADMIN"], category: "Administration & Profile" },
   { href: "/admin/workflow-settings", label: "Workflow Settings", icon: Settings2, roles: ["ADMIN"], category: "Administration & Profile" },
   { href: "/profile", label: "My Profile", icon: UserCircle2, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "HR", "FINANCE", "WAREHOUSE", "MARKETING", "MR", "DISTRIBUTOR", "DOCTOR"], category: "Administration & Profile" },
@@ -112,6 +124,17 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [navSearch, setNavSearch] = useState("");
   const [navSearchOpen, setNavSearchOpen] = useState(false);
+  const navSearchInputRef = useRef<HTMLInputElement>(null);
+
+  // System Diagnostics & Global Export State
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [recentErrors, setRecentErrors] = useState<SystemErrorRecord[]>([]);
+  const [exportToast, setExportToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsub = systemHealth.subscribe(setRecentErrors);
+    return unsub;
+  }, []);
 
   // Track expanded accordion sections
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
@@ -145,6 +168,19 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     router.push("/login");
   };
 
+  // Ctrl+K global shortcut to focus the nav search bar (Agent C)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        navSearchInputRef.current?.focus();
+        setNavSearchOpen(true);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const filteredNavItems = NAV_ITEMS.filter((item) => !userRole || item.roles.includes(userRole)).map((item) => {
     const override = userRole && "labelByRole" in item ? (item.labelByRole as unknown as Record<string, string>)[userRole] : undefined;
     return override ? { ...item, label: override } : item;
@@ -173,7 +209,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  const navSearchResults = navSearch.trim()
+  // Agent C: 2-letter minimum to trigger search results
+  const navSearchResults = navSearch.trim().length >= 2
     ? filteredNavItems.filter((i) => i.label.toLowerCase().includes(navSearch.toLowerCase()))
     : [];
 
@@ -199,12 +236,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary-700 to-primary-500 flex items-center justify-center text-white font-display font-bold text-sm shadow-sm">
-              TM
+            <img
+              src="/uploads/company/logo.png"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = "/logo.png";
+              }}
+              alt="Metapharsic"
+              className="w-9 h-9 rounded-xl object-contain bg-white p-0.5 border border-gray-200 shadow-sm"
+            />
+            <div>
+              <span className="font-display font-bold text-base text-gray-900 leading-tight block">Metapharsic</span>
+              <span className="text-[9px] text-primary-600 font-bold tracking-widest uppercase">LIFESCIENCES</span>
             </div>
-            <span className="font-display font-bold text-lg text-gray-900 tracking-tight">Trend MR</span>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="text-gray-400 hover:text-gray-600 p-1">
             <X size={20} />
@@ -268,13 +313,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
       {/* ── Tablet Rail (md) & Desktop Collapsible Sidebar (xl) ── */}
       <aside className="hidden md:flex md:w-16 xl:w-64 shrink-0 bg-white border-r border-gray-200/70 flex-col transition-all duration-200 select-none shadow-sm z-20">
-        <div className="flex items-center gap-3 px-4 xl:px-5 py-5 justify-center xl:justify-start border-b border-gray-100">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary-700 to-primary-500 flex items-center justify-center text-white font-display font-bold text-sm shrink-0 shadow-sm">
-            TM
-          </div>
+        <div className="flex items-center gap-3 px-4 xl:px-5 py-4 justify-center xl:justify-start border-b border-gray-100">
+          <img
+            src="/uploads/company/logo.png"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = "/logo.png";
+            }}
+            alt="Metapharsic"
+            className="w-9 h-9 rounded-xl object-contain bg-white p-0.5 border border-gray-200 shadow-sm shrink-0"
+          />
           <div className="hidden xl:flex flex-col">
-            <span className="font-display font-bold text-base text-gray-900 leading-none">Trend MR</span>
-            <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mt-0.5">Pharma OS</span>
+            <span className="font-display font-bold text-sm text-gray-900 leading-tight">Metapharsic</span>
+            <span className="text-[9px] text-primary-600 font-bold tracking-widest uppercase">LIFESCIENCES</span>
           </div>
         </div>
 
@@ -347,13 +397,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <Menu size={22} />
           </button>
 
-          {/* Quick Page Search */}
+          {/* Quick Page Search — Agent C: 2-letter minimum trigger + Ctrl+K shortcut */}
           <div className="hidden sm:block relative w-full max-w-xs">
             <div className="flex items-center gap-2 bg-gray-50 border border-gray-200/80 rounded-xl px-3 py-1.5 focus-within:ring-2 focus-within:ring-primary-500/20 focus-within:border-primary-500 transition-all">
               <Search size={15} className="text-gray-400 shrink-0" />
               <input
+                ref={navSearchInputRef}
                 type="text"
-                placeholder="Jump to page... (Ctrl+K)"
+                placeholder="Search pages... (Ctrl+K)"
                 value={navSearch}
                 onChange={(e) => {
                   setNavSearch(e.target.value);
@@ -370,12 +421,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 }}
                 className="bg-transparent text-xs outline-none w-full placeholder:text-gray-400"
               />
+              {navSearch.trim().length === 1 && (
+                <span className="text-[10px] text-amber-500 whitespace-nowrap shrink-0">1 more...</span>
+              )}
             </div>
 
-            {navSearchOpen && navSearch.trim().length > 0 && (
+            {navSearchOpen && navSearch.trim().length >= 2 && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50 max-h-80 overflow-y-auto">
                 {navSearchResults.length === 0 ? (
-                  <p className="px-4 py-3 text-xs text-gray-400">No matching pages found.</p>
+                  <p className="px-4 py-3 text-xs text-gray-400">No pages match &ldquo;{navSearch}&rdquo;.</p>
                 ) : (
                   navSearchResults.map(({ href, label, icon: Icon, category }) => (
                     <button
@@ -395,10 +449,52 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             )}
           </div>
 
-          {/* Right Header Badges */}
-          <div className="flex items-center gap-3 sm:gap-4 ml-auto">
+          {/* Right Header Tools: Universal Excel Export + Quick Jot + System Health + Badges */}
+          <div className="flex items-center gap-2 sm:gap-3 ml-auto shrink-0">
+            {/* Universal Excel Export — 1-Click on EVERY page of the App */}
+            <button
+              onClick={() => {
+                const result = exportCurrentPageToExcel();
+                setExportToast(result.message);
+                setTimeout(() => setExportToast(null), 3500);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition-all shadow-sm shrink-0"
+              title="Export current screen data to Excel (.csv with UTF-8 BOM)"
+            >
+              <FileSpreadsheet size={15} className="text-emerald-600 shrink-0" />
+              <span className="hidden md:inline">Export Excel</span>
+            </button>
+
+            {/* Admin Quick Accounts Jotter Action */}
+            {userRole && ["ADMIN", "FINANCE", "MD"].includes(userRole) && (
+              <Link
+                href="/admin/accounts-jotter"
+                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-all shrink-0"
+                title="Quickly jot down expenses, collections or ledger entries"
+              >
+                <BookOpen size={14} className="text-indigo-600 shrink-0" />
+                <span>Jot Accounts</span>
+              </Link>
+            )}
+
+            {/* System Health Sentinel Pill */}
+            <button
+              onClick={() => setDiagnosticsOpen(true)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all border shrink-0 ${
+                recentErrors.length > 0
+                  ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 animate-pulse"
+                  : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+              }`}
+              title="Inspect System Health, database connection & diagnostic error logs"
+            >
+              <span className={`w-2 h-2 rounded-full ${recentErrors.length > 0 ? "bg-red-500" : "bg-emerald-500"}`} />
+              <span className="hidden sm:inline">
+                {recentErrors.length > 0 ? `${recentErrors.length} Issue${recentErrors.length > 1 ? "s" : ""}` : "System Healthy"}
+              </span>
+            </button>
+
             {userRole && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-50 text-primary-700 border border-primary-100">
+              <span className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-50 text-primary-700 border border-primary-100">
                 <Sparkles size={12} className="text-primary-500" />
                 {userRole}
               </span>
@@ -416,16 +512,30 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
+        {/* Global Floating Toast for Excel Export */}
+        {exportToast && (
+          <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-gray-900 text-white text-xs font-semibold rounded-2xl shadow-2xl border border-gray-700 animate-in slide-in-from-bottom-3 duration-200">
+            <FileSpreadsheet size={16} className="text-emerald-400 shrink-0" />
+            <span>{exportToast}</span>
+          </div>
+        )}
+
+        {/* System Diagnostics & Error Inspector Modal */}
+        <SystemDiagnosticsModal
+          isOpen={diagnosticsOpen}
+          onClose={() => setDiagnosticsOpen(false)}
+        />
+
         <main className="relative flex-1 p-4 sm:p-6 overflow-y-auto bg-gray-50/50">
-          {logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={logoUrl}
-              alt=""
-              aria-hidden="true"
-              className="pointer-events-none select-none fixed top-1/2 left-1/2 w-[36vw] max-w-[420px] min-w-[220px] -translate-x-1/2 -translate-y-1/2 opacity-[0.03] z-0"
-            />
-          )}
+          <img
+            src="/uploads/company/logo.png"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = "/logo.png";
+            }}
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none select-none fixed top-1/2 left-1/2 w-[36vw] max-w-[420px] min-w-[220px] -translate-x-1/2 -translate-y-1/2 opacity-[0.04] z-0"
+          />
           <div className="relative z-10 max-w-7xl mx-auto">{children}</div>
         </main>
       </div>

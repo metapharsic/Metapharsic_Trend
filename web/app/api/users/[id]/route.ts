@@ -11,6 +11,7 @@ const UpdateUserSchema = z.object({
   phone: z.string().min(10).optional(),
   role: z.nativeEnum(Role).optional(),
   isActive: z.boolean().optional(),
+  resetDeviceUuid: z.boolean().optional(),
   password: z.string().min(6).optional(),
   managerId: z.string().uuid().nullable().optional(),
   territoryIds: z.array(z.string().uuid()).optional(),
@@ -71,11 +72,12 @@ async function updateUser(req: AuthedRequest, context: { params: Record<string, 
     const parsed = UpdateUserSchema.safeParse(body);
     if (!parsed.success) return badRequest("Validation error", parsed.error.flatten());
 
-    const { firstName, lastName, phone, role, isActive, password, managerId, territoryIds } = parsed.data;
+    const { firstName, lastName, phone, role, isActive, resetDeviceUuid, password, managerId, territoryIds } = parsed.data;
 
     const userUpdates: Record<string, unknown> = {};
     if (role !== undefined && (req.user.role === Role.ADMIN)) userUpdates.role = role;
     if (isActive !== undefined && req.user.role === Role.ADMIN) userUpdates.isActive = isActive;
+    if (resetDeviceUuid && req.user.role === Role.ADMIN) userUpdates.deviceUuid = null;
     if (password) userUpdates.passwordHash = await bcrypt.hash(password, 12);
 
     // territoryIds is only meaningful for ADMIN — same gate as role/isActive above.
@@ -179,7 +181,7 @@ async function deleteUser(req: AuthedRequest, context: { params: Record<string, 
   }
 }
 
-const ALL_ROLES = [Role.ADMIN, Role.MR, Role.ASM, Role.MD];
+const ALL_ROLES = Object.values(Role);
 
 export const GET = withAuth(getUser, ALL_ROLES);
 export const PUT = withAuth(updateUser, ALL_ROLES);

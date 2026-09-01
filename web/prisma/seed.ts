@@ -2,6 +2,7 @@ import { PrismaClient, Role, TourPlanStatus, TenderStatus, LeadStatus } from "@p
 import bcrypt from "bcrypt";
 import { startOfUtcDay, startOfUtcMonth } from "../lib/date";
 import { calculateDps } from "../lib/dps";
+import { DEFAULT_CHART_OF_ACCOUNTS, SYSTEM_ACCOUNT_CODES } from "../lib/ledger";
 
 const prisma = new PrismaClient();
 
@@ -21,8 +22,10 @@ async function main() {
     },
   });
 
-  await prisma.employee.create({
-    data: {
+  await prisma.employee.upsert({
+    where: { userId: adminUser.id },
+    update: {},
+    create: {
       userId: adminUser.id,
       firstName: "Admin",
       lastName: "Manager",
@@ -44,8 +47,10 @@ async function main() {
     },
   });
 
-  await prisma.employee.create({
-    data: {
+  await prisma.employee.upsert({
+    where: { userId: mdUser.id },
+    update: {},
+    create: {
       userId: mdUser.id,
       firstName: "Managing",
       lastName: "Director",
@@ -67,8 +72,10 @@ async function main() {
     },
   });
 
-  const asmEmployee = await prisma.employee.create({
-    data: {
+  const asmEmployee = await prisma.employee.upsert({
+    where: { userId: asmUser.id },
+    update: {},
+    create: {
       userId: asmUser.id,
       firstName: "Amit",
       lastName: "Sharma",
@@ -93,8 +100,10 @@ async function main() {
     },
   });
 
-  const mrEmployee = await prisma.employee.create({
-    data: {
+  const mrEmployee = await prisma.employee.upsert({
+    where: { userId: mrUser.id },
+    update: {},
+    create: {
       userId: mrUser.id,
       firstName: "Rajesh",
       lastName: "Kumar",
@@ -117,8 +126,10 @@ async function main() {
     },
   });
 
-  const abdulEmployee = await prisma.employee.create({
-    data: {
+  const abdulEmployee = await prisma.employee.upsert({
+    where: { userId: abdulUser.id },
+    update: {},
+    create: {
       userId: abdulUser.id,
       firstName: "Abdul",
       lastName: "Mannan",
@@ -141,8 +152,10 @@ async function main() {
     },
   });
 
-  const krishnaEmployee = await prisma.employee.create({
-    data: {
+  const krishnaEmployee = await prisma.employee.upsert({
+    where: { userId: krishnaUser.id },
+    update: {},
+    create: {
       userId: krishnaUser.id,
       firstName: "Krishna",
       lastName: "Murthy",
@@ -530,6 +543,17 @@ async function main() {
     },
   });
   console.log("✅ Tour Plan configuration completed");
+
+  console.log("🌱 Seeding default chart of accounts...");
+  const systemCodes = new Set<string>(Object.values(SYSTEM_ACCOUNT_CODES));
+  for (const acc of DEFAULT_CHART_OF_ACCOUNTS) {
+    await prisma.chartOfAccount.upsert({
+      where: { code: acc.code },
+      update: {},
+      create: { ...acc, isSystem: systemCodes.has(acc.code) },
+    });
+  }
+  console.log(`✅ Chart of accounts seeded (${DEFAULT_CHART_OF_ACCOUNTS.length} accounts)`);
 
   console.log("\n🎉 Seed complete!\n");
   console.log("Credentials:");

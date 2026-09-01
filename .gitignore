@@ -32,3 +32,19 @@ Thumbs.db
 
 # Uploaded runtime files (logos etc — regenerate per-deployment)
 web/public/uploads/
+!web/public/uploads/company/logo.png
+
+# SSH keys and deployment credentials
+.ssh_keys/
+*.ppk
+
+# Temporary exports and scratch
+accounts_module_export.zip
+accounts_module_export/
+accounts_module_export_unzipped/
+_to_delete/
+web/reports-output/
+brain/
+.claude/
+
+

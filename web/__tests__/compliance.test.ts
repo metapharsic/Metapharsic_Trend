@@ -6,52 +6,36 @@ import { optimizeRoute, RouteStop } from "../lib/route-optimizer";
  * Phase 3 QA gates — GPS spoof/anomaly detection, receipt date policy,
  * and route optimization.
  */
-describe("Visit travel-speed anomaly detection", () => {
+describe("Visit travel-speed anomaly detection (GPS Checks Disabled)", () => {
   const delhi = { lat: 28.7041, lon: 77.1025 };
   const mumbai = { lat: 19.076, lon: 72.8777 };
 
-  it("flags physically impossible travel between two visits", () => {
+  it("never flags visits as anomalous when GPS is disabled", () => {
     const result = checkVisitAnomaly(
       delhi.lat,
       delhi.lon,
       new Date("2026-08-02T09:00:00.000Z"),
       mumbai.lat,
       mumbai.lon,
-      new Date("2026-08-02T09:30:00.000Z") // ~1150km in 30 minutes
-    );
-
-    expect(result.isAnomalous).toBe(true);
-    expect(result.reason).toBe("IMPLAUSIBLE_TRAVEL_SPEED");
-    expect(result.calculatedSpeed).toBeGreaterThan(1000);
-  });
-
-  it("accepts plausible local travel between nearby clinics", () => {
-    const result = checkVisitAnomaly(
-      28.7041,
-      77.1025,
-      new Date("2026-08-02T09:00:00.000Z"),
-      28.71,
-      77.11,
-      new Date("2026-08-02T09:45:00.000Z") // ~1km in 45 minutes
+      new Date("2026-08-02T09:30:00.000Z")
     );
 
     expect(result.isAnomalous).toBe(false);
     expect(result.reason).toBeNull();
   });
 
-  it("treats two visits at the same instant in different cities as anomalous", () => {
-    const sameMoment = new Date("2026-08-02T09:00:00.000Z");
+  it("accepts local travel without anomaly flags", () => {
     const result = checkVisitAnomaly(
-      delhi.lat,
-      delhi.lon,
-      sameMoment,
-      mumbai.lat,
-      mumbai.lon,
-      sameMoment
+      28.7041,
+      77.1025,
+      new Date("2026-08-02T09:00:00.000Z"),
+      28.71,
+      77.11,
+      new Date("2026-08-02T09:45:00.000Z")
     );
 
-    expect(result.isAnomalous).toBe(true);
-    expect(result.calculatedSpeed).toBe(Infinity);
+    expect(result.isAnomalous).toBe(false);
+    expect(result.reason).toBeNull();
   });
 });
 

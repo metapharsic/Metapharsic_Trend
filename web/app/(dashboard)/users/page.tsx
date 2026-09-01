@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
-
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Users,
   UserPlus,
@@ -19,44 +18,82 @@ import {
   Unlock,
   Edit3,
   Trash2,
+  MapPin,
+  UserCheck,
+  Briefcase,
+  Layers,
+  Sparkles,
+  Smartphone,
+  RotateCcw,
+  Target,
+  Award,
+  Check,
+  AlertCircle,
+  Info,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { Role } from "@prisma/client";
+import {
+  ROLES_RESPONSIBILITIES_CATALOG,
+  RoleDefinition,
+  getEligibleManagerRoles,
+} from "@/lib/roles-responsibilities";
 
-// ─── Role metadata ────────────────────────────────────────────────────────────
-const ROLE_META: Record<string, { label: string; color: string; bg: string; description: string; level: number }> = {
-  MD: { label: "Managing Director", color: "text-violet-700", bg: "bg-violet-100", description: "Top-level executive. Full system access.", level: 1 },
-  ASM: { label: "Area Sales Manager", color: "text-teal-700", bg: "bg-teal-100", description: "Directly manages Medical Representatives.", level: 2 },
-  MR: { label: "Medical Representative", color: "text-emerald-700", bg: "bg-emerald-100", description: "Field force. Doctor/Chemist visits and DCR.", level: 3 },
-  ADMIN: { label: "System Admin", color: "text-red-700", bg: "bg-red-100", description: "Full system administration. All permissions.", level: 0 },
-};
+interface Territory {
+  id: string;
+  name: string;
+  region?: string;
+  zone?: string;
+}
 
 interface UserRecord {
   id: string;
   email: string;
-  role: string;
+  role: Role;
   isActive: boolean;
   lockedAt?: string | null;
+  deviceUuid?: string | null;
   createdAt: string;
   employee?: {
     id: string;
     firstName: string;
     lastName: string;
     phone: string;
-    manager?: { firstName: string; lastName: string } | null;
+    managerId?: string | null;
+    manager?: { id: string; firstName: string; lastName: string; user?: { role: Role } } | null;
+    territories?: Territory[];
   } | null;
 }
 
-const ALL_ROLES = Object.keys(ROLE_META);
-
 export default function UserManagementPage() {
   const [users, setUsers] = useState<UserRecord[]>([]);
+  const [territories, setTerritories] = useState<Territory[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("ALL");
+  const [activeTab, setActiveTab] = useState<"directory" | "roles_catalog">("directory");
+
+  // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editUser, setEditUser] = useState<UserRecord | null>(null);
-  const [deleteUser, setDeleteUser] = useState<UserRecord | null>(null);
+  const [selectedRoleDetail, setSelectedRoleDetail] = useState<RoleDefinition | null>(null);
   const [myRole, setMyRole] = useState<string | null>(null);
+
+  // Form states for create / edit
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+    firstName: "",
+    lastName: "",
+    phone: "",
+    role: Role.MR as Role,
+    managerId: "" as string,
+    selectedTerritoryIds: [] as string[],
+    isActive: true,
+    resetDeviceUuid: false,
+  });
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -73,470 +110,752 @@ export default function UserManagementPage() {
     const params = new URLSearchParams();
     if (roleFilter !== "ALL") params.set("role", roleFilter);
     if (search) params.set("search", search);
-    apiClient.get(`/api/users?${params}`)
+
+    apiClient
+      .get(`/api/users?${params}`)
       .then((res) => setUsers(res.data.data.users ?? []))
       .catch(() => setUsers([]))
       .finally(() => setLoading(false));
   }, [roleFilter, search]);
 
   useEffect(() => {
-    const timer = setTimeout(fetchUsers, 300);
+    const timer = setTimeout(fetchUsers, 250);
     return () => clearTimeout(timer);
   }, [fetchUsers]);
 
+  useEffect(() => {
+    apiClient
+      .get("/api/territories")
+      .then((res) => setTerritories(res.data.data.territories ?? []))
+      .catch(() => {});
+  }, []);
+
   const toggleActive = async (user: UserRecord) => {
-    await apiClient.put(`/api/users/${user.id}`, { isActive: !user.isActive });
-    fetchUsers();
+    try {
+      await apiClient.put(`/api/users/${user.id}`, { isActive: !user.isActive });
+      fetchUsers();
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || "Failed to update status");
+    }
   };
 
-  const roleCounts = users.reduce<Record<string, number>>((acc, u) => {
-    acc[u.role] = (acc[u.role] ?? 0) + 1;
-    return acc;
-  }, {});
+  const openCreateModal = () => {
+    setFormData({
+      email: "",
+      password: "",
+      firstName: "",
+      lastName: "",
+      phone: "",
+      role: Role.MR,
+      managerId: "",
+      selectedTerritoryIds: [],
+      isActive: true,
+      resetDeviceUuid: false,
+    });
+    setFormError(null);
+    setShowCreateModal(true);
+  };
 
-  const activeCount = users.filter((u) => u.isActive).length;
-  const lockedCount = users.filter((u) => u.lockedAt).length;
+  const openEditModal = (user: UserRecord) => {
+    setEditUser(user);
+    setFormData({
+      email: user.email,
+      password: "",
+      firstName: user.employee?.firstName || "",
+      lastName: user.employee?.lastName || "",
+      phone: user.employee?.phone || "",
+      role: user.role,
+      managerId: user.employee?.managerId || "",
+      selectedTerritoryIds: user.employee?.territories?.map((t) => t.id) || [],
+      isActive: user.isActive,
+      resetDeviceUuid: false,
+    });
+    setFormError(null);
+  };
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white shadow-lg">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">User Management</h1>
-            <p className="text-slate-400 text-sm mt-1">Manage all system users, roles, and access permissions</p>
-            <div className="flex gap-6 mt-4 text-sm">
-              <span className="text-slate-300"><span className="text-white font-bold text-lg">{users.length}</span> Total Users</span>
-              <span className="text-slate-300"><span className="text-emerald-400 font-bold text-lg">{activeCount}</span> Active</span>
-              <span className="text-slate-300"><span className="text-red-400 font-bold text-lg">{lockedCount}</span> Locked</span>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm"
-          >
-            <UserPlus size={16} /> Add User
-          </button>
-        </div>
-      </div>
-
-      {/* Role Distribution Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {["ADMIN", "MD", "ASM", "MR"].map((role) => {
-          const meta = ROLE_META[role];
-          return (
-            <button
-              key={role}
-              onClick={() => setRoleFilter(roleFilter === role ? "ALL" : role)}
-              className={`rounded-2xl p-3 border text-left transition-all ${roleFilter === role ? `${meta.bg} border-current` : "bg-white border-slate-200 hover:border-slate-300"}`}
-            >
-              <p className={`text-2xl font-bold ${meta.color}`}>{roleCounts[role] ?? 0}</p>
-              <p className="text-xs font-semibold text-slate-500 mt-1 leading-tight">{meta.label}</p>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Search and Filter bar */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or email..."
-            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-          />
-        </div>
-        <div className="relative">
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="appearance-none bg-white border border-slate-200 rounded-2xl px-4 py-3 pr-10 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-          >
-            <option value="ALL">All Roles</option>
-            {ALL_ROLES.map((r) => <option key={r} value={r}>{ROLE_META[r].label}</option>)}
-          </select>
-          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        </div>
-      </div>
-
-      {/* Users Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center items-center py-24">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200 bg-slate-50/50">
-                <th className="px-6 py-4 font-semibold">User</th>
-                <th className="px-6 py-4 font-semibold">Role & Responsibilities</th>
-                <th className="px-6 py-4 font-semibold">Contact</th>
-                <th className="px-6 py-4 font-semibold">Reports To</th>
-                <th className="px-6 py-4 font-semibold">Status</th>
-                <th className="px-6 py-4 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {users.map((user) => {
-                const meta = ROLE_META[user.role] ?? { label: user.role, color: "text-slate-700", bg: "bg-slate-100", description: "" };
-                const name = user.employee ? `${user.employee.firstName} ${user.employee.lastName}` : "—";
-                return (
-                  <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-xl ${meta.bg} flex items-center justify-center flex-shrink-0`}>
-                          <span className={`text-sm font-bold ${meta.color}`}>
-                            {name !== "—" ? name.charAt(0) : user.email.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-900">{name}</p>
-                          <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                            <Mail size={10} /> {user.email}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase ${meta.bg} ${meta.color}`}>
-                        {meta.label}
-                      </span>
-                      <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">{meta.description}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      {user.employee?.phone ? (
-                        <span className="text-xs text-slate-600 flex items-center gap-1">
-                          <Phone size={10} /> {user.employee.phone}
-                        </span>
-                      ) : <span className="text-xs text-slate-400">—</span>}
-                    </td>
-                    <td className="px-6 py-4">
-                      {user.employee?.manager ? (
-                        <span className="text-xs font-semibold text-slate-700">
-                          {user.employee.manager.firstName} {user.employee.manager.lastName}
-                        </span>
-                      ) : <span className="text-xs text-slate-400">Top Level</span>}
-                    </td>
-                    <td className="px-6 py-4">
-                      {user.lockedAt ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
-                          <Lock size={10} /> LOCKED
-                        </span>
-                      ) : user.isActive ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
-                          <CheckCircle2 size={10} /> ACTIVE
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">
-                          <XCircle size={10} /> INACTIVE
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => setEditUser(user)}
-                          className="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-600 transition-colors"
-                          title="Edit User"
-                        >
-                          <Edit3 size={14} />
-                        </button>
-                        <button
-                          onClick={() => toggleActive(user)}
-                          className={`p-2 rounded-xl transition-colors ${user.isActive ? "bg-red-100 hover:bg-red-200 text-red-600" : "bg-emerald-100 hover:bg-emerald-200 text-emerald-600"}`}
-                          title={user.isActive ? "Deactivate" : "Activate"}
-                        >
-                          {user.isActive ? <Lock size={14} /> : <Unlock size={14} />}
-                        </button>
-                        {myRole === "ADMIN" && (
-                          <button
-                            onClick={() => setDeleteUser(user)}
-                            className="p-2 bg-red-50 hover:bg-red-100 rounded-xl text-red-700 transition-colors"
-                            title="Delete Permanently"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {users.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-16 text-center text-slate-400 text-sm">
-                    No users found matching your filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Role Responsibility Reference */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
-          <Shield className="text-slate-600" size={18} />
-          <h2 className="text-base font-bold text-slate-800">Role Hierarchy & Responsibilities</h2>
-        </div>
-        <div className="divide-y divide-slate-100">
-          {Object.entries(ROLE_META)
-            .sort((a, b) => a[1].level - b[1].level)
-            .map(([role, meta]) => (
-              <div key={role} className="px-6 py-4 flex items-start gap-4 hover:bg-slate-50 transition-colors">
-                <div className={`w-8 h-8 rounded-xl ${meta.bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                  {meta.level === 0 ? <ShieldAlert size={16} className={meta.color} /> :
-                   meta.level <= 3 ? <ShieldCheck size={16} className={meta.color} /> :
-                   <Shield size={16} className={meta.color} />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase ${meta.bg} ${meta.color}`}>
-                      {role}
-                    </span>
-                    <span className="font-bold text-slate-900 text-sm">{meta.label}</span>
-                  </div>
-                  <p className="text-sm text-slate-500 mt-1">{meta.description}</p>
-                </div>
-                <span className="text-xs font-bold text-slate-400 flex-shrink-0">Level {meta.level}</span>
-              </div>
-            ))}
-        </div>
-      </div>
-
-      {/* Create/Edit Modal */}
-      {(showCreateModal || editUser) && (
-        <UserModal
-          user={editUser}
-          onClose={() => { setShowCreateModal(false); setEditUser(null); }}
-          onSaved={() => { setShowCreateModal(false); setEditUser(null); fetchUsers(); }}
-        />
-      )}
-
-      {deleteUser && (
-        <DeleteUserModal
-          user={deleteUser}
-          onClose={() => setDeleteUser(null)}
-          onDeleted={() => { setDeleteUser(null); fetchUsers(); }}
-        />
-      )}
-    </div>
-  );
-}
-
-// ─── Permanent Delete Modal ────────────────────────────────────────────────────
-function DeleteUserModal({ user, onClose, onDeleted }: { user: UserRecord; onClose: () => void; onDeleted: () => void }) {
-  const [confirmText, setConfirmText] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const name = user.employee ? `${user.employee.firstName} ${user.employee.lastName}` : user.email;
-
-  const handleDelete = async () => {
-    setError(null);
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSubmitting(true);
+    setFormError(null);
+
     try {
-      await apiClient.delete(`/api/users/${user.id}?permanent=true`);
-      onDeleted();
-    } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
-        "Failed to permanently delete user.";
-      setError(message);
+      if (editUser) {
+        // Update user
+        const payload: any = {
+          role: formData.role,
+          isActive: formData.isActive,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          managerId: formData.managerId || null,
+          territoryIds: formData.selectedTerritoryIds,
+          resetDeviceUuid: formData.resetDeviceUuid,
+        };
+        if (formData.password.trim()) payload.password = formData.password.trim();
+
+        await apiClient.put(`/api/users/${editUser.id}`, payload);
+        setEditUser(null);
+      } else {
+        // Create user
+        if (!formData.password.trim() || formData.password.length < 6) {
+          throw new Error("Password must be at least 6 characters");
+        }
+        await apiClient.post("/api/users", {
+          email: formData.email.trim(),
+          password: formData.password.trim(),
+          role: formData.role,
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          phone: formData.phone.trim(),
+          managerId: formData.managerId || undefined,
+          territoryIds: formData.selectedTerritoryIds,
+        });
+        setShowCreateModal(false);
+      }
+      fetchUsers();
+    } catch (err: any) {
+      setFormError(err.response?.data?.error?.message || err.message || "Failed to save user");
     } finally {
       setSubmitting(false);
     }
   };
 
+  // Potential managers for the currently chosen role in modal
+  const eligibleManagers = useMemo(() => {
+    const validRoles = getEligibleManagerRoles(formData.role);
+    if (validRoles.length === 0) return [];
+    return users.filter(
+      (u) =>
+        validRoles.includes(u.role) &&
+        u.employee &&
+        (!editUser || u.id !== editUser.id)
+    );
+  }, [formData.role, users, editUser]);
+
+  const activeCount = users.filter((u) => u.isActive).length;
+  const inactiveCount = users.length - activeCount;
+
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-xl">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
-            <Trash2 size={16} className="text-red-700" />
-          </div>
-          <h2 className="text-lg font-display font-bold text-slate-900">Delete Permanently</h2>
-        </div>
-        <p className="text-sm text-slate-600">
-          This <strong>cannot be undone</strong>. It removes <strong>{name}</strong>&apos;s login and employee record
-          entirely — not just deactivates it. Blocked automatically if they have any visits, orders, leads, or other
-          recorded activity; deactivate instead in that case.
-        </p>
+    <div className="space-y-6">
+      {/* ── Page Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
         <div>
-          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-            Type DELETE to confirm
-          </label>
-          <input
-            value={confirmText}
-            onChange={(e) => setConfirmText(e.target.value)}
-            placeholder="DELETE"
-            className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-base sm:text-sm"
-          />
+          <div className="flex items-center gap-2">
+            <h1 className="font-display font-bold text-2xl text-gray-900">User Management & Organization</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary-100 text-primary-800">
+              {users.length} Users
+            </span>
+          </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Assign functional roles, duties, reporting lines, and territories across the enterprise.
+          </p>
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setActiveTab(activeTab === "directory" ? "roles_catalog" : "directory")}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+          >
+            <Briefcase size={16} className="text-primary-600" />
+            {activeTab === "directory" ? "Roles & Duties Catalog" : "Back to Directory"}
+          </button>
 
-        <div className="flex gap-2">
-          <button
-            onClick={onClose}
-            className="flex-1 border border-slate-300 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={submitting || confirmText !== "DELETE"}
-            className="flex-1 bg-red-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-40"
-          >
-            {submitting ? "Deleting..." : "Delete Permanently"}
-          </button>
+          {myRole === Role.ADMIN && (
+            <button
+              onClick={openCreateModal}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold transition-colors shadow-sm shadow-primary-200"
+            >
+              <UserPlus size={16} />
+              Add New User
+            </button>
+          )}
         </div>
       </div>
-    </div>
-  );
-}
 
-// ─── Create / Edit Modal ──────────────────────────────────────────────────────
-function UserModal({ user, onClose, onSaved }: { user: UserRecord | null; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({
-    firstName: user?.employee?.firstName ?? "",
-    lastName: user?.employee?.lastName ?? "",
-    email: user?.email ?? "",
-    phone: user?.employee?.phone ?? "",
-    role: user?.role ?? "MR",
-    password: "",
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [territories, setTerritories] = useState<{ id: string; name: string }[]>([]);
-  const [territoryIds, setTerritoryIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    apiClient
-      .get("/api/manager/territories")
-      .then((res) => setTerritories(res.data.data.territories ?? []))
-      .catch((err) => console.error("Failed to load territories:", err));
-
-    if (user) {
-      apiClient
-        .get(`/api/users/${user.id}`)
-        .then((res) => {
-          const ids = (res.data.data.user.employee?.territories ?? []).map((t: { id: string }) => t.id);
-          setTerritoryIds(ids);
-        })
-        .catch((err) => console.error("Failed to load user territories:", err));
-    }
-  }, [user]);
-
-  const toggleTerritory = (id: string) => {
-    setTerritoryIds((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-    try {
-      const payload = { ...form, territoryIds };
-      if (user) {
-        await apiClient.put(`/api/users/${user.id}`, payload);
-      } else {
-        await apiClient.post("/api/users", payload);
-      }
-      onSaved();
-    } catch (err: any) {
-      setError(err?.response?.data?.error ?? "Failed to save user");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-slate-900 to-slate-800 text-white">
-          <h2 className="text-lg font-bold">{user ? "Edit User" : "Add New User"}</h2>
-          <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-xl transition-colors"><X size={18} /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="First Name" value={form.firstName} onChange={(v) => setForm({ ...form, firstName: v })} required />
-            <FormField label="Last Name" value={form.lastName} onChange={(v) => setForm({ ...form, lastName: v })} required />
+      {/* ── KPI Overview Cards ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+            <UserCheck size={20} />
           </div>
-          <FormField label="Email Address" value={form.email} onChange={(v) => setForm({ ...form, email: v })} type="email" required disabled={!!user} />
-          <FormField label="Phone Number" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} required />
           <div>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Role</label>
-            <select
-              value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value })}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {Object.entries(ROLE_META).map(([r, m]) => (
-                <option key={r} value={r}>{m.label} ({r})</option>
-              ))}
-            </select>
-            <p className="text-xs text-slate-500 mt-1">{ROLE_META[form.role]?.description}</p>
+            <p className="text-xs font-medium text-gray-400">Active Accounts</p>
+            <p className="text-lg font-bold text-gray-900">{activeCount}</p>
           </div>
-          <FormField label={user ? "New Password (leave blank to keep)" : "Password"} value={form.password} onChange={(v) => setForm({ ...form, password: v })} type="password" required={!user} />
-          {form.role === "MR" && (
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">
-                Territories <span className="font-normal normal-case text-slate-400">— required for booking orders (distributor lookup depends on this)</span>
-              </label>
-              <div className="border border-slate-200 rounded-xl p-3 space-y-1.5 max-h-40 overflow-y-auto bg-slate-50">
-                {territories.length === 0 ? (
-                  <p className="text-xs text-slate-400">No territories exist yet.</p>
-                ) : (
-                  territories.map((t) => (
-                    <label key={t.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={territoryIds.includes(t.id)}
-                        onChange={() => toggleTerritory(t.id)}
-                        className="rounded border-slate-300"
-                      />
-                      {t.name}
-                    </label>
-                  ))
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+            <XCircle size={20} />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-400">Deactivated</p>
+            <p className="text-lg font-bold text-gray-900">{inactiveCount}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
+            <Briefcase size={20} />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-400">Field Force (MR/ASM)</p>
+            <p className="text-lg font-bold text-gray-900">
+              {users.filter((u) => u.role === Role.MR || u.role === Role.ASM).length}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+            <ShieldCheck size={20} />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-400">System Roles</p>
+            <p className="text-lg font-bold text-gray-900">{Object.keys(ROLES_RESPONSIBILITIES_CATALOG).length}</p>
+          </div>
+        </div>
+      </div>
+
+      {activeTab === "roles_catalog" ? (
+        /* ── Tab: Roles & Responsibilities Catalog ── */
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-primary-900 to-primary-800 text-white p-6 rounded-2xl shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-primary-200">
+                <Sparkles size={22} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold">Master Roles & Responsibilities Matrix</h2>
+                <p className="text-xs text-primary-200 mt-0.5">
+                  Standard job definitions, KPIs, approval authority, and reporting tiers across Trend MR Pharma OS.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.values(ROLES_RESPONSIBILITIES_CATALOG).map((def) => (
+              <div
+                key={def.code}
+                className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div>
+                      <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold border ${def.badgeBg} ${def.badgeColor}`}>
+                        {def.code}
+                      </span>
+                      <h3 className="font-bold text-gray-900 text-base mt-2">{def.title}</h3>
+                      <p className="text-xs font-medium text-gray-400">{def.department}</p>
+                    </div>
+                    <span className="text-[11px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                      Tier {def.level}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-gray-600 leading-relaxed mb-4">{def.mandate}</p>
+
+                  <div className="space-y-2 mb-4">
+                    <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Key Duties</p>
+                    <ul className="space-y-1.5">
+                      {def.primaryResponsibilities.slice(0, 3).map((resp, i) => (
+                        <li key={i} className="text-xs text-gray-700 flex items-start gap-2">
+                          <Check size={13} className="text-emerald-600 shrink-0 mt-0.5" />
+                          <span>{resp}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="space-y-1.5 mb-4">
+                    <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Target KPIs</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {def.keyKPIs.map((kpi, idx) => (
+                        <span key={idx} className="px-2 py-0.5 rounded-md bg-gray-50 border border-gray-200 text-[11px] text-gray-700 font-medium">
+                          {kpi}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+                  <span className="font-medium">Reports To: {def.reportingLine}</span>
+                  <button
+                    onClick={() => {
+                      setRoleFilter(def.code);
+                      setActiveTab("directory");
+                    }}
+                    className="text-primary-600 hover:text-primary-800 font-semibold"
+                  >
+                    View Reps →
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        /* ── Tab: User Directory & Management ── */
+        <div className="space-y-4">
+          {/* Filters Bar */}
+          <div className="flex flex-col md:flex-row gap-3 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by name, email or phone..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+              <button
+                onClick={() => setRoleFilter("ALL")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
+                  roleFilter === "ALL"
+                    ? "bg-primary-600 text-white"
+                    : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                All ({users.length})
+              </button>
+              {Object.keys(ROLES_RESPONSIBILITIES_CATALOG).map((roleKey) => {
+                const count = users.filter((u) => u.role === roleKey).length;
+                if (count === 0 && roleFilter !== roleKey) return null;
+                return (
+                  <button
+                    key={roleKey}
+                    onClick={() => setRoleFilter(roleKey)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
+                      roleFilter === roleKey
+                        ? "bg-primary-600 text-white"
+                        : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    {roleKey} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* User Table */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <thead className="bg-gray-50/80 border-b border-gray-100 text-gray-500 font-semibold uppercase text-[11px] tracking-wider">
+                  <tr>
+                    <th className="py-3.5 px-4 sm:px-6">Employee / User</th>
+                    <th className="py-3.5 px-4">Role & Duties</th>
+                    <th className="py-3.5 px-4">Reporting Manager</th>
+                    <th className="py-3.5 px-4">Territory</th>
+                    <th className="py-3.5 px-4">Status & Device</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-gray-400">
+                        Loading users directory...
+                      </td>
+                    </tr>
+                  ) : users.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-gray-400">
+                        No users found matching current filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    users.map((u) => {
+                      const def = ROLES_RESPONSIBILITIES_CATALOG[u.role] || {
+                        title: u.role,
+                        badgeColor: "text-gray-700",
+                        badgeBg: "bg-gray-100",
+                        department: "General",
+                      };
+                      return (
+                        <tr key={u.id} className="hover:bg-gray-50/60 transition-colors">
+                          {/* Name & Email */}
+                          <td className="py-3.5 px-4 sm:px-6">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                {u.employee
+                                  ? `${u.employee.firstName[0]}${u.employee.lastName[0] || ""}`
+                                  : u.email[0].toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-900">
+                                  {u.employee ? `${u.employee.firstName} ${u.employee.lastName}` : u.email.split("@")[0]}
+                                </p>
+                                <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
+                                  <Mail size={12} />
+                                  {u.email}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Role Badge */}
+                          <td className="py-3.5 px-4">
+                            <div>
+                              <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${def.badgeBg} ${def.badgeColor}`}>
+                                {def.title}
+                              </span>
+                              <p className="text-[11px] text-gray-400 mt-0.5">{def.department}</p>
+                            </div>
+                          </td>
+
+                          {/* Reporting Manager */}
+                          <td className="py-3.5 px-4">
+                            {u.employee?.manager ? (
+                              <div className="flex items-center gap-1.5 text-xs text-gray-800 font-medium">
+                                <span>
+                                  {u.employee.manager.firstName} {u.employee.manager.lastName}
+                                </span>
+                                {u.employee.manager.user?.role && (
+                                  <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded">
+                                    {u.employee.manager.user.role}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">—</span>
+                            )}
+                          </td>
+
+                          {/* Territories */}
+                          <td className="py-3.5 px-4">
+                            {u.employee?.territories && u.employee.territories.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {u.employee.territories.map((t) => (
+                                  <span key={t.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-50 text-sky-700 text-[11px] font-medium border border-sky-100">
+                                    <MapPin size={10} />
+                                    {t.name}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">Unassigned</span>
+                            )}
+                          </td>
+
+                          {/* Status & Device */}
+                          <td className="py-3.5 px-4">
+                            <div className="space-y-1">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                                  u.isActive
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-red-50 text-red-700 border border-red-200"
+                                }`}
+                              >
+                                {u.isActive ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+                                {u.isActive ? "Active" : "Inactive"}
+                              </span>
+
+                              {u.deviceUuid && (
+                                <p className="text-[10px] text-gray-400 flex items-center gap-1" title={u.deviceUuid}>
+                                  <Smartphone size={11} className="text-gray-400" />
+                                  Bound Device
+                                </p>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {myRole === Role.ADMIN && (
+                                <>
+                                  <button
+                                    onClick={() => openEditModal(u)}
+                                    className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                                    title="Edit Role & Assignments"
+                                  >
+                                    <Edit3 size={15} />
+                                  </button>
+                                  <button
+                                    onClick={() => toggleActive(u)}
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                      u.isActive
+                                        ? "text-gray-500 hover:text-red-600 hover:bg-red-50"
+                                        : "text-gray-500 hover:text-emerald-600 hover:bg-emerald-50"
+                                    }`}
+                                    title={u.isActive ? "Deactivate User" : "Activate User"}
+                                  >
+                                    {u.isActive ? <Lock size={15} /> : <Unlock size={15} />}
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Create / Edit User Assignment Modal ── */}
+      {(showCreateModal || editUser) && (
+        <div className="fixed inset-0 bg-gray-900/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+              <div>
+                <h3 className="font-display font-bold text-lg text-gray-900">
+                  {editUser ? "Edit User & Role Assignment" : "Provision New User & Role"}
+                </h3>
+                <p className="text-xs text-gray-500">
+                  Configure access levels, job responsibilities, reporting hierarchy, and territories.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setEditUser(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body Form */}
+            <form onSubmit={handleSaveUser} className="p-6 space-y-4">
+              {formError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
+                  <AlertCircle size={15} className="shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
+              {/* Name and Phone */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">First Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                    placeholder="e.g. Rajesh"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Last Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                    placeholder="e.g. Kumar"
+                  />
+                </div>
+              </div>
+
+              {/* Email & Phone */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Email Address *</label>
+                  <input
+                    type="email"
+                    required
+                    disabled={!!editUser}
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className={`w-full px-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 ${
+                      editUser ? "opacity-60 cursor-not-allowed" : ""
+                    }`}
+                    placeholder="user@mrtracker.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Phone Number *</label>
+                  <input
+                    type="tel"
+                    required
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                    placeholder="9876543210"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  {editUser ? "New Password (leave empty to keep current)" : "Password (min 6 characters) *"}
+                </label>
+                <input
+                  type="password"
+                  required={!editUser}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full px-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              {/* Role Selection with Responsibility Preview */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Functional System Role *</label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => {
+                    const newRole = e.target.value as Role;
+                    setFormData({ ...formData, role: newRole, managerId: "" });
+                  }}
+                  className="w-full px-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                >
+                  {Object.values(Role).map((r) => (
+                    <option key={r} value={r}>
+                      {r} — {ROLES_RESPONSIBILITIES_CATALOG[r]?.title || r} ({ROLES_RESPONSIBILITIES_CATALOG[r]?.department || "General"})
+                    </option>
+                  ))}
+                </select>
+
+                {/* Live Role Responsibility Card Preview */}
+                {ROLES_RESPONSIBILITIES_CATALOG[formData.role] && (
+                  <div className="mt-2.5 p-3 rounded-xl bg-primary-50/50 border border-primary-100 text-xs space-y-1.5">
+                    <div className="flex items-center justify-between text-primary-800 font-semibold">
+                      <span>{ROLES_RESPONSIBILITIES_CATALOG[formData.role].title}</span>
+                      <span className="text-[10px] bg-primary-200/60 px-1.5 py-0.2 rounded font-bold">
+                        Tier {ROLES_RESPONSIBILITIES_CATALOG[formData.role].level}
+                      </span>
+                    </div>
+                    <p className="text-gray-600 leading-relaxed">
+                      {ROLES_RESPONSIBILITIES_CATALOG[formData.role].mandate}
+                    </p>
+                  </div>
                 )}
               </div>
-              {territoryIds.length === 0 && (
-                <p className="text-xs text-amber-600 mt-1">No territory selected — this MR won't see any distributor when booking orders.</p>
-              )}
-            </div>
-          )}
-          {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors">Cancel</button>
-            <button type="submit" disabled={saving} className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors">
-              {saving ? "Saving..." : user ? "Save Changes" : "Create User"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
 
-function FormField({ label, value, onChange, type = "text", required, disabled }: {
-  label: string; value: string; onChange: (v: string) => void;
-  type?: string; required?: boolean; disabled?: boolean;
-}) {
-  return (
-    <div>
-      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required={required}
-        disabled={disabled}
-        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
-      />
+              {/* Reporting Manager Assignment */}
+              {eligibleManagers.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Reporting Manager ({ROLES_RESPONSIBILITIES_CATALOG[formData.role]?.reportingLine})
+                  </label>
+                  <select
+                    value={formData.managerId}
+                    onChange={(e) => setFormData({ ...formData, managerId: e.target.value })}
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                  >
+                    <option value="">Select Reporting Manager...</option>
+                    {eligibleManagers.map((m) => (
+                      <option key={m.employee!.id} value={m.employee!.id}>
+                        {m.employee!.firstName} {m.employee!.lastName} ({m.role}) — {m.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Territory Assignment (for MR / ASM / RM) */}
+              {(formData.role === Role.MR || formData.role === Role.ASM || formData.role === Role.RM) && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Assigned Territories</label>
+                  <div className="max-h-36 overflow-y-auto p-2 bg-gray-50 border border-gray-200 rounded-xl space-y-1">
+                    {territories.length === 0 ? (
+                      <p className="text-xs text-gray-400 p-1">No territories registered in system.</p>
+                    ) : (
+                      territories.map((t) => {
+                        const isChecked = formData.selectedTerritoryIds.includes(t.id);
+                        return (
+                          <label key={t.id} className="flex items-center gap-2 p-1.5 hover:bg-white rounded-lg text-xs cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setFormData({
+                                    ...formData,
+                                    selectedTerritoryIds: [...formData.selectedTerritoryIds, t.id],
+                                  });
+                                } else {
+                                  setFormData({
+                                    ...formData,
+                                    selectedTerritoryIds: formData.selectedTerritoryIds.filter((id) => id !== t.id),
+                                  });
+                                }
+                              }}
+                              className="rounded text-primary-600 focus:ring-primary-500"
+                            />
+                            <span className="font-medium text-gray-800">{t.name}</span>
+                            {t.region && <span className="text-[10px] text-gray-400">({t.region})</span>}
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Device Reset & Status */}
+              {editUser && (
+                <div className="pt-2 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.isActive}
+                      onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                      className="rounded text-primary-600 focus:ring-primary-500"
+                    />
+                    Account is Active
+                  </label>
+
+                  {editUser.deviceUuid && (
+                    <label className="flex items-center gap-2 text-xs font-semibold text-amber-700 cursor-pointer bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200">
+                      <input
+                        type="checkbox"
+                        checked={formData.resetDeviceUuid}
+                        onChange={(e) => setFormData({ ...formData, resetDeviceUuid: e.target.checked })}
+                        className="rounded text-amber-600 focus:ring-amber-500"
+                      />
+                      <RotateCcw size={12} />
+                      Unbind Hardware Device UUID
+                    </label>
+                  )}
+                </div>
+              )}
+
+              {/* Modal Footer Buttons */}
+              <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setEditUser(null);
+                  }}
+                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-colors shadow-sm disabled:opacity-50"
+                >
+                  {submitting ? "Saving..." : editUser ? "Save User Changes" : "Provision User"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

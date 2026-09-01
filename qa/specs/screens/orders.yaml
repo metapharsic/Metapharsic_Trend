@@ -1,0 +1,140 @@
+# INTENDED specification for the Sales Orders screen.
+#
+# This file is hand-authored and is the source of truth for what the screen
+# SHOULD be. The as-built half is generated from source by
+# qa/tools/extract-asbuilt.mjs -- never edit as-built.json by hand.
+# qa/tools/diff-spec.mjs compares the two and emits the bug backlog.
+
+screen: orders
+title: Sales Orders
+url: /orders
+module: orders
+owner: sales
+
+roles:
+  # Who may open the screen at all.
+  allowed: [MR, ASM, ADMIN, MD]
+  denied: [DISTRIBUTOR, DOCTOR, WAREHOUSE, HR, FINANCE]
+
+scope:
+  # The single rule every endpoint behind this screen must obey for an MR.
+  # Drift here is the failure this whole framework exists to catch.
+  MR: employeeId
+  ASM: all
+  ADMIN: all
+  MD: all
+
+apis:
+  - url: /api/orders/secondary
+    purpose: Sales order list + status tallies
+    paginated: true
+    requiresPaginationTotal: true
+    tallySource: server        # statusCounts must come from groupBy, not the page
+  - url: /api/invoices
+    purpose: Generated invoices list
+    paginated: true
+    requiresPaginationTotal: true
+  - url: /api/orders/history
+    purpose: Combined ledger history
+    paginated: true
+    requiresPaginationTotal: true
+  - url: /api/products
+    purpose: Product dropdown source
+  - url: /api/manager/entities
+    purpose: Chemist + distributor dropdown source
+  - url: /api/mr/territories
+    purpose: Territory dropdown source
+
+tables:
+  # Prisma models the screen reads or writes, for schema-change blast radius.
+  reads: [Order, OrderItem, Invoice, Product, Chemist, Distributor, Collection]
+  writes: [Order, OrderItem, Invoice, LedgerTransaction, LedgerEntry]
+
+tabs:
+  - id: orders
+    heading: Sales Orders
+    countFrom: pagination.total       # NOT orders.length
+  - id: invoices
+    heading: Generated Invoices
+    countFrom: pagination.total
+  - id: history
+    heading: Complete History
+    countFrom: pagination.total
+
+dropdowns:
+  - name: chemistId
+    label: Chemist
+    source: /api/manager/entities?type=CHEMIST
+    required: true
+    placeholder: true
+    emptyStateMessage: No chemists in your territory
+  - name: distributorId
+    label: Distributor
+    source: /api/manager/entities?type=DISTRIBUTOR
+    required: true
+    placeholder: true
+  - name: item.productId
+    label: Product
+    source: /api/products
+    required: true
+    placeholder: true
+  - name: orderStatus
+    label: Status filter
+    source: static
+    options: [ALL, PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED]
+
+fields:
+  - name: quantity
+    label: Qty
+    type: number
+    required: true
+    min: 1
+    validation: Integer >= 1
+    validator: CreateOrderSchema.items.quantity
+  - name: freeQty
+    label: Free
+    type: number
+    required: false
+    min: 0
+    validator: CreateOrderSchema.items.freeQty
+  - name: discountPct
+    label: Disc %
+    type: number
+    required: false
+    min: 0
+    max: 100
+    validator: CreateOrderSchema.items.discountPct
+  - name: batchNo
+    label: Batch No
+    type: text
+    required: false
+    note: Falls back to product.currentBatchNo when blank
+  - name: expDate
+    label: Expiry
+    type: date
+    required: false
+  - name: lrNo
+    label: LR No
+    type: text
+    required: false
+  - name: dueDate
+    label: Due Date
+    type: date
+    required: false
+
+validations:
+  - trigger: submit with no chemist
+    message: Select a chemist.
+  - trigger: submit with no distributor
+    message: Select a distributor.
+  - trigger: submit with zero product lines
+    message: Add at least one product line.
+  - trigger: order value exceeds chemist credit limit
+    message: server-rejected
+    level: server
+    source: lib/credit.canPlaceOrder
+
+testability:
+  # Playwright needs stable hooks. Every field and tab above must be
+  # addressable by one of these, or the UI is not automatable.
+  requireSelectors: [name, data-testid]

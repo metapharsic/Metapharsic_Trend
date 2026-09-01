@@ -15,15 +15,22 @@ export async function POST(req: NextRequest) {
       return badRequest("Validation error", parsed.error.flatten());
     }
 
-    const { email, password, role, deviceUuid } = parsed.data;
+    const email = parsed.data.email.trim().toLowerCase();
+    const password = parsed.data.password;
+    const { role, deviceUuid } = parsed.data;
 
-    const user = await db.user.findUnique({
-      where: { email },
+    const user = await db.user.findFirst({
+      where: {
+        email: {
+          equals: email,
+          mode: "insensitive",
+        },
+      },
       include: { employee: true },
     });
 
     if (!user) {
-      return unauthorized("Invalid credentials");
+      return unauthorized("Invalid credentials. Please verify your email.");
     }
 
     // Strict role check
@@ -35,9 +42,13 @@ export async function POST(req: NextRequest) {
       return apiError("FORBIDDEN", "Account is inactive", 403);
     }
 
+    // The stored hash is the only authority on whether a password is correct.
+    // There is no fallback list and no rewrite-on-login: a login must never be
+    // able to change the credential it is checking.
     const passwordMatch = await bcrypt.compare(password, user.passwordHash);
+
     if (!passwordMatch) {
-      return unauthorized("Invalid credentials");
+      return unauthorized("Invalid credentials. Please check your password.");
     }
 
     // MR specific device UUID binding validation

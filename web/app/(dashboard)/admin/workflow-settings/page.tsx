@@ -99,37 +99,6 @@ export default function WorkflowSettingsPage() {
           <Toggle checked={settings.enforceTourPlan} onChange={(v) => save({ enforceTourPlan: v })} />
         </div>
 
-        <div className="p-5 flex items-center justify-between gap-4">
-          <div>
-            <p className="font-bold text-gray-900 text-sm">Geofence Radius</p>
-            <p className="text-xs text-gray-500 mt-0.5">Max distance (metres) from the entity's pinned location to allow checkout.</p>
-          </div>
-          <input
-            type="number"
-            min={10}
-            max={5000}
-            value={settings.geofenceRadiusMeters}
-            onChange={(e) => setSettings({ ...settings, geofenceRadiusMeters: Number(e.target.value) })}
-            onBlur={(e) => save({ geofenceRadiusMeters: Number(e.target.value) })}
-            className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm text-right"
-          />
-        </div>
-
-        <div className="p-5 flex items-center justify-between gap-4">
-          <div>
-            <p className="font-bold text-gray-900 text-sm">GPS Accuracy Warning</p>
-            <p className="text-xs text-gray-500 mt-0.5">Warn MR to recapture if GPS accuracy is worse than this (metres).</p>
-          </div>
-          <input
-            type="number"
-            min={5}
-            max={1000}
-            value={settings.gpsAccuracyWarnMeters}
-            onChange={(e) => setSettings({ ...settings, gpsAccuracyWarnMeters: Number(e.target.value) })}
-            onBlur={(e) => save({ gpsAccuracyWarnMeters: Number(e.target.value) })}
-            className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm text-right"
-          />
-        </div>
       </div>
 
       <div className="flex items-center gap-2 text-xs text-gray-400">

@@ -452,27 +452,12 @@ function MyAttendance() {
                 <X size={18} />
               </button>
             </div>
-            <p className="text-xs text-slate-400 mb-3">View only — attendance is recorded via GPS check-in and cannot be edited.</p>
+            <p className="text-xs text-slate-400 mb-3">View only — attendance is recorded upon daily check-in.</p>
             <div className="border-t border-slate-100 pt-1">
               <FormRow label="Status" value={STATUS_LABEL[viewing.status]} />
               <FormRow label="Check-In Time" value={new Date(viewing.checkIn).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} />
               <FormRow label="Check-Out Time" value={viewing.checkOut ? new Date(viewing.checkOut).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "Still checked in"} />
               <FormRow label="Hours Logged" value={viewing.minutes !== null ? fmtHours(viewing.minutes) : "—"} />
-              {viewing.latitude !== null && viewing.longitude !== null && (
-                <FormRow
-                  label="GPS Location"
-                  value={
-                    <a
-                      href={`https://maps.google.com/?q=${viewing.latitude},${viewing.longitude}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-emerald-600 hover:underline inline-flex items-center gap-1"
-                    >
-                      <MapPin size={12} /> {viewing.latitude.toFixed(5)}, {viewing.longitude.toFixed(5)}
-                    </a>
-                  }
-                />
-              )}
             </div>
           </div>
         </div>

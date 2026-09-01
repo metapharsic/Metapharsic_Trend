@@ -48,7 +48,9 @@ async function getUsers(req: AuthedRequest) {
             firstName: true,
             lastName: true,
             phone: true,
-            manager: { select: { firstName: true, lastName: true } },
+            managerId: true,
+            manager: { select: { id: true, firstName: true, lastName: true, user: { select: { role: true } } } },
+            territories: { select: { id: true, name: true, region: true, zone: true } },
           },
         },
       },
@@ -107,5 +109,5 @@ async function createUser(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getUsers, [Role.ADMIN, Role.MD]);
+export const GET = withAuth(getUsers, [Role.ADMIN, Role.MD, Role.HR, Role.NSM, Role.ZSM, Role.RM, Role.ASM]);
 export const POST = withAuth(createUser, [Role.ADMIN]);

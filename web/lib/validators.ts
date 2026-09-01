@@ -43,11 +43,11 @@ export const CreateVisitSchema = z.object({
   hospitalId: z.string().uuid("Valid hospital ID required").optional(),
   purpose: z.string().min(1, "Purpose is required"),
   feedback: z.string().optional(),
-  latitude: z.coerce.number().min(-90).max(90),
-  longitude: z.coerce.number().min(-180).max(180),
+  latitude: z.coerce.number().optional().default(0),
+  longitude: z.coerce.number().optional().default(0),
   startedAt: z.coerce.date().optional(),
-  startLatitude: z.coerce.number().min(-90).max(90).optional(),
-  startLongitude: z.coerce.number().min(-180).max(180).optional(),
+  startLatitude: z.coerce.number().optional().default(0),
+  startLongitude: z.coerce.number().optional().default(0),
   durationMinutes: z.coerce.number().int().min(0).max(600).optional(),
   boxesPlaced: z.coerce.number().int().min(0).optional(),
   samples: z.array(z.object({
@@ -160,6 +160,7 @@ export const UpdateOrderStatusSchema = z.object({
 });
 
 export const UpdateOrderItemsSchema = z.object({
+  status: z.enum(["PENDING", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED"]).optional(),
   items: z.array(
     z.object({
       productId: z.string().uuid(),
@@ -173,6 +174,7 @@ export const UpdateOrderItemsSchema = z.object({
     })
   ).min(1, "At least one item is required"),
 });
+
 
 // ─── Expense Claims ──────────────────────────────────────────
 

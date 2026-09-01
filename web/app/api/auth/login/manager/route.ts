@@ -6,6 +6,20 @@ import { signAccessToken, signRefreshToken } from "@/lib/auth";
 import { ManagerLoginSchema } from "@/lib/validators";
 import { ok, badRequest, unauthorized, apiError } from "@/lib/api-response";
 
+/** Roles permitted to authenticate through the manager login door. */
+const MANAGER_ROLES: Role[] = [
+  Role.ADMIN,
+  Role.MD,
+  Role.NSM,
+  Role.ZSM,
+  Role.RM,
+  Role.ASM,
+  Role.HR,
+  Role.FINANCE,
+  Role.WAREHOUSE,
+  Role.MARKETING,
+];
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,23 +29,42 @@ export async function POST(req: NextRequest) {
       return badRequest("Validation error", parsed.error.flatten());
     }
 
-    const { email, password } = parsed.data;
+    const email = parsed.data.email.trim().toLowerCase();
+    const password = parsed.data.password;
 
-    const user = await db.user.findUnique({
-      where: { email },
+    const user = await db.user.findFirst({
+      where: {
+        email: {
+          equals: email,
+          mode: "insensitive",
+        },
+      },
       include: { employee: true },
     });
 
     if (!user) {
-      return unauthorized("Invalid credentials");
+      return unauthorized("Invalid credentials. Please verify your email.");
     }
     if (!user.isActive) {
       return apiError("FORBIDDEN", "Account is inactive", 403);
     }
 
+    // The stored hash is the only authority on whether a password is correct.
+    // There is no fallback list and no rewrite-on-login: a login must never be
+    // able to change the credential it is checking.
     const passwordMatch = await bcrypt.compare(password, user.passwordHash);
+
     if (!passwordMatch) {
-      return unauthorized("Invalid credentials");
+      return unauthorized("Invalid credentials. Please check your password.");
+    }
+
+    // This door serves office/management roles only. Without this check it
+    // issues a token for whatever role the account happens to hold, so a
+    // DISTRIBUTOR or DOCTOR account signs in through the manager login and
+    // lands in the management UI. Field reps use /api/auth/login/mr, which
+    // additionally enforces device binding.
+    if (!MANAGER_ROLES.includes(user.role)) {
+      return unauthorized("This account cannot sign in here. Use the app assigned to your role.");
     }
 
     const tokenPayload = { sub: user.id, role: user.role };
@@ -67,8 +100,8 @@ export async function POST(req: NextRequest) {
     });
 
     return response;
-  } catch (err) {
+  } catch (err: any) {
     console.error("[POST /api/auth/login/manager]", err);
-    return apiError("INTERNAL_SERVER_ERROR", "Login failed", 500);
+    return apiError("INTERNAL_SERVER_ERROR", err?.message || "Login failed", 500);
   }
 }

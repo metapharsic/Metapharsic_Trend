@@ -2,86 +2,88 @@ import cron from "node-cron";
 import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/mailer";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
-import { startOfUtcDay, addUtcDays } from "@/lib/date";
+import {
+  compileIndividualMrEodData,
+  formatIndividualMrWhatsAppReport,
+  compileAdminExecutiveDigestData,
+  formatAdminExecutiveWhatsAppDigest,
+} from "@/lib/whatsapp-reports";
 
-function fmtHours(minutes: number) {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${h}h ${m}m`;
-}
-
-export async function runDailySummary() {
-  const todayStart = startOfUtcDay();
-  const todayEnd = addUtcDays(todayStart, 1);
-
+export async function runDailySummary(targetDate: Date = new Date()) {
   const mrs = await db.employee.findMany({
     where: { user: { role: "MR", isActive: true } },
     include: { user: { select: { email: true } } },
   });
 
-  let sentCount = 0;
-  let whatsappSentCount = 0;
+  let mrEmailCount = 0;
+  let mrWhatsAppCount = 0;
+  let adminEmailCount = 0;
+  let adminWhatsAppCount = 0;
 
+  // 1. Dispatch individual descriptive EOD reports to each MR
   for (const mr of mrs) {
-    const [attendanceSessions, visits, leads, orderItems, collections, samples] = await Promise.all([
-      db.attendance.findMany({ where: { employeeId: mr.id, date: todayStart }, orderBy: { checkIn: "asc" } }),
-      db.visit.findMany({
-        where: { employeeId: mr.id, createdAt: { gte: todayStart, lt: todayEnd } },
-        select: { boxesPlaced: true, doctorId: true, chemistId: true },
-      }),
-      db.lead.count({ where: { employeeId: mr.id, createdAt: { gte: todayStart, lt: todayEnd } } }),
-      db.orderItem.findMany({
-        where: { order: { employeeId: mr.id, createdAt: { gte: todayStart, lt: todayEnd } } },
-        select: { price: true, quantity: true },
-      }),
-      db.collection.aggregate({
-        where: { employeeId: mr.id, createdAt: { gte: todayStart, lt: todayEnd } },
-        _sum: { amount: true },
-      }),
-      db.sample.findMany({
-        where: { visit: { employeeId: mr.id, createdAt: { gte: todayStart, lt: todayEnd } } },
-        select: { quantity: true },
-      }),
-    ]);
+    const eodData = await compileIndividualMrEodData(mr.id, targetDate);
+    if (!eodData) continue;
 
-    // Multiple check-in/out sessions can now exist per day — sum across all of them.
-    const hoursMinutes = attendanceSessions.reduce(
-      (sum, a) => sum + Math.round(((a.checkOut ?? new Date()).getTime() - a.checkIn.getTime()) / 60000),
-      0
-    );
-    const latestSession = attendanceSessions[attendanceSessions.length - 1];
-    const stillCheckedIn = attendanceSessions.length > 0 && !latestSession.checkOut;
-    const boxesPlaced = visits.reduce((s, v) => s + (v.boxesPlaced ?? 0), 0);
-    const doctorCalls = visits.filter((v) => v.doctorId).length;
-    const chemistCalls = visits.filter((v) => v.chemistId).length;
-    const salesToday = orderItems.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
-    const collectionToday = Number(collections._sum.amount ?? 0);
-    const samplesGiven = samples.reduce((s, x) => s + x.quantity, 0);
+    const reportText = formatIndividualMrWhatsAppReport(eodData);
 
-    const lines = [
-      `EOD Report — ${mr.firstName} ${mr.lastName} — ${todayStart.toISOString().slice(0, 10)}`,
-      ``,
-      `Logged in: ${attendanceSessions.length > 0 ? fmtHours(hoursMinutes) + (stillCheckedIn ? " (still checked in)" : "") : "Did not check in"}`,
-      `Calls made: ${visits.length} (Doctors: ${doctorCalls}, Chemists: ${chemistCalls})`,
-      `Boxes placed: ${boxesPlaced}`,
-      `Samples given: ${samplesGiven}`,
-      `Orders booked: ₹${salesToday.toFixed(2)}`,
-      `Collections: ₹${collectionToday.toFixed(2)}`,
-      `Leads generated: ${leads}`,
-    ];
-    const summaryText = lines.join("\n");
-
-    if (mr.user.email) {
-      const result = await sendEmail(mr.user.email, `EOD Report — ${mr.firstName} ${mr.lastName}`, summaryText);
-      if (result.sent) sentCount++;
+    if (mr.user?.email) {
+      const emailResult = await sendEmail(
+        mr.user.email,
+        `EOD Performance Report — ${eodData.mrName} (${eodData.date.toISOString().slice(0, 10)})`,
+        reportText
+      );
+      if (emailResult.sent) mrEmailCount++;
     }
+
     if (mr.phone) {
-      const waResult = await sendWhatsAppMessage(mr.phone, summaryText);
-      if (waResult.sent) whatsappSentCount++;
+      const waResult = await sendWhatsAppMessage(mr.phone, reportText);
+      if (waResult.sent) mrWhatsAppCount++;
     }
   }
 
-  console.log(`[DailySummaryJob] Processed ${mrs.length} MR(s), ${sentCount} email(s), ${whatsappSentCount} whatsapp msg(s) sent at ${new Date().toISOString()}`);
+  // 2. Dispatch Executive Fleet Digest to Admins and Managing Directors
+  const executiveData = await compileAdminExecutiveDigestData(targetDate);
+  const executiveDigestText = formatAdminExecutiveWhatsAppDigest(executiveData);
+
+  const managementUsers = await db.employee.findMany({
+    where: {
+      user: {
+        role: { in: ["ADMIN", "MD", "NSM"] },
+        isActive: true,
+      },
+    },
+    include: { user: { select: { email: true } } },
+  });
+
+  for (const mgr of managementUsers) {
+    if (mgr.user?.email) {
+      const emailResult = await sendEmail(
+        mgr.user.email,
+        `Executive Fleet EOD Digest — ${executiveData.date.toISOString().slice(0, 10)}`,
+        executiveDigestText
+      );
+      if (emailResult.sent) adminEmailCount++;
+    }
+
+    if (mgr.phone) {
+      const waResult = await sendWhatsAppMessage(mgr.phone, executiveDigestText);
+      if (waResult.sent) adminWhatsAppCount++;
+    }
+  }
+
+  const logMessage = `[DailySummaryJob] Processed ${mrs.length} MR(s) [Emails: ${mrEmailCount}, WhatsApp: ${mrWhatsAppCount}] & ${managementUsers.length} Admin/MD(s) [Emails: ${adminEmailCount}, WhatsApp: ${adminWhatsAppCount}] at ${new Date().toISOString()}`;
+  console.log(logMessage);
+
+  return {
+    mrsProcessed: mrs.length,
+    mrEmailCount,
+    mrWhatsAppCount,
+    managementProcessed: managementUsers.length,
+    adminEmailCount,
+    adminWhatsAppCount,
+    executiveData,
+  };
 }
 
 export function startDailySummaryJob() {
@@ -90,8 +92,8 @@ export function startDailySummaryJob() {
     try {
       await runDailySummary();
     } catch (err) {
-      console.error("[DailySummaryJob] Error:", err);
+      console.error("[DailySummaryJob] Error executing scheduled EOD summary:", err);
     }
   });
-  console.log("[DailySummaryJob] Scheduled — runs daily at 21:00 IST");
+  console.log("[DailySummaryJob] Scheduled — runs daily at 21:00 IST (Personalized MR EOD Reports + Admin Executive Digest)");
 }

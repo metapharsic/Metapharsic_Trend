@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { VisitDetailModal } from "@/components/mr/visit-detail-modal";
+import { RaiseClaimModal } from "@/components/mr/claim-modal";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface Notification {
@@ -124,6 +125,7 @@ export default function MrDashboardPage() {
   const [geoError, setGeoError]       = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [openVisitId, setOpenVisitId]  = useState<string | null>(null);
+  const [showClaimModal, setShowClaimModal] = useState(false);
   const [team, setTeam]               = useState<TeamRow[]>([]);
   const [teamLoading, setTeamLoading] = useState(true);
 
@@ -157,44 +159,39 @@ export default function MrDashboardPage() {
     else fetchData();
   }, [showTeamView, fetchData, fetchTeam]);
 
-  const handleCheckIn = () => {
-    setGeoError(null);
-    if (!navigator.geolocation) { setGeoError("Geolocation is not supported by your browser."); return; }
-    setCheckingIn(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          await apiClient.post("/api/mr/attendance/check-in", {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-          });
-          fetchData();
-        } catch (e: any) {
-          setGeoError(e?.response?.data?.error?.message ?? "Check-in failed. Try again.");
-        } finally { setCheckingIn(false); }
-      },
-      (err) => { setGeoError(`GPS error: ${err.message}`); setCheckingIn(false); }
-    );
+  const getCoords = (): Promise<{ latitude: number; longitude: number }> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) { resolve({ latitude: 0, longitude: 0 }); return; }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        () => resolve({ latitude: 0, longitude: 0 }),
+        { timeout: 3000 }
+      );
+    });
   };
 
-  const handleCheckOut = () => {
+  const handleCheckIn = async () => {
     setGeoError(null);
-    if (!navigator.geolocation) { setGeoError("Geolocation is not supported by your browser."); return; }
+    setCheckingIn(true);
+    try {
+      const { latitude, longitude } = await getCoords();
+      await apiClient.post("/api/mr/attendance/check-in", { latitude, longitude });
+      fetchData();
+    } catch (e: any) {
+      setGeoError(e?.response?.data?.error?.message ?? "Check-in failed. Try again.");
+    } finally { setCheckingIn(false); }
+  };
+
+  const handleCheckOut = async () => {
+    setGeoError(null);
     setCheckingOut(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          await apiClient.post("/api/mr/attendance/check-out", {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-          });
-          fetchData();
-        } catch (e: any) {
-          setGeoError(e?.response?.data?.error?.message ?? "Check-out failed.");
-        } finally { setCheckingOut(false); }
-      },
-      (err) => { setGeoError(`GPS error: ${err.message}`); setCheckingOut(false); }
-    );
+    try {
+      const { latitude, longitude } = await getCoords();
+      await apiClient.post("/api/mr/attendance/check-out", { latitude, longitude });
+      fetchData();
+    } catch (e: any) {
+      setGeoError(e?.response?.data?.error?.message ?? "Check-out failed.");
+    } finally { setCheckingOut(false); }
   };
 
   // ─── Team view (admin/ASM default — everyone's activity, no picker) ────────────
@@ -295,6 +292,15 @@ export default function MrDashboardPage() {
                 className="p-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl transition-colors" title="Refresh">
                 <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
               </button>
+              {/* Raise Claim Button */}
+              {data.employee.isSelf && (
+                <button
+                  onClick={() => setShowClaimModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold rounded-xl transition-colors"
+                >
+                  <Package size={14} /> Raise Claim
+                </button>
+              )}
               {/* Check In / Check Out */}
               {data.employee.isSelf && !data.attendance.checkedIn && (
                 <button onClick={handleCheckIn} disabled={checkingIn}
@@ -563,6 +569,10 @@ export default function MrDashboardPage() {
 
       {openVisitId && (
         <VisitDetailModal visitId={openVisitId} onClose={() => setOpenVisitId(null)} />
+      )}
+
+      {showClaimModal && (
+        <RaiseClaimModal onClose={() => setShowClaimModal(false)} onClaimCreated={fetchData} />
       )}
 
       {/* ─── Invoices Generated ────────────────────────────────────────────────── */}

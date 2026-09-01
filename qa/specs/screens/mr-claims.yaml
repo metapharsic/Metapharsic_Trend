@@ -1,0 +1,66 @@
+# INTENDED specification for the MR Expense Claims screen.
+
+screen: mr-claims
+title: Expense Claims
+url: /mr/claims
+module: expenses
+owner: field-ops
+
+roles:
+  allowed: [MR]
+  denied: [DISTRIBUTOR, DOCTOR, WAREHOUSE]
+
+scope:
+  MR: employeeId
+
+apis:
+  - url: /api/mr/claims
+    purpose: Claim list + create
+    paginated: true
+    requiresPaginationTotal: true
+  - url: /api/manager/entities
+    purpose: Chemist + distributor dropdown source
+  - url: /api/products
+    purpose: Product dropdown source
+
+tables:
+  reads: [Claim, Expense, Product, Chemist, Distributor]
+  writes: [Claim, Expense]
+
+dropdowns:
+  - name: form.chemistId
+    label: Chemist
+    source: /api/manager/entities?type=CHEMIST
+    required: false
+    placeholder: true
+  - name: form.distributorId
+    label: Distributor
+    source: /api/manager/entities?type=DISTRIBUTOR
+    required: false
+    placeholder: true
+  - name: form.productId
+    label: Product
+    source: /api/products
+    required: true
+    placeholder: true
+
+fields:
+  - name: amount
+    label: Amount
+    type: number
+    required: true
+    min: 1
+  - name: quantity
+    label: Quantity
+    type: number
+    required: true
+    min: 1
+
+validations:
+  - trigger: submit with no product
+    message: Select a product.
+  - trigger: submit with non-positive amount
+    message: Enter a valid amount.
+
+testability:
+  requireSelectors: [name, data-testid]

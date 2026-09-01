@@ -1,7 +1,6 @@
-const EARTH_RADIUS_KM = 6371;
-const ANOMALY_MAX_SPEED_KMH = Number(process.env.ANOMALY_MAX_SPEED_KMH ?? 60);
-
-export function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+export function haversineDistanceKm(lat1?: number, lon1?: number, lat2?: number, lon2?: number): number {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+  const EARTH_RADIUS_KM = 6371;
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
@@ -20,26 +19,23 @@ export interface AnomalyCheckResult {
   calculatedSpeed: number;
 }
 
+/**
+ * GPS tracking and geofencing are disabled.
+ * Always returns non-anomalous status.
+ */
 export function checkVisitAnomaly(
-  prevLat: number,
-  prevLon: number,
-  prevTime: Date,
-  currLat: number,
-  currLon: number,
-  currTime: Date
+  _prevLat?: number,
+  _prevLon?: number,
+  _prevTime?: Date,
+  _currLat?: number,
+  _currLon?: number,
+  _currTime?: Date
 ): AnomalyCheckResult {
-  const distanceKm = haversineDistanceKm(prevLat, prevLon, currLat, currLon);
-  const timeDiffMinutes = Math.max((currTime.getTime() - prevTime.getTime()) / 60000, 0);
-  const timeDiffHours = timeDiffMinutes / 60;
-  const calculatedSpeed = timeDiffHours > 0 ? distanceKm / timeDiffHours : Infinity;
-
-  const isAnomalous = calculatedSpeed > ANOMALY_MAX_SPEED_KMH;
-
   return {
-    isAnomalous,
-    reason: isAnomalous ? "IMPLAUSIBLE_TRAVEL_SPEED" : null,
-    distanceKm,
-    timeDiffMinutes,
-    calculatedSpeed,
+    isAnomalous: false,
+    reason: null,
+    distanceKm: 0,
+    timeDiffMinutes: 0,
+    calculatedSpeed: 0,
   };
 }

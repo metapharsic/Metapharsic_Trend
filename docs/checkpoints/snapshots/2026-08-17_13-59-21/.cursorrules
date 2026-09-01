@@ -1,0 +1,24 @@
+# AI Developer Guidelines for Pharma OS
+
+## Tech Stack
+- Frontend: Next.js (App Router), TailwindCSS, TypeScript
+- Mobile: Flutter (Offline-First)
+- Backend: NestJS, Prisma ORM, PostgreSQL
+- State Management: Zustand
+
+## Coding Rules
+1. ALWAYS use strict TypeScript typing. Do not use `any`.
+2. All API responses must follow this interface: `{ success: boolean, data: T, error?: string }`
+3. Never drop existing database columns in Prisma without asking for explicit permission.
+4. When writing UI components, strictly follow the `docs/03_features` guidelines.
+
+## Context Retrieval
+- Before creating a new database model, read `docs/02_database/schema_design.md`.
+- Before adding a new API endpoint, read `docs/04_api_contracts/endpoints_list.md`.
+- When starting a new session, ALWAYS read `docs/06_workflows/current_task.md` to understand the active context.
+
+## Documentation Sync & Conflict Rules
+1. **Verify Before Coding**: Before making any code modifications, check that the proposed code does not conflict with active specifications in `docs/09_business_rules/core_logic.md` or `docs/02_database/production_schema.prisma`.
+2. **Handle Conflicts Proactively**: If a conflict or gap is found between the codebase, database schema, and documentation, the AI MUST report it to the user and request confirmation BEFORE writing code.
+3. **Auto-Update Workflows**: Once a task is completed, update the corresponding `Completed Tasks` in `docs/06_workflows/current_task.md` and document any modified dependencies or API routes in their respective markdown files.
+

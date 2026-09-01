@@ -1,0 +1,27 @@
+{
+  "_comment": "Known, accepted contract violations as of the first QA pass. The suite asserts that offenders are a SUBSET of this list: pre-existing debt stays green, new drift fails. Delete an entry the moment it is fixed - the suite tells you when one becomes stale.",
+  "_generated": "2026-08-25",
+  "envelopeBypass": [],
+  "unauthenticated": [],
+  "indirectRoleGates": [
+    "GET /api/users/[id] -> ALL_ROLES",
+    "PUT /api/users/[id] -> ALL_ROLES"
+  ],
+  "paginatedWithoutTotal": [
+    "/api/mr/ledgers"
+  ],
+  "silentlyCapped": [
+    "/api/distributor/invoices",
+    "/api/invoices",
+    "/api/manager/mr-stock/history",
+    "/api/manager/notifications",
+    "/api/manager/visits/map",
+    "/api/orders/history",
+    "/api/products/[id]/movements"
+  ],
+  "countFromArrayLength": [
+    "/admin/claims: Pending ASM Review",
+    "/orders: Complete History",
+    "/orders: Generated Invoices"
+  ]
+}

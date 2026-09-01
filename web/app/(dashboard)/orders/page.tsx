@@ -101,6 +101,9 @@ export default function OrdersDashboard() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [invoiceBusyId, setInvoiceBusyId] = useState<string | null>(null);
+  const [deleteInvoice, setDeleteInvoice] = useState<any | null>(null);
+  const [deleteInvoiceError, setDeleteInvoiceError] = useState<string | null>(null);
+  const [deletingInvoice, setDeletingInvoice] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"orders" | "invoices" | "history">("orders");
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -157,10 +160,11 @@ export default function OrdersDashboard() {
   // MR is the first point of contact for a chemist — only they book orders.
   // ASM/ADMIN/MD oversee and advance fulfilment status but don't originate sales.
   const canBook = role === "MR";
-  const canAdvance = role === "ASM" || role === "ADMIN" || role === "MD";
-  const canManageInvoices = role === "ASM" || role === "ADMIN";
-  // Only the booking MR (own orders, backend-enforced) or ASM/ADMIN may edit/delete an order.
-  const canEditOrders = role === "MR" || role === "ASM" || role === "ADMIN";
+  const isAdmin = role === "ADMIN" || role === "MD";
+  const canAdvance = role === "ASM" || isAdmin;
+  const canManageInvoices = role === "ASM" || isAdmin || role === "MR";
+  // Admins/MDs have full privileges to edit/delete any order; MR/ASM can edit open ones.
+  const canEditOrders = role === "MR" || role === "ASM" || isAdmin;
 
   const advance = async (order: Order) => {
     const next = NEXT_STATUS[order.status];
@@ -203,6 +207,25 @@ export default function OrdersDashboard() {
       console.error("Failed to update invoice:", err);
     } finally {
       setInvoiceBusyId(null);
+    }
+  };
+
+  const confirmDeleteInvoice = async () => {
+    if (!deleteInvoice) return;
+    setDeletingInvoice(true);
+    setDeleteInvoiceError(null);
+    try {
+      await apiClient.delete(`/api/invoices/${deleteInvoice.id}`);
+      setDeleteInvoice(null);
+      loadInvoices();
+      load();
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
+        "Failed to delete invoice.";
+      setDeleteInvoiceError(message);
+    } finally {
+      setDeletingInvoice(false);
     }
   };
 
@@ -351,7 +374,7 @@ export default function OrdersDashboard() {
                           Mark {NEXT_STATUS[order.status]}
                         </button>
                       )}
-                      {canEditOrders && EDITABLE_STATUSES.includes(order.status) && (
+                      {canEditOrders && (isAdmin || EDITABLE_STATUSES.includes(order.status)) && (
                         <>
                           <button
                             onClick={() => setEditOrderId(order.id)}
@@ -458,13 +481,22 @@ export default function OrdersDashboard() {
                       })}
                     </td>
                     {canManageInvoices && (
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
                         <button
                           disabled={invoiceBusyId === inv.id}
                           onClick={() => togglePaid(inv)}
-                          className="text-teal-600 hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors font-semibold text-xs border border-transparent hover:border-teal-100 disabled:opacity-50"
+                          className="text-teal-600 hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors font-semibold text-xs border border-transparent hover:border-teal-100 disabled:opacity-50 mr-1"
                         >
                           Mark {inv.paid ? "Unpaid" : "Paid"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDeleteInvoice(inv);
+                            setDeleteInvoiceError(null);
+                          }}
+                          className="text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors font-semibold text-xs border border-transparent hover:border-red-100"
+                        >
+                          Delete
                         </button>
                       </td>
                     )}
@@ -595,6 +627,40 @@ export default function OrdersDashboard() {
                 className="flex-1 bg-red-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
               >
                 {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteInvoice && (
+        <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-display font-bold text-slate-900">
+                Delete invoice {deleteInvoice.invoiceNo}?
+              </h2>
+              <button onClick={() => setDeleteInvoice(null)} className="text-slate-400 hover:text-slate-700">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-sm text-slate-500">
+              This permanently removes invoice <span className="font-semibold text-slate-700">{deleteInvoice.invoiceNo}</span> and reverses its accounting ledger postings.
+            </p>
+            {deleteInvoiceError && <p className="text-sm text-red-600">{deleteInvoiceError}</p>}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteInvoice(null)}
+                className="flex-1 border border-slate-300 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteInvoice}
+                disabled={deletingInvoice}
+                className="flex-1 bg-red-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+              >
+                {deletingInvoice ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
@@ -847,6 +913,7 @@ function EditOrderModal({
 }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [items, setItems] = useState<LineItem[]>([]);
+  const [orderStatus, setOrderStatus] = useState<string>("PENDING");
   const [chemistName, setChemistName] = useState("");
   const [distributorName, setDistributorName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -862,6 +929,7 @@ function EditOrderModal({
         const order = orderRes.data.data.order;
         setChemistName(order.chemist?.name ?? "—");
         setDistributorName(order.distributor?.name ?? "—");
+        setOrderStatus(order.status ?? "PENDING");
         setItems(
           order.items.map((it: any) => ({
             productId: it.product.id,
@@ -899,6 +967,7 @@ function EditOrderModal({
     setSubmitting(true);
     try {
       await apiClient.put(`/api/orders/${orderId}`, {
+        status: orderStatus,
         items: validItems.map((it) => ({
           productId: it.productId,
           quantity: it.quantity,
@@ -934,7 +1003,7 @@ function EditOrderModal({
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
               <div>
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Chemist</p>
                 <p className="font-semibold text-slate-800">{chemistName}</p>
@@ -942,6 +1011,20 @@ function EditOrderModal({
               <div>
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Distributor</p>
                 <p className="font-semibold text-slate-800">{distributorName}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Order Status</p>
+                <select
+                  value={orderStatus}
+                  onChange={(e) => setOrderStatus(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-2.5 py-1 text-sm font-semibold text-slate-800 mt-0.5"
+                >
+                  <option value="PENDING">PENDING</option>
+                  <option value="CONFIRMED">CONFIRMED</option>
+                  <option value="SHIPPED">SHIPPED</option>
+                  <option value="DELIVERED">DELIVERED</option>
+                  <option value="CANCELLED">CANCELLED</option>
+                </select>
               </div>
             </div>
 

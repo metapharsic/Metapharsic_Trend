@@ -1,0 +1,15 @@
+{
+  "name": "trend-mr-e2e",
+  "private": true,
+  "description": "Browser conformance layer. Kept out of web/ so Playwright's runner and Jest never share a config or a transpiler.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report ../qa/reports/playwright-html",
+    "install:browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0"
+  }
+}

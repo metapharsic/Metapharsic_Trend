@@ -236,8 +236,16 @@ async function createEntity(req: AuthedRequest) {
         include: { territories: { select: { id: true } } },
       });
       const ownTerritoryIds = employee?.territories.map((t) => t.id) ?? [];
-      if (!ownTerritoryIds.includes(territoryId)) {
+      // If employee has specific assigned territories and the selected one is not in them
+      if (ownTerritoryIds.length > 0 && !ownTerritoryIds.includes(territoryId)) {
         return badRequest("You may only add entities within your own assigned territories");
+      }
+      // If employee has no territories assigned yet, auto-assign this territory
+      if (employee && ownTerritoryIds.length === 0) {
+        await db.employee.update({
+          where: { id: employee.id },
+          data: { territories: { connect: { id: territoryId } } },
+        });
       }
     }
 
@@ -291,6 +299,17 @@ async function createEntity(req: AuthedRequest) {
           longitude,
           territoryId,
           whatsApp: whatsApp || null,
+          dpsScore: 50.0,
+          dpsTier: "B",
+          requiredMonthlyVisits: 2,
+          crmProfile: {
+            create: {
+              prescriptionPotential: 50,
+              competitorIntensity: 1,
+              salesConversionRate: 0.5,
+              sampleRoi: 1.5,
+            },
+          },
         },
       });
       return created({
@@ -385,4 +404,4 @@ async function createEntity(req: AuthedRequest) {
 }
 
 export const GET = withAuth(getEntities, [Role.MR, Role.MD, Role.NSM, Role.ZSM, Role.RM, Role.ASM, Role.ADMIN]);
-export const POST = withAuth(createEntity, [Role.MR, Role.ASM, Role.ADMIN]);
+export const POST = withAuth(createEntity, [Role.MR, Role.ASM, Role.ADMIN, Role.RM, Role.ZSM, Role.NSM, Role.MD]);

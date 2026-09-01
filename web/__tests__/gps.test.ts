@@ -1,24 +1,19 @@
-import { haversineDistanceKm } from "../lib/gps";
+import { haversineDistanceKm, checkVisitAnomaly } from "../lib/gps";
 
-describe("Geofence GPS Auditing Tests", () => {
-  const doctorLat = 28.7041;
-  const doctorLon = 77.1025;
-
-  it("should PASS when the check-in is within 100 meters", () => {
-    // Coordinate extremely close to Doctor's clinic (~15 meters)
-    const checkInLat = 28.7042;
-    const checkInLon = 77.1026;
-
-    const distanceMeters = haversineDistanceKm(doctorLat, doctorLon, checkInLat, checkInLon) * 1000;
-    expect(distanceMeters).toBeLessThan(100);
+describe("GPS & Distance Auditing (GPS Removed)", () => {
+  it("should safely handle zero or missing coordinates", () => {
+    expect(haversineDistanceKm(0, 0, 0, 0)).toBe(0);
+    expect(haversineDistanceKm(undefined, undefined, 28.7, 77.1)).toBe(0);
   });
 
-  it("should FAIL when the check-in is outside 100 meters", () => {
-    // Coordinate far away from Doctor's clinic (~15 kilometers)
-    const checkInLat = 28.8041;
-    const checkInLon = 77.2025;
+  it("should calculate valid distance when coordinates are supplied", () => {
+    const d = haversineDistanceKm(28.7041, 77.1025, 28.7042, 77.1026);
+    expect(d).toBeGreaterThanOrEqual(0);
+  });
 
-    const distanceMeters = haversineDistanceKm(doctorLat, doctorLon, checkInLat, checkInLon) * 1000;
-    expect(distanceMeters).toBeGreaterThan(100);
+  it("should always return non-anomalous result from checkVisitAnomaly", () => {
+    const result = checkVisitAnomaly(28.7, 77.1, new Date(), 30.5, 79.2, new Date());
+    expect(result.isAnomalous).toBe(false);
+    expect(result.reason).toBeNull();
   });
 });

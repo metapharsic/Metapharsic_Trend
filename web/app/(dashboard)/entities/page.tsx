@@ -814,7 +814,11 @@ function AddEntityModal({
   useEffect(() => {
     apiClient
       .get("/api/manager/territories")
-      .then((res) => setTerritories(res.data.data.territories))
+      .then((res) => {
+        const list = res.data.data.territories || [];
+        setTerritories(list);
+        if (list.length === 1) setTerritoryId(list[0].id);
+      })
       .catch((err) => console.error("Failed to load territories:", err));
   }, []);
 

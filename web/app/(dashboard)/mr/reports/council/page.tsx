@@ -43,6 +43,7 @@ import {
   CheckSquare,
   Square,
   Zap,
+  Lock,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 
@@ -238,9 +239,10 @@ export default function MultiAgentMrReportPage() {
   >("council");
   const [loading, setLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   // Timeframe & Scope Filters
-  const [selectedPeriod, setSelectedPeriod] = useState<"daily" | "weekly" | "monthly" | "custom" | "all">("all");
+  const [selectedPeriod, setSelectedPeriod] = useState<"daily" | "weekly" | "monthly" | "custom" | "all">("daily");
   const [customStartDate, setCustomStartDate] = useState<string>("");
   const [customEndDate, setCustomEndDate] = useState<string>("");
 
@@ -273,7 +275,7 @@ export default function MultiAgentMrReportPage() {
 
   // WhatsApp Modal State
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
-  const [whatsAppTarget, setWhatsAppTarget] = useState<"INDIVIDUAL_MR" | "EXECUTIVE_FLEET" | "CUSTOM_PHONE">("INDIVIDUAL_MR");
+  const [whatsAppTarget, setWhatsAppTarget] = useState<"ALL_MRS_INDIVIDUALLY" | "INDIVIDUAL_MR" | "EXECUTIVE_FLEET" | "CUSTOM_PHONE">("ALL_MRS_INDIVIDUALLY");
   const [customPhone, setCustomPhone] = useState("");
   const [whatsAppPreviewText, setWhatsAppPreviewText] = useState("");
   const [whatsAppUrl, setWhatsAppUrl] = useState("");
@@ -281,6 +283,54 @@ export default function MultiAgentMrReportPage() {
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
   const [dispatchStatus, setDispatchStatus] = useState<{ success?: boolean; message?: string } | null>(null);
+  const [batchDispatchResults, setBatchDispatchResults] = useState<{
+    success: boolean;
+    message: string;
+    dispatchedCount: number;
+    totalTargets: number;
+    agentStatuses: Array<{
+      agentCode: string;
+      agentName: string;
+      domainScope: string;
+      status: string;
+      score: number;
+      latencyMs: number;
+      findings?: string[];
+      warnings?: string[];
+    }>;
+    details: Array<{
+      mrId: string;
+      recipient: string;
+      phone: string | null;
+      territory: string;
+      doctorCalls: number;
+      chemistCalls: number;
+      salesTodayPtr: number;
+      collectionsToday: number;
+      dutyHours: number;
+      councilScore: number;
+      overallGrade: string;
+      sent: boolean;
+      reason?: string;
+      whatsappUrl?: string;
+    }>;
+  } | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("accessToken");
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          setCurrentUserRole(payload.role || null);
+        } catch (e) {
+          console.error("Token decode error:", e);
+        }
+      }
+    }
+  }, []);
+
+  const isAdmin = currentUserRole === "ADMIN" || currentUserRole === "MD";
 
   // Trigger Multi-Agent Progress Sequence
   const runAgentProgressAnimation = useCallback(() => {
@@ -320,9 +370,9 @@ export default function MultiAgentMrReportPage() {
         }
 
         const res = await apiClient.get("/api/mr/reports/multi-agent", { params });
-        const data = res.data?.data?.reports || (res.data?.data ? [res.data.data] : []);
+        const data = res.data?.data?.reports || (Array.isArray(res.data?.data) ? res.data.data : res.data?.data ? [res.data.data] : []);
         setReports(data);
-        if (data.length > 0 && !selectedMrId) {
+        if (data.length > 0 && (!selectedMrId || !data.some((r: any) => r.mrId === selectedMrId))) {
           setSelectedMrId(data[0].mrId);
         }
         setLastRefreshed(new Date().toLocaleTimeString());
@@ -349,7 +399,7 @@ export default function MultiAgentMrReportPage() {
       config = selectiveConfig,
       period = selectedPeriod
     ) => {
-      if (!currentReport && target !== "EXECUTIVE_FLEET") return;
+      if (!currentReport && target !== "EXECUTIVE_FLEET" && target !== "ALL_MRS_INDIVIDUALLY") return;
       setLoadingWhatsAppPreview(true);
       setDispatchStatus(null);
       try {
@@ -374,6 +424,9 @@ export default function MultiAgentMrReportPage() {
         }
 
         if (target === "INDIVIDUAL_MR" && currentReport) {
+          params.employeeId = currentReport.mrId;
+        } else if (target === "ALL_MRS_INDIVIDUALLY" && currentReport) {
+          // Preview first MR in fleet for illustration
           params.employeeId = currentReport.mrId;
         } else if (target === "CUSTOM_PHONE") {
           if (currentReport) params.employeeId = currentReport.mrId;
@@ -401,9 +454,15 @@ export default function MultiAgentMrReportPage() {
     }
   }, [isWhatsAppModalOpen, whatsAppTarget, customPhone, selectiveConfig, selectedPeriod, fetchWhatsAppPreview]);
 
-  const handleOpenWhatsAppModal = () => {
+  const handleOpenWhatsAppModal = (target: "ALL_MRS_INDIVIDUALLY" | "INDIVIDUAL_MR" = "ALL_MRS_INDIVIDUALLY") => {
+    setWhatsAppTarget(target);
+    if (target === "ALL_MRS_INDIVIDUALLY") {
+      setSelectedPeriod("daily");
+    }
+    setBatchDispatchResults(null);
+    setDispatchStatus(null);
     setIsWhatsAppModalOpen(true);
-    fetchWhatsAppPreview("INDIVIDUAL_MR", "", selectiveConfig, selectedPeriod);
+    fetchWhatsAppPreview(target, "", selectiveConfig, target === "ALL_MRS_INDIVIDUALLY" ? "daily" : selectedPeriod);
   };
 
   const handleCopyWhatsAppText = async () => {
@@ -418,8 +477,19 @@ export default function MultiAgentMrReportPage() {
   };
 
   const handleDispatchWhatsAppApi = async () => {
+    if (!isAdmin) {
+      setDispatchStatus({
+        success: false,
+        message: "Access Denied: Only Administrators have permission to send or broadcast reports.",
+      });
+      return;
+    }
+
     setSendingWhatsApp(true);
     setDispatchStatus(null);
+    setBatchDispatchResults(null);
+    runAgentProgressAnimation();
+
     try {
       const payload: any = {
         targetType: whatsAppTarget,
@@ -433,7 +503,7 @@ export default function MultiAgentMrReportPage() {
         payload.employeeId = currentReport.mrId;
       } else if (whatsAppTarget === "CUSTOM_PHONE") {
         if (!customPhone.trim()) {
-          setDispatchStatus({ success: false, message: "Please enter a valid phone number" });
+          setDispatchStatus({ success: false, message: "Please enter a valid WhatsApp phone number" });
           setSendingWhatsApp(false);
           return;
         }
@@ -442,17 +512,28 @@ export default function MultiAgentMrReportPage() {
       }
 
       const res = await apiClient.post("/api/mr/reports/multi-agent/whatsapp", payload);
-      if (res.data?.success || res.data?.data?.success) {
+      const data = res.data?.data || res.data;
+
+      if (res.data?.success || data?.success) {
         setDispatchStatus({
           success: true,
-          message: `Dispatched to ${res.data.data?.dispatchedCount || 1} recipient(s) successfully!`,
+          message: data.message || `Dispatched to ${data?.dispatchedCount || 1} MR(s) successfully!`,
         });
+
+        if (data.agentStatuses || data.details) {
+          setBatchDispatchResults({
+            success: true,
+            message: data.message,
+            dispatchedCount: data.dispatchedCount || 0,
+            totalTargets: data.totalTargets || 0,
+            agentStatuses: data.agentStatuses || [],
+            details: data.details || [],
+          });
+        }
       } else {
         setDispatchStatus({
           success: false,
-          message:
-            res.data?.message ||
-            "Message generated. If Meta Cloud API is not configured, please click 'Open in WhatsApp' below to dispatch directly.",
+          message: res.data?.message || "Failed to complete dispatch.",
         });
       }
     } catch (err: any) {
@@ -460,6 +541,7 @@ export default function MultiAgentMrReportPage() {
       setDispatchStatus({
         success: false,
         message:
+          err.response?.data?.error?.message ||
           err.response?.data?.message ||
           "Failed to dispatch via Cloud API. You can still use 'Open in WhatsApp' to send directly.",
       });
@@ -543,7 +625,7 @@ export default function MultiAgentMrReportPage() {
 
         <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold tracking-wider text-emerald-400 border border-emerald-500/30">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                 8 DOMAIN AGENTS ONLINE
@@ -552,25 +634,53 @@ export default function MultiAgentMrReportPage() {
                 <Sparkles className="h-3 w-3" />
                 Selective Council Matrix
               </span>
+              {isAdmin ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-bold text-amber-300 border border-amber-500/30">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Admin Dispatch Authorized
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-700/50 px-2.5 py-0.5 text-xs text-slate-300 border border-slate-600">
+                  <Lock className="h-3 w-3 text-slate-400" />
+                  MR View Only
+                </span>
+              )}
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-indigo-100 to-indigo-300 bg-clip-text text-transparent">
               Multi-Agent MR Granular Audit & Intelligence
             </h1>
             <p className="text-sm text-slate-300 max-w-2xl">
               Real-time multi-agent synthesis across Doctor Detailing, Chemist Calls, Secondary Sales, Collections,
-              Attendance Timing, Expenses ROI, Geofence Telemetry & P&L Margins with custom selective WhatsApp dispatching.
+              Attendance Timing, Expenses ROI, Geofence Telemetry & P&L Margins with Admin-exclusive individual dispatch.
             </p>
           </div>
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-3 self-stretch md:self-auto">
-            <button
-              onClick={handleOpenWhatsAppModal}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 text-sm font-semibold shadow-lg shadow-emerald-900/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
-            >
-              <MessageCircle className="h-4 w-4" />
-              <span>Send via WhatsApp</span>
-            </button>
+            {isAdmin ? (
+              <>
+                <button
+                  onClick={() => handleOpenWhatsAppModal("ALL_MRS_INDIVIDUALLY")}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white px-4 py-2.5 text-sm font-bold shadow-lg shadow-emerald-900/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <Send className="h-4 w-4" />
+                  <span>Send Daily Report to All MRs</span>
+                </button>
+
+                <button
+                  onClick={() => handleOpenWhatsAppModal("INDIVIDUAL_MR")}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2.5 text-sm font-semibold shadow-md transition-all hover:scale-[1.02]"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span>Send to MR</span>
+                </button>
+              </>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800/80 px-3.5 py-2 text-xs text-slate-300 border border-slate-700">
+                <Lock className="h-3.5 w-3.5 text-amber-400" />
+                <span>Admin Dispatch Only</span>
+              </div>
+            )}
 
             <button
               onClick={() => fetchReports(selectedPeriod, customStartDate, customEndDate)}
@@ -1456,8 +1566,8 @@ export default function MultiAgentMrReportPage() {
 
       {/* ── SELECTIVE WHATSAPP DISPATCH MODAL ───────────────────────── */}
       {isWhatsAppModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in">
-          <div className="relative w-full max-w-3xl rounded-3xl bg-white dark:bg-slate-900 p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] overflow-y-auto space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in">
+          <div className="relative w-full max-w-4xl rounded-3xl bg-white dark:bg-slate-900 p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[92vh] overflow-y-auto space-y-6">
             <button
               onClick={() => setIsWhatsAppModalOpen(false)}
               className="absolute right-6 top-6 rounded-full p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600"
@@ -1470,11 +1580,22 @@ export default function MultiAgentMrReportPage() {
                 <MessageCircle className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Selective WhatsApp Report Dispatch
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                    Multi-Agent WhatsApp Intelligence Dispatch
+                  </h3>
+                  {isAdmin ? (
+                    <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
+                      ADMIN DISPATCH
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-slate-700 px-2 py-0.5 text-[10px] font-bold text-slate-300">
+                      VIEW ONLY
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Customized real-time report generated by 8 AI Domain Agents.
+                  Granular audit syntheses evaluated by 8 AI domain agents and formatted for WhatsApp.
                 </p>
               </div>
             </div>
@@ -1482,41 +1603,74 @@ export default function MultiAgentMrReportPage() {
             {/* Recipient Target Selector */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                Select Recipient:
+                Select Dispatch Mode:
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
                 {[
                   {
+                    id: "ALL_MRS_INDIVIDUALLY",
+                    label: "⚡ All MRs Individually",
+                    sub: "Daily report to each MR phone",
+                    badge: "Recommended",
+                  },
+                  {
                     id: "INDIVIDUAL_MR",
-                    label: `Send to ${currentReport?.fullName || "MR"}`,
-                    sub: currentReport?.phone || "No MR phone",
+                    label: `👤 Current MR (${currentReport?.fullName?.split(" ")[0] || "MR"})`,
+                    sub: currentReport?.phone || "No phone registered",
                   },
                   {
                     id: "EXECUTIVE_FLEET",
-                    label: "Executive Fleet Digest",
-                    sub: "All MRs summary",
+                    label: "🏛️ Executive Digest",
+                    sub: "Fleet summary to leadership",
                   },
                   {
                     id: "CUSTOM_PHONE",
-                    label: "Custom WhatsApp No.",
-                    sub: "Any phone number",
+                    label: "📱 Custom Phone",
+                    sub: "Direct custom mobile no.",
                   },
                 ].map((target) => (
                   <button
                     key={target.id}
-                    onClick={() => setWhatsAppTarget(target.id as any)}
-                    className={`p-3 rounded-xl border text-left transition-all ${
+                    onClick={() => {
+                      setWhatsAppTarget(target.id as any);
+                      if (target.id === "ALL_MRS_INDIVIDUALLY") {
+                        setSelectedPeriod("daily");
+                      }
+                    }}
+                    className={`p-3 rounded-2xl border text-left transition-all relative ${
                       whatsAppTarget === target.id
-                        ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-900 dark:text-emerald-200 font-bold"
-                        : "bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                        ? "bg-emerald-500/10 border-emerald-500 text-emerald-900 dark:text-emerald-200 font-bold shadow-sm ring-1 ring-emerald-500/40"
+                        : "bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                     }`}
                   >
+                    {target.badge && (
+                      <span className="absolute -top-2 right-2 rounded-full bg-amber-500 text-slate-950 font-black text-[9px] px-1.5 py-0.2 shadow-sm">
+                        {target.badge}
+                      </span>
+                    )}
                     <span className="text-xs block">{target.label}</span>
-                    <span className="text-[11px] text-slate-400 font-normal">{target.sub}</span>
+                    <span className="text-[11px] text-slate-400 font-normal truncate block mt-0.5">
+                      {target.sub}
+                    </span>
                   </button>
                 ))}
               </div>
             </div>
+
+            {/* Target Explanation Banner */}
+            {whatsAppTarget === "ALL_MRS_INDIVIDUALLY" && (
+              <div className="rounded-2xl bg-gradient-to-r from-emerald-950/40 to-indigo-950/40 p-4 border border-emerald-800/40 text-xs text-emerald-200 space-y-1">
+                <div className="flex items-center gap-2 font-bold text-emerald-300">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Personalized Batch Dispatching Engine Active</span>
+                </div>
+                <p className="text-slate-300 text-[11px] leading-relaxed">
+                  Every active Medical Representative ({reports.length} MRs) will receive their own personalized Daily
+                  Audit Report directly on their registered WhatsApp number with today&apos;s Doctor calls, Chemist visits,
+                  POB bookings, Secondary sales, Collections, Attendance timing, and Expenses claims.
+                </p>
+              </div>
+            )}
 
             {/* Custom Phone Input */}
             {whatsAppTarget === "CUSTOM_PHONE" && (
@@ -1529,7 +1683,7 @@ export default function MultiAgentMrReportPage() {
                   placeholder="+919876543210"
                   value={customPhone}
                   onChange={(e) => setCustomPhone(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-sm text-slate-900 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
             )}
@@ -1539,7 +1693,9 @@ export default function MultiAgentMrReportPage() {
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                   <Eye className="h-3.5 w-3.5 text-emerald-500" />
-                  Live WhatsApp Message Preview:
+                  {whatsAppTarget === "ALL_MRS_INDIVIDUALLY"
+                    ? `Live WhatsApp Message Preview (Sample: ${currentReport?.fullName || "MR"}):`
+                    : "Live WhatsApp Message Preview:"}
                 </label>
                 <button
                   onClick={handleCopyWhatsAppText}
@@ -1550,7 +1706,7 @@ export default function MultiAgentMrReportPage() {
                 </button>
               </div>
 
-              <div className="rounded-2xl bg-emerald-950/20 dark:bg-slate-950 p-4 border border-emerald-800/30 dark:border-slate-800 font-mono text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap max-h-72 overflow-y-auto leading-relaxed shadow-inner">
+              <div className="rounded-2xl bg-slate-950 p-4 border border-slate-800 font-mono text-xs text-slate-200 whitespace-pre-wrap max-h-64 overflow-y-auto leading-relaxed shadow-inner">
                 {loadingWhatsAppPreview ? (
                   <div className="flex items-center justify-center p-8 text-slate-400 gap-2">
                     <RefreshCw className="h-4 w-4 animate-spin" />
@@ -1562,7 +1718,7 @@ export default function MultiAgentMrReportPage() {
               </div>
             </div>
 
-            {/* Dispatch Status Alert */}
+            {/* Live Dispatch Status Alert */}
             {dispatchStatus && (
               <div
                 className={`p-4 rounded-xl text-xs font-medium ${
@@ -1575,26 +1731,153 @@ export default function MultiAgentMrReportPage() {
               </div>
             )}
 
+            {/* ── BATCH DISPATCH RESULTS & LIVE AGENT MATRIX ─────────── */}
+            {batchDispatchResults && (
+              <div className="space-y-4 pt-2 border-t border-slate-200 dark:border-slate-800">
+                {/* 8 Agent Verification Status Chips */}
+                <div>
+                  <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                    <Cpu className="h-4 w-4 text-indigo-400" />
+                    Council 8-Domain Agent Verification Matrix:
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {batchDispatchResults.agentStatuses.map((ag) => (
+                      <div
+                        key={ag.agentCode}
+                        className="rounded-xl bg-slate-50 dark:bg-slate-800/60 p-2.5 border border-slate-200 dark:border-slate-700 flex flex-col justify-between"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-bold text-slate-400 truncate">{ag.domainScope}</span>
+                          <span
+                            className={`rounded px-1.5 py-0.2 text-[9px] font-black ${
+                              ag.status === "ONLINE_PASS"
+                                ? "bg-emerald-500/20 text-emerald-400"
+                                : "bg-amber-500/20 text-amber-400"
+                            }`}
+                          >
+                            {ag.score}%
+                          </span>
+                        </div>
+                        <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                          {ag.agentName}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Fleet MR Dispatch Roster Table */}
+                <div>
+                  <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2.5 flex items-center justify-between">
+                    <span>Fleet Individual MR Dispatch Roster ({batchDispatchResults.details.length} MRs):</span>
+                    <span className="text-emerald-400 text-xs font-normal">
+                      {batchDispatchResults.dispatchedCount} Dispatched Successfully
+                    </span>
+                  </h4>
+                  <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-500 font-semibold border-b border-slate-200 dark:border-slate-700">
+                          <tr>
+                            <th className="p-3">MR Name & Territory</th>
+                            <th className="p-3">Phone</th>
+                            <th className="p-3 text-center">Dr Calls</th>
+                            <th className="p-3 text-center">Chemist</th>
+                            <th className="p-3 text-right">Sales (PTR)</th>
+                            <th className="p-3 text-center">Grade</th>
+                            <th className="p-3 text-center">Status</th>
+                            <th className="p-3 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {batchDispatchResults.details.map((d) => (
+                            <tr key={d.mrId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                              <td className="p-3">
+                                <span className="font-bold text-slate-900 dark:text-white block">{d.recipient}</span>
+                                <span className="text-[10px] text-slate-400">{d.territory}</span>
+                              </td>
+                              <td className="p-3 text-slate-600 dark:text-slate-300 font-mono text-[11px]">
+                                {d.phone || "No Phone"}
+                              </td>
+                              <td className="p-3 text-center font-semibold text-slate-900 dark:text-white">
+                                {d.doctorCalls}
+                              </td>
+                              <td className="p-3 text-center font-semibold text-slate-900 dark:text-white">
+                                {d.chemistCalls}
+                              </td>
+                              <td className="p-3 text-right font-black text-emerald-600 dark:text-emerald-400">
+                                ₹{d.salesTodayPtr.toLocaleString("en-IN")}
+                              </td>
+                              <td className="p-3 text-center">
+                                <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 font-bold text-indigo-300 text-[10px]">
+                                  {d.overallGrade} ({d.councilScore})
+                                </span>
+                              </td>
+                              <td className="p-3 text-center">
+                                {d.sent ? (
+                                  <span className="inline-flex items-center gap-1 text-emerald-400 font-bold text-[11px]">
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> SENT
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-amber-400 font-semibold text-[11px]">
+                                    <AlertTriangle className="h-3.5 w-3.5" /> FAILED
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3 text-right">
+                                {d.whatsappUrl && (
+                                  <a
+                                    href={d.whatsappUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 text-[11px] font-bold transition-all shadow-sm"
+                                  >
+                                    <MessageCircle className="h-3 w-3" />
+                                    <span>Chat</span>
+                                  </a>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Modal Actions */}
             <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
               <a
                 href={whatsAppUrl || `https://wa.me/?text=${encodeURIComponent(whatsAppPreviewText)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 text-sm font-bold shadow-lg shadow-emerald-900/30 transition-all hover:scale-[1.02]"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 px-5 py-3 text-sm font-semibold transition-all border border-slate-700"
               >
                 <ExternalLink className="h-4 w-4" />
-                <span>Open in WhatsApp (wa.me)</span>
+                <span>Open in WhatsApp Web</span>
               </a>
 
-              <button
-                onClick={handleDispatchWhatsAppApi}
-                disabled={sendingWhatsApp}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-3 text-sm font-bold transition-all disabled:opacity-50"
-              >
-                {sendingWhatsApp ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                <span>Send via Cloud API</span>
-              </button>
+              {isAdmin ? (
+                <button
+                  onClick={handleDispatchWhatsAppApi}
+                  disabled={sendingWhatsApp}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-6 py-3 text-sm font-bold shadow-lg shadow-emerald-900/40 transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  {sendingWhatsApp ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  <span>
+                    {whatsAppTarget === "ALL_MRS_INDIVIDUALLY"
+                      ? "⚡ Dispatch to All MRs Individually"
+                      : "Send via Cloud API"}
+                  </span>
+                </button>
+              ) : (
+                <div className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-3 text-xs text-amber-300 border border-slate-700">
+                  <Lock className="h-4 w-4" />
+                  <span>Admin Permission Required to Dispatch</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -9,8 +9,8 @@ import { startOfUtcDay } from "@/lib/date";
 
 
 const CheckInBodySchema = z.object({
-  latitude: z.coerce.number().min(-90).max(90),
-  longitude: z.coerce.number().min(-180).max(180),
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
   faceToken: z.string().optional(),
 });
 
@@ -54,8 +54,8 @@ async function handler(req: AuthedRequest) {
         date: today,
         status: AttendanceStatus.PRESENT,
         checkIn: new Date(),
-        latitude,
-        longitude,
+        latitude: latitude ?? 0,
+        longitude: longitude ?? 0,
         faceToken: faceToken || crypto.randomBytes(16).toString("hex"),
       },
     });

@@ -135,6 +135,6 @@ async function assignTerritory(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getTerritories, [Role.ASM, Role.ADMIN, Role.MD]);
+export const GET = withAuth(getTerritories, [Role.MR, Role.ASM, Role.ADMIN, Role.MD, Role.RM, Role.ZSM, Role.NSM]);
 export const POST = withAuth(createTerritory, [Role.ASM, Role.ADMIN, Role.MD]);
 export const PUT = withAuth(assignTerritory, [Role.ASM, Role.ADMIN, Role.MD]);

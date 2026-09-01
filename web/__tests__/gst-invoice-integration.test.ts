@@ -2,6 +2,7 @@ import { Role } from "@prisma/client";
 import { testDb, resetFixture, tokenFor, jsonRequest, readJson, noParams, TestFixture } from "./helpers/api";
 import { POST as createOrder } from "../app/api/orders/secondary/route";
 import { PUT as updateOrder, DELETE as deleteOrder, GET as getOrder } from "../app/api/orders/[id]/route";
+import { DELETE as deleteInvoice } from "../app/api/invoices/[id]/route";
 import { PUT as updateProduct } from "../app/api/products/[id]/route";
 
 /**
@@ -132,4 +133,75 @@ describe("Order booking -> invoice GST integration", () => {
     const body = await readJson(res);
     expect(body.data.order.items[0].batchNo).toBe("T-OVERRIDE");
   });
+
+  it("deletes an invoice and clears its automatic ledger entries cleanly", async () => {
+    const body = await bookOrder(5, 10);
+    const invoice = await testDb.invoice.findUnique({ where: { orderId: body.data.order.id } });
+    expect(invoice).toBeTruthy();
+
+    // Verify auto-posted ledger entries exist
+    const initialLedger = await testDb.ledgerTransaction.findMany({
+      where: { sourceType: "INVOICE", sourceId: invoice!.id },
+    });
+    expect(initialLedger.length).toBeGreaterThan(0);
+
+    // Delete invoice via DELETE /api/invoices/[id]
+    const deleteRes = await deleteInvoice(
+      jsonRequest(`/api/invoices/${invoice!.id}`, {
+        method: "DELETE",
+        token: tokenFor(fx.mrUserId, Role.ADMIN),
+      }),
+      { params: { id: invoice!.id } }
+    );
+    expect(deleteRes.status).toBe(200);
+
+    // Verify invoice is gone from database
+    const deletedInvoice = await testDb.invoice.findUnique({ where: { id: invoice!.id } });
+    expect(deletedInvoice).toBeNull();
+
+    // Verify ledger transactions were reversed / purged
+    const remainingLedger = await testDb.ledgerTransaction.findMany({
+      where: { sourceType: "INVOICE", sourceId: invoice!.id },
+    });
+    expect(remainingLedger.length).toBe(0);
+  });
+
+  it("grants Admin/MD full privileges to edit, modify line items, append items, change status, and delete even on DELIVERED orders", async () => {
+    const body = await bookOrder(5, 5);
+    const orderId = body.data.order.id;
+    await testDb.order.update({ where: { id: orderId }, data: { status: "DELIVERED" } });
+
+    // Admin edits DELIVERED order: modifies quantity and changes status back to CONFIRMED
+    const adminEditRes = await updateOrder(
+      jsonRequest(`/api/orders/${orderId}`, {
+        method: "PUT",
+        token: tokenFor(fx.adminUserId, Role.ADMIN),
+        body: {
+          status: "CONFIRMED",
+          items: [{ productId: fx.productId, quantity: 15 }],
+        },
+      }),
+      { params: { id: orderId } }
+    );
+    expect(adminEditRes.status).toBe(200);
+
+    const updatedOrder = await testDb.order.findUnique({ where: { id: orderId }, include: { items: true } });
+    expect(updatedOrder!.status).toBe("CONFIRMED");
+    expect(updatedOrder!.items[0].quantity).toBe(15);
+
+    // Admin deletes the order
+    const adminDeleteRes = await deleteOrder(
+      jsonRequest(`/api/orders/${orderId}`, {
+        method: "DELETE",
+        token: tokenFor(fx.adminUserId, Role.ADMIN),
+      }),
+      { params: { id: orderId } }
+    );
+    expect(adminDeleteRes.status).toBe(200);
+
+    const deletedOrder = await testDb.order.findUnique({ where: { id: orderId } });
+    expect(deletedOrder).toBeNull();
+  });
 });
+
+

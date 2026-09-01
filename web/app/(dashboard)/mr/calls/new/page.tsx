@@ -194,9 +194,6 @@ function NewCallForm() {
     if (!newAddress.trim()) return setAddEntityError("Address is required.");
     if (!newTerritoryId) return setAddEntityError("Select a territory.");
     if (entityType === "DOCTOR" && !newSpecialty.trim()) return setAddEntityError("Specialty is required.");
-    if (gps.status !== "ready" || gps.lat === undefined || gps.lon === undefined) {
-      return setAddEntityError("GPS location not captured yet — this pins the entity's location. Wait for capture or hit Recapture.");
-    }
 
     setAddingEntity(true);
     try {
@@ -204,8 +201,8 @@ function NewCallForm() {
         name: newName.trim(),
         type: entityType,
         address: newAddress.trim(),
-        latitude: gps.lat,
-        longitude: gps.lon,
+        latitude: 0,
+        longitude: 0,
         territoryId: newTerritoryId,
         ...(entityType === "DOCTOR" ? { primarySpecialty: newSpecialty.trim() } : {}),
         ...(entityType === "CHEMIST" ? { contactPerson: newContactPerson.trim() || undefined } : {}),
@@ -264,9 +261,6 @@ function NewCallForm() {
 
     if (!selected) return setError("Select a doctor or chemist to log this call against.");
     if (!purpose.trim()) return setError("Purpose is required.");
-    if (gps.status !== "ready" || gps.lat === undefined || gps.lon === undefined) {
-      return setError("GPS location not captured. Allow location access and try again.");
-    }
     if (requirePhoto && !photo) return setError("A visit verification photo is required.");
 
     const formData = new FormData();
@@ -274,12 +268,12 @@ function NewCallForm() {
     else formData.append("chemistId", selected.id);
     formData.append("purpose", purpose);
     if (feedback) formData.append("feedback", feedback);
-    formData.append("latitude", String(gps.lat));
-    formData.append("longitude", String(gps.lon));
+    formData.append("latitude", "0");
+    formData.append("longitude", "0");
     if (callStart) {
       formData.append("startedAt", callStart.startedAt);
-      if (!Number.isNaN(callStart.lat)) formData.append("startLatitude", String(callStart.lat));
-      if (!Number.isNaN(callStart.lon)) formData.append("startLongitude", String(callStart.lon));
+      formData.append("startLatitude", "0");
+      formData.append("startLongitude", "0");
     }
     if (durationMinutes) formData.append("durationMinutes", durationMinutes);
     if (boxesPlaced) formData.append("boxesPlaced", boxesPlaced);
@@ -492,44 +486,15 @@ function NewCallForm() {
           )}
         </div>
 
-        {/* ── GPS ── */}
-        <div>
-          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">GPS Location *</label>
-          <div className="flex flex-wrap items-center gap-2">
-            <div
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold border ${
-                gps.status === "ready" && !gpsAccuracyPoor
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : gps.status === "error"
-                    ? "bg-red-50 text-red-700 border-red-200"
-                    : gpsAccuracyPoor
-                      ? "bg-amber-50 text-amber-700 border-amber-200"
-                      : "bg-slate-50 text-slate-500 border-slate-200"
-              }`}
-            >
-              <MapPin size={14} />
-              {gps.status === "ready" &&
-                `Captured (${gps.lat!.toFixed(5)}, ${gps.lon!.toFixed(5)})${gps.accuracy !== undefined ? ` · ±${Math.round(gps.accuracy)}m` : ""}`}
-              {gps.status === "locating" && "Locating..."}
-              {gps.status === "idle" && "Not captured"}
-              {gps.status === "error" && (gps.error ?? "GPS error")}
-            </div>
-            <button onClick={captureGps} className="text-xs font-semibold text-emerald-600 hover:underline px-2 py-2 -mx-2">
-              Recapture
-            </button>
+        {/* ── Call Time ── */}
+        {callStart && (
+          <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 flex items-center justify-between text-xs text-emerald-800">
+            <span className="font-semibold flex items-center gap-1.5">
+              Call Session Active
+            </span>
+            <span>Started at {new Date(callStart.startedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
           </div>
-          {gpsAccuracyPoor && (
-            <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-              <AlertTriangle size={12} /> GPS accuracy is low (±{Math.round(gps.accuracy!)}m). Move to open sky and recapture for a reliable fix.
-            </p>
-          )}
-          <p className="text-xs text-slate-400 mt-1">You must be within {geofenceRadiusMeters}m of the consulted entity.</p>
-          {callStart && (
-            <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
-              <MapPin size={12} /> Call started {new Date(callStart.startedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-            </p>
-          )}
-        </div>
+        )}
 
         {/* ── Purpose / Notes ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

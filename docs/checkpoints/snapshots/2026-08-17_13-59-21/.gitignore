@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Next.js build output
+.next/
+**/.next/
+out/
+
+# Env files — secrets, DB creds, JWT keys. Never commit.
+.env
+.env.*
+!.env.example
+
+# Real data — DB dumps, backups. Never commit customer data.
+Backup_f_B/
+**/*.dump
+**/*.sql
+
+# Logs
+logs/
+**/*.log
+
+# Expo / mobile build junk
+mobile/.expo/
+mobile/node_modules/
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+
+# Uploaded runtime files (logos etc — regenerate per-deployment)
+web/public/uploads/
