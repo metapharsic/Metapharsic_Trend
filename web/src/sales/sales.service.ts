@@ -67,12 +67,15 @@ export class SalesService {
             where: { chemistId: data.chemistId },
             _sum: { amount: true },
           }),
-          db.order.aggregate({
+          db.order.findMany({
             where: { chemistId: data.chemistId },
-            _sum: { amount: true },
+            select: { items: { select: { price: true, quantity: true } } },
           }),
         ]);
-        const totalOrdered = Number(orders._sum.amount || 0);
+        const totalOrdered = orders.reduce(
+          (sum, o) => sum + o.items.reduce((iSum, i) => iSum + Number(i.price || 0) * (i.quantity || 0), 0),
+          0
+        );
         const totalCollected = Number(collections._sum.amount || 0);
         const outstanding = outstandingBalance(totalOrdered, totalCollected);
         const orderVal = data.items.reduce((acc, i) => acc + (i.price || 0) * i.quantity, 0);
@@ -105,7 +108,7 @@ export class SalesService {
 
       let discountPct = item.discountPct ?? 0;
       if (data.applyBestScheme && discountPct === 0) {
-        const matchingScheme = bestSchemeFor(schemes, product.id, item.quantity);
+        const matchingScheme = bestSchemeFor(schemes, item.quantity);
         if (matchingScheme) {
           discountPct = matchingScheme.discountPct;
         }
@@ -259,7 +262,7 @@ export class SalesService {
           transport: data.transport ?? "Local Courier",
           vehicleNo: data.vehicleNo ?? null,
           totalItems: order.items.length,
-          totalQty: totals.totalQuantity,
+          totalQty: totals.totalQty,
           totalDiscount: totals.totalDiscount,
           totalGst: totals.totalGst,
           roundOff: totals.roundOff,
