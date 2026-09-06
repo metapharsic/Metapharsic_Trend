@@ -148,10 +148,10 @@ async function main() {
 
     // 5. Verify Reports & Multi-Agent Model Module
     console.log("\n🤖 5. Testing Reports Module & Multi-Agent Model (src/reports)...");
-    const biCatalog = await ReportsService.runBiReport({ timeframe: "this_month" }, null);
+    const biCatalog = await ReportsService.runBiReport({ limit: 50, page: 1, timeframe: "this_month" }, null);
     console.log(`   ✔️ BI Report Catalog: ${biCatalog.reports?.length} reports available.`);
 
-    const salesBi = await ReportsService.runBiReport({ report: "product-wise-sales", timeframe: "this_month" }, null);
+    const salesBi = await ReportsService.runBiReport({ limit: 50, page: 1, report: "product-wise-sales", timeframe: "this_month" }, null);
     console.log(`   ✔️ Product-wise Profitability Report: ${salesBi.rows?.length} SKUs evaluated.`);
 
     if (mrEmployee) {
