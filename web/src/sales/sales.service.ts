@@ -57,9 +57,29 @@ export class SalesService {
   static async createOrder(data: CreateSalesOrderInput, employeeId?: string | null) {
     // 1. Credit Check if booked for a Chemist
     if (data.chemistId) {
-      const creditStatus = await canPlaceOrder(data.chemistId);
-      if (!creditStatus.allowed) {
-        throw new Error(`Credit limit exceeded: ${creditStatus.reason}`);
+      const chemist = await db.chemist.findUnique({
+        where: { id: data.chemistId },
+        select: { creditLimit: true },
+      });
+      if (chemist && chemist.creditLimit) {
+        const [collections, orders] = await Promise.all([
+          db.collection.aggregate({
+            where: { chemistId: data.chemistId },
+            _sum: { amount: true },
+          }),
+          db.order.aggregate({
+            where: { chemistId: data.chemistId },
+            _sum: { totalAmount: true },
+          }),
+        ]);
+        const totalOrdered = Number(orders._sum.totalAmount || 0);
+        const totalCollected = Number(collections._sum.amount || 0);
+        const outstanding = outstandingBalance(totalOrdered, totalCollected);
+        const orderVal = data.items.reduce((acc, i) => acc + (i.price || 0) * i.quantity, 0);
+        const creditGuard = canPlaceOrder({ creditLimit: Number(chemist.creditLimit), outstanding }, orderVal);
+        if (!creditGuard.allowed) {
+          throw new Error(`Credit limit exceeded: ${creditGuard.reason}`);
+        }
       }
     }
 
