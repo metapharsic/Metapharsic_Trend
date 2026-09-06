@@ -448,7 +448,7 @@ export class ReportsService {
    * Get Live Multi-Agent Council Status Board
    */
   static async getCouncilStatusBoard() {
-    const reports = await this.generateAllMrMultiAgentReports({ period: "daily" });
+    const reports = await this.generateAllMrMultiAgentReports({ period: "daily", includeDoctorVisits: true });
     const allAgentResults = reports.flatMap((r) => r.councilEvaluation.agentStatuses);
 
     const statusCounts: Record<AgentStatusType, number> = {
