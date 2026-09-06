@@ -122,7 +122,16 @@ async function getInvoices(req: AuthedRequest) {
     const to = searchParams.get("to") || undefined;
 
     const isManager =
-      req.user.role === Role.ASM || req.user.role === Role.ADMIN || req.user.role === Role.MD;
+      req.user.role === Role.ASM ||
+      req.user.role === Role.ADMIN ||
+      req.user.role === Role.MD ||
+      req.user.role === Role.NSM ||
+      req.user.role === Role.ZSM ||
+      req.user.role === Role.RM ||
+      req.user.role === Role.FINANCE ||
+      req.user.role === Role.WAREHOUSE ||
+      req.user.role === Role.MARKETING ||
+      req.user.role === Role.HR;
 
     const filters: Prisma.InvoiceWhereInput[] = [];
 
@@ -272,4 +281,4 @@ async function getInvoices(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getInvoices, [Role.MR, Role.ASM, Role.ADMIN, Role.MD]);
+export const GET = withAuth(getInvoices);

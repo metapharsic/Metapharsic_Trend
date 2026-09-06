@@ -208,12 +208,7 @@ export const generateInvoiceRoute = withAuth(generateInvoiceHandler, [
   Role.ASM,
   Role.WAREHOUSE,
 ]);
-export const getInvoicesRoute = withAuth(getInvoicesHandler, [
-  Role.MR,
-  Role.ASM,
-  Role.ADMIN,
-  Role.MD,
-]);
+export const getInvoicesRoute = withAuth(getInvoicesHandler);
 export const recordCollectionRoute = withAuth(recordCollectionHandler, [
   Role.MR,
   Role.ASM,

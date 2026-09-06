@@ -57,4 +57,4 @@ async function simulateScheme(req: AuthedRequest) {
   }
 }
 
-export const POST = withAuth(simulateScheme, [Role.ASM, Role.ADMIN]);
+export const POST = withAuth(simulateScheme);

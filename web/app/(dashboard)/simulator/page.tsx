@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   Calculator,
   Percent,
@@ -8,6 +9,7 @@ import {
   ArrowRight,
   AlertTriangle,
   Package,
+  FileText,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 
@@ -94,13 +96,23 @@ export default function SimulatorDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-fuchsia-100 flex justify-between items-center bg-gradient-to-r from-fuchsia-50 to-white">
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-fuchsia-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-fuchsia-50 via-white to-indigo-50/30">
         <div>
           <h1 className="text-2xl font-display font-bold text-slate-900">Scheme Simulator</h1>
-          <p className="text-sm text-slate-500 mt-1">Live what-if analysis using real product pricing</p>
+          <p className="text-sm text-slate-500 mt-1">Live what-if analysis using real product pricing &amp; invoice commercial economics</p>
         </div>
-        <div className="p-3 bg-fuchsia-100 rounded-xl text-fuchsia-600">
-          <Calculator size={24} />
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/ptr-calculator"
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-sm"
+          >
+            <FileText size={15} />
+            <span>Open PTR &amp; Invoice Commercial Ledger</span>
+            <ArrowRight size={14} />
+          </Link>
+          <div className="p-3 bg-fuchsia-100 rounded-xl text-fuchsia-600">
+            <Calculator size={24} />
+          </div>
         </div>
       </div>
 

@@ -937,19 +937,38 @@ export function AdminPtrCalculator() {
       {activeView === "simulator" && simulationData && (
         <div className="space-y-6">
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <Sliders size={16} className="text-indigo-600" />
                 <h3 className="text-sm font-bold text-slate-800">
                   Strategic Trade Scheme What-If Simulator
                 </h3>
               </div>
-              <button
-                onClick={handleResetSimulator}
-                className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-semibold"
-              >
-                <RotateCcw size={12} /> Reset Assumptions
-              </button>
+              <div className="flex items-center gap-3 flex-wrap">
+                {liveData?.invoices && liveData.invoices.length > 0 && (
+                  <select
+                    onChange={(e) => {
+                      const inv = liveData.invoices.find((i) => i.id === e.target.value);
+                      if (inv) setSelectedInvoice(inv);
+                    }}
+                    defaultValue=""
+                    className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="" disabled>Inspect Live Database Invoice ({liveData.invoices.length} available)...</option>
+                    {liveData.invoices.map((inv) => (
+                      <option key={inv.id} value={inv.id}>
+                        {inv.invoiceNo} — {inv.chemistName} (₹{currency(inv.totalRevenue)})
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  onClick={handleResetSimulator}
+                  className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-semibold"
+                >
+                  <RotateCcw size={12} /> Reset Assumptions
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1091,12 +1110,24 @@ export function AdminPtrCalculator() {
                   <span>{selectedInvoice.territoryName}</span>
                 </div>
               </div>
-              <button
-                onClick={() => setSelectedInvoice(null)}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setSelectedInvoice(null);
+                    setActiveView("simulator");
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-bold transition border border-indigo-200"
+                >
+                  <Sliders size={13} />
+                  <span>Simulate Scheme</span>
+                </button>
+                <button
+                  onClick={() => setSelectedInvoice(null)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 space-y-6">
