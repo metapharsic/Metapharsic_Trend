@@ -19,8 +19,8 @@ export const BiReportQuerySchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   territoryId: z.string().optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(50),
 });
 
 export const MultiAgentReportQuerySchema = z.object({
