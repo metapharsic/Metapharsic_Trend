@@ -106,6 +106,7 @@ async function main() {
         {
           chemistId: chemist.id,
           distributorId: distributor.id,
+          applyBestScheme: true,
           items: [
             {
               productId: product.id,
