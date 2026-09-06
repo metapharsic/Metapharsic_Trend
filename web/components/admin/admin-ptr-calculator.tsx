@@ -73,21 +73,23 @@ export function AdminPtrCalculator() {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch("/api/admin/ptr-calculator", {
+      let res = await fetch("/api/admin/ptr-calculator", {
         method: "POST",
         headers,
         body: JSON.stringify(simInputs),
       });
 
+      if (!res.ok) {
+        res = await fetch("/api/admin/ptr-calculator", { method: "GET", headers });
+      }
+
       if (res.ok) {
         const json = await res.json();
         const data: MultiAgentOrchestrationResponse = json.data;
         if (data?.liveData) {
-          startTransition(() => {
-            setLiveData(data.liveData);
-            setSimulationData(data.simulation);
-            setAgents(data.agents);
-          });
+          setLiveData(data.liveData);
+          setSimulationData(data.simulation);
+          setAgents(data.agents || []);
           return;
         }
       }
@@ -96,26 +98,24 @@ export function AdminPtrCalculator() {
       const axiosRes = await apiClient.post("/api/admin/ptr-calculator", simInputs);
       if (axiosRes.data?.data) {
         const data: MultiAgentOrchestrationResponse = axiosRes.data.data;
-        startTransition(() => {
-          setLiveData(data.liveData);
-          setSimulationData(data.simulation);
-          setAgents(data.agents);
-        });
+        setLiveData(data.liveData);
+        setSimulationData(data.simulation);
+        setAgents(data.agents || []);
       }
     } catch (err) {
       console.error("Failed to fetch commercial data:", err);
       try {
-        const axiosRes = await apiClient.post("/api/admin/ptr-calculator", simInputs);
-        if (axiosRes.data?.data) {
-          const data: MultiAgentOrchestrationResponse = axiosRes.data.data;
-          startTransition(() => {
-            setLiveData(data.liveData);
-            setSimulationData(data.simulation);
-            setAgents(data.agents);
-          });
+        const getRes = await fetch("/api/admin/ptr-calculator");
+        if (getRes.ok) {
+          const json = await getRes.json();
+          if (json.data?.liveData) {
+            setLiveData(json.data.liveData);
+            setSimulationData(json.data.simulation);
+            setAgents(json.data.agents || []);
+          }
         }
       } catch (e) {
-        console.error("Fallback to apiClient also failed:", e);
+        console.error("Fallback GET fetch failed:", e);
       }
     } finally {
       setLoading(false);

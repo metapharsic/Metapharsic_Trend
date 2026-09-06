@@ -15,7 +15,10 @@ export function withAuth(handler: RouteHandler, roles?: Role | Role[]) {
     req: NextRequest,
     context: { params: Record<string, string | string[] | undefined> }
   ): Promise<NextResponse> => {
-    const token = extractBearerToken(req.headers.get("authorization"));
+    const token =
+      extractBearerToken(req.headers.get("authorization")) ||
+      req.cookies.get("accessToken")?.value ||
+      req.cookies.get("token")?.value;
     if (!token) return unauthorized();
 
     let payload: JWTPayload;
