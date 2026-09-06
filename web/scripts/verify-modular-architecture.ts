@@ -156,7 +156,7 @@ async function main() {
 
     if (mrEmployee) {
       console.log(`\n🧠 Running Multi-Agent Council Evaluation for MR: ${mrEmployee.firstName} ${mrEmployee.lastName}...`);
-      const councilReport = await ReportsService.generateMrMultiAgentReport(mrEmployee.id, { period: "all" });
+      const councilReport = await ReportsService.generateMrMultiAgentReport(mrEmployee.id, { period: "all", includeDoctorVisits: true });
       if (councilReport) {
         const { councilEvaluation } = councilReport;
         console.log(`   🎖️ Council Overall Grade: ${councilEvaluation.overallGrade} | Score: ${councilEvaluation.councilScore}/100`);
