@@ -69,10 +69,10 @@ export class SalesService {
           }),
           db.order.aggregate({
             where: { chemistId: data.chemistId },
-            _sum: { totalAmount: true },
+            _sum: { amount: true },
           }),
         ]);
-        const totalOrdered = Number(orders._sum.totalAmount || 0);
+        const totalOrdered = Number(orders._sum.amount || 0);
         const totalCollected = Number(collections._sum.amount || 0);
         const outstanding = outstandingBalance(totalOrdered, totalCollected);
         const orderVal = data.items.reduce((acc, i) => acc + (i.price || 0) * i.quantity, 0);
