@@ -1,3 +1,4 @@
+import { CacheService } from '@/services/cache.service';
 import { db } from "@/lib/db";
 import { Role } from "@prisma/client";
 import { randomUUID } from "crypto";
@@ -367,6 +368,9 @@ async function createVisit(req: AuthedRequest) {
       return createdVisit;
     });
 
+    CacheService.invalidate('admin_kpis');
+
+    
     return ok({ visitId: visit.id, success: true });
   } catch (err) {
     if (err instanceof Error && (err.message.startsWith("Insufficient sample stock") || err.message.startsWith("Insufficient gift stock"))) {

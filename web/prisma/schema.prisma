@@ -366,6 +366,7 @@ model Product {
   mrp                   Decimal?              @db.Decimal(10, 2)
   ptr                   Decimal?              @db.Decimal(10, 2)
   pts                   Decimal?              @db.Decimal(10, 2)
+  purchaseRate          Decimal?              @db.Decimal(10, 2)
   marginStructure       String?
   therapySegment        String?
   /// GST Harmonized System of Nomenclature code, printed on invoices.
@@ -433,6 +434,10 @@ model Order {
   invoice       Invoice?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+
+  @@index([createdAt])
+  @@index([employeeId, createdAt])
+  @@index([status, createdAt])
 }
 
 model OrderItem {
@@ -457,6 +462,9 @@ model OrderItem {
   gstPct       Decimal   @default(0) @db.Decimal(5, 2)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([productId])
 }
 
 model TourPlan {
@@ -485,6 +493,9 @@ model TourPlanDay {
   plannedDoctor    Doctor?   @relation(fields: [plannedDoctorId], references: [id])
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+
+  @@index([date])
+  @@index([tourPlanId, date])
 }
 
 model LocationLog {
@@ -495,6 +506,9 @@ model LocationLog {
   longitude  Float
   isMocked   Boolean  @default(false)
   recordedAt DateTime @default(now())
+
+  @@index([recordedAt])
+  @@index([employeeId, recordedAt])
 }
 
 model Visit {
@@ -531,6 +545,11 @@ model Visit {
   lead                Lead?
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
+
+  @@index([createdAt])
+  @@index([employeeId, createdAt])
+  @@index([doctorId])
+  @@index([chemistId])
 }
 
 enum LeadStatus {
@@ -761,6 +780,9 @@ model Attendance {
   faceToken  String?
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
+
+  @@index([date, status])
+  @@index([employeeId, date])
 }
 
 model Target {
@@ -847,6 +869,10 @@ model Invoice {
   grandTotal   Decimal? @db.Decimal(10, 2)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([paid, createdAt])
+  @@index([orderId])
 }
 
 /// Singleton — the seller/bank block printed on every invoice. Exactly one row.

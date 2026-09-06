@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { Role, OrderStatus, ExpenseStatus } from "@prisma/client";
 import { startOfUtcMonth } from "./date";
+import { profitFor } from "./pricing";
 
 export type AgentStatusType = "ONLINE_PASS" | "ONLINE_WARNING" | "ONLINE_ALERT" | "IDLE" | "ERROR";
 
@@ -389,13 +390,19 @@ export class MultiAgentCouncilService {
 
     for (const ord of orders) {
       for (const item of ord.items || []) {
-        const ptrVal = Number(item.product?.ptr || item.price || 0);
-        const ptsVal = Number(item.product?.pts || 0);
+        // Revenue and cost via lib/pricing -- the council used to read
+        // ptr || price for revenue and pts || 0 for cost, so it reported a
+        // different margin than the invoice screen for the same order.
         const qty = item.quantity || 0;
+        const line = profitFor([
+          { quantity: qty, price: item.price, freeQty: item.freeQty, product: item.product },
+        ]);
+        const ptrVal = line.revenue;
+        const ptsVal = line.cost;
 
         totalUnits += qty;
-        totalRevenuePtr += ptrVal * qty;
-        totalRevenuePts += ptsVal * qty;
+        totalRevenuePtr += ptrVal;
+        totalRevenuePts += ptsVal;
 
         const prodId = item.productId;
         const existing = skuMap.get(prodId) || {
@@ -406,8 +413,8 @@ export class MultiAgentCouncilService {
           pts: 0,
         };
         existing.units += qty;
-        existing.ptr += ptrVal * qty;
-        existing.pts += ptsVal * qty;
+        existing.ptr += ptrVal;
+        existing.pts += ptsVal;
         skuMap.set(prodId, existing);
       }
     }
@@ -845,9 +852,13 @@ export class MultiAgentCouncilService {
     for (const ord of mr.orders || []) {
       for (const item of ord.items || []) {
         const prodId = item.productId;
-        const ptrVal = Number(item.product?.ptr || item.price || 0);
-        const ptsVal = Number(item.product?.pts || 0);
         const qty = item.quantity || 0;
+        // Same single source of truth as the commercial agent above.
+        const line = profitFor([
+          { quantity: qty, price: item.price, freeQty: item.freeQty, product: item.product },
+        ]);
+        const ptrVal = line.revenue;
+        const ptsVal = line.cost;
 
         const curr = skuMap.get(prodId) || {
           productId: prodId,
@@ -858,8 +869,8 @@ export class MultiAgentCouncilService {
           revenuePts: 0,
         };
         curr.units += qty;
-        curr.revenuePtr += ptrVal * qty;
-        curr.revenuePts += ptsVal * qty;
+        curr.revenuePtr += ptrVal;
+        curr.revenuePts += ptsVal;
         skuMap.set(prodId, curr);
       }
     }

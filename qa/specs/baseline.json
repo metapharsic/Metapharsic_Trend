@@ -12,7 +12,6 @@
   ],
   "silentlyCapped": [
     "/api/distributor/invoices",
-    "/api/invoices",
     "/api/manager/mr-stock/history",
     "/api/manager/notifications",
     "/api/manager/visits/map",
@@ -21,7 +20,6 @@
   ],
   "countFromArrayLength": [
     "/admin/claims: Pending ASM Review",
-    "/orders: Complete History",
-    "/orders: Generated Invoices"
+    "/orders: Complete History"
   ]
 }

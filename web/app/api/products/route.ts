@@ -4,6 +4,8 @@ import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, created, badRequest, conflict, apiError } from "@/lib/api-response";
 import { PaginationSchema } from "@/lib/validators";
 import { z } from "zod";
+import { costBasis, type CostBasisSource } from "@/lib/pricing";
+import { ProductPricingAgentsService } from "@/services/product-pricing-agents.service";
 
 
 const emptyToNull = (val: unknown) => (val === "" || val === null || val === undefined ? null : val);
@@ -18,6 +20,7 @@ const CreateProductSchema = z.object({
   mrp: z.coerce.number().min(0).optional(),
   ptr: z.coerce.number().min(0).optional(),
   pts: z.coerce.number().min(0).optional(),
+  purchaseRate: z.coerce.number().min(0).optional(),
   marginStructure: z.preprocess(emptyToNull, z.string().nullable().optional()),
   therapySegment: z.preprocess(emptyToNull, z.string().nullable().optional()),
   hsnCode: z.preprocess(emptyToNull, z.string().nullable().optional()),
@@ -86,9 +89,33 @@ async function getProducts(req: AuthedRequest) {
     const enriched = products.map((p) => {
       const rate = burnByProduct.get(p.id) ?? 0;
       const unitValue = Number(p.ptr ?? p.price);
+      const marginSettings = ProductPricingAgentsService.parseMarginStructure(p.marginStructure);
+      const pts = Number(p.pts ?? p.ptr ?? p.price);
+      const dbPurchaseRate = (p as any).purchaseRate != null ? Number((p as any).purchaseRate) : null;
+      // companyMarginPct is a MARKUP ON COST: pts = cost * (1 + m/100).
+      // Reversing it is a DIVISION, not a subtraction - the old
+      // `pts * (1 - m/100)` understated cost badly (140 read as 84, not 100).
+      const companyMarkupPct = marginSettings?.companyMarginPct ?? ProductPricingAgentsService.DEFAULT_COMPANY_MARGIN_PCT;
+      const derivedFromPts = Math.round((pts / Math.max(0.01, 1 + companyMarkupPct / 100)) * 100) / 100;
+      const purchaseRate =
+        dbPurchaseRate != null && dbPurchaseRate > 0
+          ? dbPurchaseRate
+          : marginSettings?.purchaseRate || derivedFromPts;
+      // Whether the number above is a real paid cost or a derivation, so the
+      // UI can label an estimate instead of presenting a guess as fact.
+      const costBasisExact = dbPurchaseRate != null && dbPurchaseRate > 0;
+      const costBasisSource: CostBasisSource = costBasisExact ? "purchaseRate" : costBasis(p).source;
+      const grossMarginPct = unitValue > 0 ? Math.round(((unitValue - purchaseRate) / unitValue) * 1000) / 10 : 0;
+
       return {
         ...p,
+        purchaseRate,
+        marginSettings,
+        grossMarginPct,
+        costBasisExact,
+        costBasisSource,
         stockValue: Math.round(p.stockQty * unitValue * 100) / 100,
+        stockValueAtCost: Math.round(p.stockQty * purchaseRate * 100) / 100,
         lastMovementAt: lastMovementByProduct.get(p.id) ?? p.updatedAt,
         forecast: {
           burnRatePerDay: Math.round(rate * 100) / 100,

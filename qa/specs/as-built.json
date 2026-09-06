@@ -1,8 +1,8 @@
 {
   "generatedFrom": "source",
   "counts": {
-    "routes": 114,
-    "screens": 49
+    "routes": 121,
+    "screens": 53
   },
   "routes": [
     {
@@ -82,6 +82,62 @@
       ]
     },
     {
+      "url": "/api/admin/diagnostics",
+      "file": "app/api/admin/diagnostics/route.ts",
+      "methods": {
+        "GET": {
+          "handler": "handler",
+          "authenticated": true,
+          "roles": [
+            "ADMIN",
+            "MD",
+            "NSM"
+          ]
+        }
+      },
+      "paginated": false,
+      "exposesPaginationTotal": false,
+      "exposesFlatTotal": false,
+      "hardTake": [],
+      "usesGroupBy": false,
+      "scope": {
+        "byEmployeeId": false,
+        "byOrderEmployeeId": false,
+        "byTerritory": false,
+        "resolvesEmployee": false,
+        "managerBypass": false,
+        "managerRoles": []
+      },
+      "envelope": {
+        "usesHelpers": true,
+        "rawNextResponse": false
+      },
+      "validators": []
+    },
+    {
+      "url": "/api/admin/ptr-calculator",
+      "file": "app/api/admin/ptr-calculator/route.ts",
+      "methods": {},
+      "paginated": false,
+      "exposesPaginationTotal": false,
+      "exposesFlatTotal": false,
+      "hardTake": [],
+      "usesGroupBy": false,
+      "scope": {
+        "byEmployeeId": false,
+        "byOrderEmployeeId": false,
+        "byTerritory": false,
+        "resolvesEmployee": false,
+        "managerBypass": false,
+        "managerRoles": []
+      },
+      "envelope": {
+        "usesHelpers": true,
+        "rawNextResponse": false
+      },
+      "validators": []
+    },
+    {
       "url": "/api/admin/reports/whatsapp-eod",
       "file": "app/api/admin/reports/whatsapp-eod/route.ts",
       "methods": {
@@ -125,6 +181,39 @@
       ]
     },
     {
+      "url": "/api/admin/users/change-password",
+      "file": "app/api/admin/users/change-password/route.ts",
+      "methods": {
+        "POST": {
+          "handler": "handler",
+          "authenticated": true,
+          "roles": [
+            "ADMIN"
+          ]
+        }
+      },
+      "paginated": false,
+      "exposesPaginationTotal": false,
+      "exposesFlatTotal": false,
+      "hardTake": [],
+      "usesGroupBy": false,
+      "scope": {
+        "byEmployeeId": false,
+        "byOrderEmployeeId": false,
+        "byTerritory": false,
+        "resolvesEmployee": false,
+        "managerBypass": false,
+        "managerRoles": []
+      },
+      "envelope": {
+        "usesHelpers": true,
+        "rawNextResponse": false
+      },
+      "validators": [
+        "ChangePasswordSchema"
+      ]
+    },
+    {
       "url": "/api/asm/dashboard",
       "file": "app/api/asm/dashboard/route.ts",
       "methods": {
@@ -144,7 +233,7 @@
       "hardTake": [],
       "usesGroupBy": false,
       "scope": {
-        "byEmployeeId": true,
+        "byEmployeeId": false,
         "byOrderEmployeeId": false,
         "byTerritory": false,
         "resolvesEmployee": true,
@@ -752,6 +841,50 @@
       ]
     },
     {
+      "url": "/api/finance/accounts-jotter",
+      "file": "app/api/finance/accounts-jotter/route.ts",
+      "methods": {
+        "POST": {
+          "handler": "postJotEntry",
+          "authenticated": true,
+          "roles": [
+            "ADMIN",
+            "FINANCE",
+            "MD"
+          ]
+        },
+        "GET": {
+          "handler": "getJotSummary",
+          "authenticated": true,
+          "roles": [
+            "ADMIN",
+            "FINANCE",
+            "MD"
+          ]
+        }
+      },
+      "paginated": false,
+      "exposesPaginationTotal": false,
+      "exposesFlatTotal": false,
+      "hardTake": [],
+      "usesGroupBy": false,
+      "scope": {
+        "byEmployeeId": false,
+        "byOrderEmployeeId": false,
+        "byTerritory": false,
+        "resolvesEmployee": false,
+        "managerBypass": false,
+        "managerRoles": []
+      },
+      "envelope": {
+        "usesHelpers": true,
+        "rawNextResponse": false
+      },
+      "validators": [
+        "JotEntrySchema"
+      ]
+    },
+    {
       "url": "/api/finance/dashboard",
       "file": "app/api/finance/dashboard/route.ts",
       "methods": {
@@ -1181,12 +1314,10 @@
           ]
         }
       },
-      "paginated": false,
-      "exposesPaginationTotal": false,
+      "paginated": true,
+      "exposesPaginationTotal": true,
       "exposesFlatTotal": false,
-      "hardTake": [
-        500
-      ],
+      "hardTake": [],
       "usesGroupBy": false,
       "scope": {
         "byEmployeeId": true,
@@ -1204,7 +1335,9 @@
         "usesHelpers": true,
         "rawNextResponse": false
       },
-      "validators": []
+      "validators": [
+        "PaginationSchema"
+      ]
     },
     {
       "url": "/api/invoices/[id]",
@@ -1666,11 +1799,11 @@
       },
       "paginated": false,
       "exposesPaginationTotal": false,
-      "exposesFlatTotal": true,
+      "exposesFlatTotal": false,
       "hardTake": [],
-      "usesGroupBy": true,
+      "usesGroupBy": false,
       "scope": {
-        "byEmployeeId": true,
+        "byEmployeeId": false,
         "byOrderEmployeeId": false,
         "byTerritory": false,
         "resolvesEmployee": false,
@@ -1869,7 +2002,7 @@
       "hardTake": [],
       "usesGroupBy": false,
       "scope": {
-        "byEmployeeId": true,
+        "byEmployeeId": false,
         "byOrderEmployeeId": false,
         "byTerritory": false,
         "resolvesEmployee": false,
@@ -4003,6 +4136,29 @@
       "validators": []
     },
     {
+      "url": "/api/products/calculate-pricing",
+      "file": "app/api/products/calculate-pricing/route.ts",
+      "methods": {},
+      "paginated": false,
+      "exposesPaginationTotal": false,
+      "exposesFlatTotal": false,
+      "hardTake": [],
+      "usesGroupBy": false,
+      "scope": {
+        "byEmployeeId": false,
+        "byOrderEmployeeId": false,
+        "byTerritory": false,
+        "resolvesEmployee": false,
+        "managerBypass": false,
+        "managerRoles": []
+      },
+      "envelope": {
+        "usesHelpers": true,
+        "rawNextResponse": false
+      },
+      "validators": []
+    },
+    {
       "url": "/api/products/visual-aids",
       "file": "app/api/products/visual-aids/route.ts",
       "methods": {
@@ -4061,6 +4217,82 @@
         "byEmployeeId": false,
         "byOrderEmployeeId": false,
         "byTerritory": true,
+        "resolvesEmployee": true,
+        "managerBypass": false,
+        "managerRoles": []
+      },
+      "envelope": {
+        "usesHelpers": true,
+        "rawNextResponse": false
+      },
+      "validators": []
+    },
+    {
+      "url": "/api/reports/item-history",
+      "file": "app/api/reports/item-history/route.ts",
+      "methods": {
+        "GET": {
+          "handler": "getItemHistoryReport",
+          "authenticated": true,
+          "roles": [
+            "ADMIN",
+            "ASM",
+            "FINANCE",
+            "MD",
+            "MR",
+            "NSM",
+            "RM",
+            "WAREHOUSE",
+            "ZSM"
+          ]
+        }
+      },
+      "paginated": false,
+      "exposesPaginationTotal": false,
+      "exposesFlatTotal": false,
+      "hardTake": [],
+      "usesGroupBy": false,
+      "scope": {
+        "byEmployeeId": false,
+        "byOrderEmployeeId": false,
+        "byTerritory": false,
+        "resolvesEmployee": false,
+        "managerBypass": false,
+        "managerRoles": []
+      },
+      "envelope": {
+        "usesHelpers": true,
+        "rawNextResponse": false
+      },
+      "validators": []
+    },
+    {
+      "url": "/api/reports/mr-daily-calls",
+      "file": "app/api/reports/mr-daily-calls/route.ts",
+      "methods": {
+        "GET": {
+          "handler": "handler",
+          "authenticated": true,
+          "roles": [
+            "ADMIN",
+            "ASM",
+            "MD",
+            "MR",
+            "NSM",
+            "RM",
+            "ZSM"
+          ]
+        }
+      },
+      "paginated": false,
+      "exposesPaginationTotal": false,
+      "exposesFlatTotal": false,
+      "hardTake": [],
+      "usesGroupBy": false,
+      "scope": {
+        "byEmployeeId": true,
+        "byOrderEmployeeId": false,
+        "byTerritory": false,
         "resolvesEmployee": true,
         "managerBypass": false,
         "managerRoles": []
@@ -4431,6 +4663,83 @@
       "readsPaginationTotal": false
     },
     {
+      "url": "/admin/accounts-jotter",
+      "file": "app/(dashboard)/admin/accounts-jotter/page.tsx",
+      "roleFromPath": "admin",
+      "apis": [
+        "/api/finance/accounts-jotter"
+      ],
+      "dropdowns": [
+        {
+          "name": "paymentMode",
+          "boundTo": "paymentMode",
+          "optionsFrom": null,
+          "hasPlaceholder": false,
+          "required": false
+        },
+        {
+          "name": "customDebitId",
+          "boundTo": "customDebitId",
+          "optionsFrom": null,
+          "hasPlaceholder": true,
+          "required": false
+        },
+        {
+          "name": "customCreditId",
+          "boundTo": "customCreditId",
+          "optionsFrom": null,
+          "hasPlaceholder": true,
+          "required": false
+        }
+      ],
+      "fields": [
+        {
+          "tag": "input",
+          "name": null,
+          "type": "date",
+          "required": false,
+          "min": null,
+          "max": null,
+          "step": null,
+          "maxLength": null
+        },
+        {
+          "tag": "input",
+          "name": "0.00",
+          "type": "number",
+          "required": false,
+          "min": "0.01",
+          "max": null,
+          "step": "0.01",
+          "maxLength": null
+        },
+        {
+          "tag": "input",
+          "name": "e.g. Petrol DA for Rajesh Kumar, Tea & biscuits for office...",
+          "type": "text",
+          "required": false,
+          "min": null,
+          "max": null,
+          "step": null,
+          "maxLength": null
+        },
+        {
+          "tag": "input",
+          "name": "e.g. VCH-001",
+          "type": "text",
+          "required": false,
+          "min": null,
+          "max": null,
+          "step": null,
+          "maxLength": null
+        }
+      ],
+      "validationMessages": [],
+      "lengthDerivedCounts": [],
+      "countHeadings": [],
+      "readsPaginationTotal": false
+    },
+    {
       "url": "/admin/claims",
       "file": "app/(dashboard)/admin/claims/page.tsx",
       "roleFromPath": "admin",
@@ -4612,6 +4921,18 @@
       "readsPaginationTotal": false
     },
     {
+      "url": "/admin/diagnostics",
+      "file": "app/(dashboard)/admin/diagnostics/page.tsx",
+      "roleFromPath": "admin",
+      "apis": [],
+      "dropdowns": [],
+      "fields": [],
+      "validationMessages": [],
+      "lengthDerivedCounts": [],
+      "countHeadings": [],
+      "readsPaginationTotal": false
+    },
+    {
       "url": "/admin/financials",
       "file": "app/(dashboard)/admin/financials/page.tsx",
       "roleFromPath": "admin",
@@ -4664,6 +4985,18 @@
       ],
       "countHeadings": [],
       "readsPaginationTotal": true
+    },
+    {
+      "url": "/admin/ptr-calculator",
+      "file": "app/(dashboard)/admin/ptr-calculator/page.tsx",
+      "roleFromPath": "admin",
+      "apis": [],
+      "dropdowns": [],
+      "fields": [],
+      "validationMessages": [],
+      "lengthDerivedCounts": [],
+      "countHeadings": [],
+      "readsPaginationTotal": false
     },
     {
       "url": "/admin/workflow-settings",
@@ -5582,9 +5915,29 @@
           "name": null,
           "type": "number",
           "required": true,
+          "min": "0.01",
+          "max": null,
+          "step": "0.01",
+          "maxLength": null
+        },
+        {
+          "tag": "input",
+          "name": "Box ₹",
+          "type": "number",
+          "required": false,
           "min": null,
           "max": null,
           "step": "0.01",
+          "maxLength": null
+        },
+        {
+          "tag": "input",
+          "name": "Units",
+          "type": "number",
+          "required": false,
+          "min": null,
+          "max": null,
+          "step": null,
           "maxLength": null
         },
         {
@@ -5595,6 +5948,36 @@
           "min": null,
           "max": null,
           "step": "0.01",
+          "maxLength": null
+        },
+        {
+          "tag": "input",
+          "name": null,
+          "type": "number",
+          "required": false,
+          "min": "0",
+          "max": "50",
+          "step": "0.1",
+          "maxLength": null
+        },
+        {
+          "tag": "input",
+          "name": null,
+          "type": "number",
+          "required": true,
+          "min": null,
+          "max": null,
+          "step": "0.01",
+          "maxLength": null
+        },
+        {
+          "tag": "input",
+          "name": null,
+          "type": "number",
+          "required": false,
+          "min": "0",
+          "max": "90",
+          "step": "0.1",
           "maxLength": null
         },
         {
@@ -5736,7 +6119,7 @@
         {
           "tag": "input",
           "name": null,
-          "type": "password",
+          "type": "showPassword ? ",
           "required": true,
           "min": null,
           "max": null,
@@ -6277,6 +6660,13 @@
       ],
       "dropdowns": [
         {
+          "name": "paid",
+          "boundTo": "invoicePaid",
+          "optionsFrom": null,
+          "hasPlaceholder": true,
+          "required": false
+        },
+        {
           "name": "chemistId",
           "boundTo": "chemistId",
           "optionsFrom": "chemists",
@@ -6313,6 +6703,26 @@
         }
       ],
       "fields": [
+        {
+          "tag": "input",
+          "name": "q",
+          "type": "text",
+          "required": false,
+          "min": null,
+          "max": null,
+          "step": null,
+          "maxLength": null
+        },
+        {
+          "tag": "input",
+          "name": "customer",
+          "type": "text",
+          "required": false,
+          "min": null,
+          "max": null,
+          "step": null,
+          "maxLength": null
+        },
         {
           "tag": "input",
           "name": null,
@@ -6406,10 +6816,6 @@
       ],
       "countHeadings": [
         {
-          "heading": "Generated Invoices",
-          "array": "invoices"
-        },
-        {
           "heading": "Complete History",
           "array": "history"
         }
@@ -6498,6 +6904,61 @@
         "displayRows",
         "numericKeys"
       ],
+      "countHeadings": [],
+      "readsPaginationTotal": false
+    },
+    {
+      "url": "/reports/mr-daily-calls",
+      "file": "app/(dashboard)/reports/mr-daily-calls/page.tsx",
+      "roleFromPath": "reports",
+      "apis": [
+        "/api/reports/mr-daily-calls"
+      ],
+      "dropdowns": [
+        {
+          "name": "selectedMr",
+          "boundTo": "selectedMr",
+          "optionsFrom": null,
+          "hasPlaceholder": true,
+          "required": false
+        }
+      ],
+      "fields": [
+        {
+          "tag": "input",
+          "name": null,
+          "type": "date",
+          "required": false,
+          "min": null,
+          "max": null,
+          "step": null,
+          "maxLength": null
+        },
+        {
+          "tag": "input",
+          "name": null,
+          "type": "date",
+          "required": false,
+          "min": null,
+          "max": null,
+          "step": null,
+          "maxLength": null
+        },
+        {
+          "tag": "input",
+          "name": "Search MR name (2+ letters)...",
+          "type": "text",
+          "required": false,
+          "min": null,
+          "max": null,
+          "step": null,
+          "maxLength": null
+        }
+      ],
+      "validationMessages": [
+        "Failed to load report. Please try again."
+      ],
+      "lengthDerivedCounts": [],
       "countHeadings": [],
       "readsPaginationTotal": false
     },
@@ -8438,6 +8899,11 @@
       },
       {
         "field": "pts",
+        "type": "Decimal?",
+        "required": false
+      },
+      {
+        "field": "purchaseRate",
         "type": "Decimal?",
         "required": false
       },

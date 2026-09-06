@@ -58,9 +58,6 @@ const NAV_CATEGORY_ORDER = [
 const NAV_ITEMS = [
   // ── Executive & Dashboards ───────────────────────────────────
   { href: "/md", label: "MD Executive Dashboard", icon: LayoutGrid, roles: ["MD", "ADMIN"], category: "Executive & Dashboards" },
-  { href: "/nsm", label: "NSM National Dashboard", icon: LayoutGrid, roles: ["NSM", "ADMIN"], category: "Executive & Dashboards" },
-  { href: "/zsm", label: "ZSM Zonal Dashboard", icon: LayoutGrid, roles: ["ZSM", "ADMIN"], category: "Executive & Dashboards" },
-  { href: "/rm", label: "RM Regional Dashboard", icon: LayoutGrid, roles: ["RM", "ADMIN"], category: "Executive & Dashboards" },
   { href: "/asm", label: "ASM Area Dashboard", icon: LayoutGrid, roles: ["ASM", "ADMIN"], category: "Executive & Dashboards" },
   { href: "/mr", label: "MR Field Dashboard", icon: LayoutGrid, roles: ["MR", "ADMIN"], category: "Executive & Dashboards" },
   { href: "/mr/reports/council", label: "Multi-Agent AI Council", icon: Sparkles, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "MR"], category: "Executive & Dashboards" },
@@ -108,6 +105,7 @@ const NAV_ITEMS = [
   { href: "/marketing", label: "Marketing Campaigns", icon: BarChart3, roles: ["MARKETING", "ADMIN"], category: "Analytics & Marketing" },
 
   // ── Administration & Profile ─────────────────────────────────
+  { href: "/admin/ptr-calculator", label: "PTR & Scheme Simulator", icon: Calculator, roles: ["ADMIN", "MD"], category: "Administration & Profile" },
   { href: "/admin/accounts-jotter", label: "Quick Accounts Jotter", icon: BookOpen, roles: ["ADMIN", "FINANCE"], category: "Administration & Profile" },
   { href: "/admin/diagnostics", label: "System Health & Diagnostics", icon: ShieldAlert, roles: ["ADMIN", "MD"], category: "Administration & Profile" },
   { href: "/admin/company-settings", label: "Company Settings", icon: Building2, roles: ["ADMIN"], category: "Administration & Profile" },

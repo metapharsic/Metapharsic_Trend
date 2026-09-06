@@ -8,7 +8,7 @@ async function getMarketingDashboard(req: AuthedRequest) {
   try {
     const monthStart = startOfUtcMonth();
 
-    const [schemes, visualAids, giftsThisMonth, doctorsCount, visitsWithFeedback] = await Promise.all([
+    const [schemes, visualAids, giftsThisMonth, doctorsCount, totalVisitsThisMonth, visitsWithFeedback] = await Promise.all([
       db.discountScheme.findMany({
         include: {
           product: { select: { id: true, name: true, sku: true } },
@@ -36,12 +36,19 @@ async function getMarketingDashboard(req: AuthedRequest) {
       }),
       db.doctor.count(),
       db.visit.count({
+        where: { createdAt: { gte: monthStart } },
+      }),
+      db.visit.count({
         where: {
           createdAt: { gte: monthStart },
           feedback: { not: null },
         },
       }),
     ]);
+
+    const genuineEngagement = totalVisitsThisMonth > 0
+      ? Math.min(100, Math.round((visitsWithFeedback / totalVisitsThisMonth) * 100))
+      : 80;
 
     // Active campaigns mapped from discount schemes and e-detailing visual aids
     const campaigns: Array<{
@@ -54,12 +61,12 @@ async function getMarketingDashboard(req: AuthedRequest) {
       discountPct: number;
       minQty: number;
       freeQty: number;
-    }> = schemes.map((s, idx) => ({
+    }> = schemes.map((s) => ({
       id: s.id,
       name: s.name || `${s.product?.name ?? "Special"} Incentive (${Number(s.discountPct)}% Off)`,
       type: "DISCOUNT" as const,
       targetAudience: `Min Order ${s.minQuantity} units`,
-      engagementRate: Math.min(95, Math.max(60, 75 + ((idx * 7) % 20))),
+      engagementRate: genuineEngagement,
       status: s.isActive ? ("ACTIVE" as const) : ("SCHEDULED" as const),
       discountPct: Number(s.discountPct),
       minQty: s.minQuantity,
@@ -82,13 +89,16 @@ async function getMarketingDashboard(req: AuthedRequest) {
     }
 
     const totalGiftUnits = giftsThisMonth.reduce((sum, g) => sum + g.quantity, 0);
+    const giftBudgetUtilized = doctorsCount > 0
+      ? Math.min(100, Math.round((giftsThisMonth.length / doctorsCount) * 100))
+      : 0;
 
     return ok({
       kpis: {
         activeCampaigns: campaigns.length,
         visualAidsDeployed: visualAids.length,
-        avgEngagement: visitsWithFeedback > 0 ? Math.min(95, 68 + (visitsWithFeedback % 25)) : 72,
-        giftBudgetUtilized: Math.min(100, Math.max(25, (totalGiftUnits * 4) % 95 || 65)),
+        avgEngagement: genuineEngagement,
+        giftBudgetUtilized,
       },
       campaigns,
       visualAids: visualAids.map((va) => ({

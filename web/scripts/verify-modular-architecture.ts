@@ -110,6 +110,7 @@ async function main() {
             {
               productId: product.id,
               quantity: 10,
+              freeQty: 0,
               price: 120.0,
               discountPct: 5,
               gstPct: 12,

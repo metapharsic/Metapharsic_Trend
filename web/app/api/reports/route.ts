@@ -3,6 +3,13 @@ import { Role, ExpenseStatus, OrderStatus } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, badRequest, apiError } from "@/lib/api-response";
 import { startOfUtcMonth, startOfUtcDay, addUtcDays } from "@/lib/date";
+import {
+  COST_BASIS_SELECT,
+  costBasis,
+  profitFor,
+  round2,
+  type CostBasisSource,
+} from "@/lib/pricing";
 
 // ADMIN/MD/NSM see company-wide data; ZSM/RM/ASM are scoped to their own
 // territories only — mirrors the scoping already enforced on api/mr/dashboard.
@@ -73,7 +80,22 @@ const REPORTS = {
             ...(territoryIds ? { employee: { territories: { some: { id: { in: territoryIds } } } } } : {}),
           },
         },
-        include: { product: true },
+        select: {
+          quantity: true,
+          price: true,
+          freeQty: true,
+          product: {
+            select: {
+              ...COST_BASIS_SELECT,
+              name: true,
+              sku: true,
+              therapySegment: true,
+              packSize: true,
+              mrp: true,
+              stockQty: true,
+            },
+          },
+        },
       });
       const byProduct = new Map<string, {
         name: string;
@@ -87,12 +109,16 @@ const REPORTS = {
         units: number;
         ptsValue: number;
         ptrValue: number;
+        revenue: number;
+        cost: number;
         profit: number;
         marginPercent: number;
         markupPercent: number;
+        costBasisSource: CostBasisSource;
       }>();
       for (const item of items) {
         const key = item.product.id;
+        const basis = costBasis(item.product);
         const entry = byProduct.get(key) ?? {
           name: item.product.name,
           sku: item.product.sku,
@@ -105,21 +131,25 @@ const REPORTS = {
           units: 0,
           ptsValue: 0,
           ptrValue: 0,
+          revenue: 0,
+          cost: 0,
           profit: 0,
           marginPercent: 0,
           markupPercent: 0,
+          costBasisSource: basis.source,
         };
+        // Cost and profit come from lib/pricing — this report does not derive
+        // its own cost basis (it used to read ptr - pts straight off Product).
+        const line = profitFor([item]);
         entry.units += item.quantity;
         entry.ptsValue += Number(item.product.pts || 0) * item.quantity;
         entry.ptrValue += Number(item.product.ptr || 0) * item.quantity;
-        
-        const diff = Number(item.product.ptr || 0) - Number(item.product.pts || 0);
-        entry.profit += diff * item.quantity;
-
-        const ptr = Number(item.product.ptr || 0);
-        const pts = Number(item.product.pts || 0);
-        entry.marginPercent = ptr > 0 ? Math.round((diff / ptr) * 10000) / 100 : 0;
-        entry.markupPercent = pts > 0 ? Math.round((diff / pts) * 10000) / 100 : 0;
+        entry.revenue = round2(entry.revenue + line.revenue);
+        entry.cost = round2(entry.cost + line.cost);
+        entry.profit = round2(entry.revenue - entry.cost);
+        entry.marginPercent = entry.revenue > 0 ? round2((entry.profit / entry.revenue) * 100) : 0;
+        entry.markupPercent = entry.cost > 0 ? round2((entry.profit / entry.cost) * 100) : 0;
+        entry.costBasisSource = basis.source;
 
         byProduct.set(key, entry);
       }
@@ -174,20 +204,20 @@ const REPORTS = {
       });
 
       return employees.map((emp) => {
-        let totalSales = 0;
-        let totalProfit = 0;
-        for (const order of emp.orders) {
-          for (const item of order.items) {
-            const ptr = Number(item.product.ptr || item.price || 0);
-            const pts = Number(item.product.pts || 0);
-            totalSales += ptr * item.quantity;
-            totalProfit += (ptr - pts) * item.quantity;
-          }
-        }
+        // Revenue, cost and profit all come from lib/pricing. This report used
+        // to read `ptr - pts` off the Product, which ignored purchaseRate and
+        // treated a missing pts as a cost of zero -- i.e. infinite margin.
+        const lines = emp.orders.flatMap((order) => order.items);
+        const totals = profitFor(lines);
+        const totalSales = totals.revenue;
+        const totalProfit = totals.profitAmount;
+        const usedSources = [...new Set(totals.sources)];
+        const costBasisSource: CostBasisSource | "mixed" =
+          usedSources.length === 1 ? usedSources[0] : usedSources.length === 0 ? "none" : "mixed";
 
         const totalExpenses = emp.expenses.reduce((sum, e) => sum + Number(e.amount), 0);
-        const netProfit = totalProfit - totalExpenses;
-        const profitMargin = totalSales > 0 ? Math.round((totalProfit / totalSales) * 10000) / 100 : 0;
+        const netProfit = round2(totalProfit - totalExpenses);
+        const profitMargin = totals.profitPct ?? 0;
 
         return {
           mrName: `${emp.firstName} ${emp.lastName}`,
@@ -197,6 +227,7 @@ const REPORTS = {
           expenses: totalExpenses,
           netProfit: netProfit,
           profitMargin: profitMargin,
+          costBasisSource,
         };
       }).sort((a, b) => b.salesValue - a.salesValue);
     },

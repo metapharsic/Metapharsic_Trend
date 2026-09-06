@@ -32,7 +32,7 @@ async function getOrder(
         doctor: { select: { fullName: true, clinicAddress: true, mobile: true, territoryId: true } },
         distributor: { select: { name: true, address: true, gstNo: true } },
         employee: { select: { id: true, firstName: true, lastName: true } },
-        items: { include: { product: { select: { id: true, name: true, sku: true } } } },
+        items: { include: { product: { select: { id: true, name: true, sku: true, pts: true, ptr: true, price: true } } } },
         invoice: true,
       },
     });

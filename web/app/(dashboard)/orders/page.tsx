@@ -49,12 +49,56 @@ interface Product {
   mrp: string | null;
 }
 
+interface InvoiceRow {
+  id: string;
+  orderId: string;
+  invoiceNo: string;
+  amount: string;
+  paid: boolean;
+  createdAt: string;
+  order: {
+    id: string;
+    status: string;
+    chemist: { id: string; name: string } | null;
+    distributor: { id: string; name: string } | null;
+    items: OrderItem[];
+  } | null;
+  revenue: number;
+  cost: number;
+  profitAmount: number;
+  profitPct: number | null;
+}
+
+interface InvoicePagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+interface InvoiceTotals {
+  profitAmount: number;
+  revenue: number;
+}
+
+interface InvoicesResponse {
+  invoices: InvoiceRow[];
+  pagination: InvoicePagination;
+  totals: InvoiceTotals;
+}
+
 function currency(value: number | string): string {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(Number(value));
+}
+
+function profitColor(value: number): string {
+  if (value < 0) return "text-red-600";
+  if (value > 0) return "text-emerald-600";
+  return "text-slate-500";
 }
 
 function orderValue(order: Order): number {
@@ -106,8 +150,13 @@ export default function OrdersDashboard() {
   const [deletingInvoice, setDeletingInvoice] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"orders" | "invoices" | "history">("orders");
-  const [invoices, setInvoices] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [invoicesLoading, setInvoicesLoading] = useState(true);
+  const [invoicePagination, setInvoicePagination] = useState<InvoicePagination | null>(null);
+  const [invoiceTotals, setInvoiceTotals] = useState<InvoiceTotals | null>(null);
+  const [invoiceQ, setInvoiceQ] = useState("");
+  const [invoiceCustomer, setInvoiceCustomer] = useState("");
+  const [invoicePaid, setInvoicePaid] = useState<"" | "true" | "false">("");
   const [history, setHistory] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
 
@@ -132,9 +181,18 @@ export default function OrdersDashboard() {
 
   const loadInvoices = () => {
     setInvoicesLoading(true);
+    const params: Record<string, string> = {};
+    if (invoiceQ.trim()) params.q = invoiceQ.trim();
+    if (invoiceCustomer.trim()) params.customer = invoiceCustomer.trim();
+    if (invoicePaid) params.paid = invoicePaid;
     apiClient
-      .get("/api/invoices")
-      .then((res) => setInvoices(res.data.data.invoices ?? []))
+      .get("/api/invoices", { params })
+      .then((res) => {
+        const payload = res.data.data as Partial<InvoicesResponse> | undefined;
+        setInvoices(payload?.invoices ?? []);
+        setInvoicePagination(payload?.pagination ?? null);
+        setInvoiceTotals(payload?.totals ?? null);
+      })
       .catch((err) => console.error("Failed to load invoices:", err))
       .finally(() => setInvoicesLoading(false));
   };
@@ -156,6 +214,13 @@ export default function OrdersDashboard() {
     load(ordersPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ordersPage]);
+
+  useEffect(() => {
+    if (activeTab !== "invoices") return;
+    const t = setTimeout(() => loadInvoices(), 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, invoiceQ, invoiceCustomer, invoicePaid]);
 
   // MR is the first point of contact for a chemist — only they book orders.
   // ASM/ADMIN/MD oversee and advance fulfilment status but don't originate sales.
@@ -281,7 +346,6 @@ export default function OrdersDashboard() {
         <button
           onClick={() => {
             setActiveTab("invoices");
-            loadInvoices();
           }}
           className={`flex items-center gap-1.5 px-4 py-2.5 font-bold transition-all border-b-2 cursor-pointer ${
             activeTab === "invoices"
@@ -290,7 +354,7 @@ export default function OrdersDashboard() {
           }`}
         >
           <Receipt size={15} />
-          Generated Invoices ({invoices.length})
+          Generated Invoices ({invoicePagination?.total ?? invoices.length})
         </button>
         <button
           onClick={() => {
@@ -422,30 +486,103 @@ export default function OrdersDashboard() {
       )}
 
       {activeTab === "invoices" && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
-          {invoicesLoading ? (
-            <div className="flex justify-center items-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+        <div className="space-y-4">
+
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+            <div className="px-6 pt-5 pb-3 border-b border-slate-100 flex flex-wrap items-center gap-3">
+              <input
+                type="text"
+                name="q"
+                data-testid="invoice-search-q"
+                value={invoiceQ}
+                onChange={(e) => setInvoiceQ(e.target.value)}
+                placeholder="Search invoice no. or customer…"
+                className="flex-1 min-w-[220px] px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+              />
+              <input
+                type="text"
+                name="customer"
+                data-testid="invoice-search-customer"
+                value={invoiceCustomer}
+                onChange={(e) => setInvoiceCustomer(e.target.value)}
+                placeholder="Customer name (e.g. Chemist)"
+                className="min-w-[180px] px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+              />
+              <select
+                name="paid"
+                data-testid="invoice-search-paid"
+                value={invoicePaid}
+                onChange={(e) => setInvoicePaid(e.target.value as "" | "true" | "false")}
+                className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+              >
+                <option value="">All Invoices</option>
+                <option value="true">Paid Only</option>
+                <option value="false">Unpaid Only</option>
+              </select>
+              {(invoiceQ || invoiceCustomer || invoicePaid) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInvoiceQ("");
+                    setInvoiceCustomer("");
+                    setInvoicePaid("");
+                  }}
+                  className="px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
-          ) : invoices.length === 0 ? (
-            <div className="px-6 py-12 text-center text-slate-400">
-              <Receipt size={32} className="mx-auto mb-2 text-slate-300" />
-              <p className="text-sm font-medium">No invoices found.</p>
-            </div>
-          ) : (
-            <table className="w-full text-sm min-w-[640px]">
-              <thead>
-                <tr className="bg-slate-50 text-left text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                  <th className="px-6 py-3 font-semibold">Invoice No</th>
-                  <th className="px-6 py-3 font-semibold">Chemist (Customer)</th>
-                  <th className="px-6 py-3 font-semibold">Distributor</th>
-                  <th className="px-6 py-3 font-semibold text-right">Amount</th>
-                  <th className="px-5 py-3 font-semibold text-center">Status</th>
-                  <th className="px-6 py-3 font-semibold">Generated Date</th>
-                  {canManageInvoices && <th className="px-6 py-3 font-semibold text-right">Actions</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+            {role === "ADMIN" && invoiceTotals && (
+              <div className="px-6 py-2.5 bg-slate-50/80 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <p
+                  data-testid="invoice-total-profit"
+                  className="font-semibold text-slate-600"
+                >
+                  Total profit (all matching invoices, not just this page):{" "}
+                  <span className={`font-bold ${profitColor(invoiceTotals.profitAmount)}`}>
+                    {currency(invoiceTotals.profitAmount)}
+                  </span>
+                </p>
+                <div className="flex items-center gap-4 text-slate-500">
+                  <span>Revenue: <strong className="text-slate-700">{currency(invoiceTotals.revenue)}</strong></span>
+                  {invoiceTotals.revenue > 0 && (
+                    <span>
+                      Avg Margin:{" "}
+                      <strong className={profitColor(invoiceTotals.profitAmount)}>
+                        {((invoiceTotals.profitAmount / invoiceTotals.revenue) * 100).toFixed(1)}%
+                      </strong>
+                    </span>
+                  )}
+                  <span className="text-emerald-700 font-medium">✓ Certified Read-Only (0 DB writes)</span>
+                </div>
+              </div>
+            )}
+            {invoicesLoading ? (
+              <div className="flex justify-center items-center py-20">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+              </div>
+            ) : invoices.length === 0 ? (
+              <div className="px-6 py-12 text-center text-slate-400">
+                <Receipt size={32} className="mx-auto mb-2 text-slate-300" />
+                <p className="text-sm font-medium">No invoices found.</p>
+              </div>
+            ) : (
+              <table className="w-full text-sm min-w-[640px]">
+                <thead>
+                  <tr className="bg-slate-50 text-left text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                    <th className="px-6 py-3 font-semibold">Invoice No</th>
+                    <th className="px-6 py-3 font-semibold">Chemist (Customer)</th>
+                    <th className="px-6 py-3 font-semibold">Distributor</th>
+                    <th className="px-6 py-3 font-semibold text-right">Amount</th>
+                    {role === "ADMIN" && <th className="px-6 py-3 font-semibold text-right">Profit Earned (₹)</th>}
+                    {role === "ADMIN" && <th className="px-6 py-3 font-semibold text-right">Profit %</th>}
+                    <th className="px-5 py-3 font-semibold text-center">Status</th>
+                    <th className="px-6 py-3 font-semibold">Generated Date</th>
+                    {canManageInvoices && <th className="px-6 py-3 font-semibold text-right">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
                 {invoices.map((inv) => (
                   <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
@@ -466,6 +603,16 @@ export default function OrdersDashboard() {
                     <td className="px-6 py-4 text-right font-bold text-slate-900">
                       {currency(inv.amount)}
                     </td>
+                    {role === "ADMIN" && (
+                      <td className={`px-6 py-4 text-right font-bold ${profitColor(inv.profitAmount)}`}>
+                        {currency(inv.profitAmount)}
+                      </td>
+                    )}
+                    {role === "ADMIN" && (
+                      <td className={`px-6 py-4 text-right font-bold ${inv.profitPct == null ? "text-slate-400" : profitColor(inv.profitPct)}`}>
+                        {inv.profitPct == null ? "—" : `${inv.profitPct.toFixed(1)}%`}
+                      </td>
+                    )}
                     <td className="px-5 py-3 text-center">
                       <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
                         inv.paid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
@@ -505,6 +652,7 @@ export default function OrdersDashboard() {
               </tbody>
             </table>
           )}
+        </div>
         </div>
       )}
 

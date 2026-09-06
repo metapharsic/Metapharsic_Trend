@@ -3,12 +3,14 @@ import { Role } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, badRequest, notFound, apiError } from "@/lib/api-response";
 import { z } from "zod";
+import { ProductPricingAgentsService } from "@/services/product-pricing-agents.service";
 
 
 const emptyToNull = (val: unknown) => (val === "" || val === null ? null : val);
 
 const UpdateProductSchema = z.object({
   name: z.string().min(1).optional(),
+  sku: z.string().min(1).optional(),
   price: z.coerce.number().min(0).optional(),
   composition: z.preprocess(emptyToNull, z.string().nullable().optional()),
   strength: z.preprocess(emptyToNull, z.string().nullable().optional()),
@@ -16,6 +18,7 @@ const UpdateProductSchema = z.object({
   mrp: z.coerce.number().min(0).optional(),
   ptr: z.coerce.number().min(0).optional(),
   pts: z.coerce.number().min(0).optional(),
+  purchaseRate: z.coerce.number().min(0).optional(),
   marginStructure: z.preprocess(emptyToNull, z.string().nullable().optional()),
   therapySegment: z.preprocess(emptyToNull, z.string().nullable().optional()),
   hsnCode: z.preprocess(emptyToNull, z.string().nullable().optional()),
@@ -64,11 +67,40 @@ async function updateProduct(
       return updated;
     });
 
-    return ok({ product });
+    // Run multi-agent audit on current pricing structure
+    const pricingAudit = ProductPricingAgentsService.calculatePricing({
+      mrp: Number(product.mrp || 0),
+      ptr: Number(product.ptr || 0),
+      pts: Number(product.pts || 0),
+      purchaseRate: Number(product.purchaseRate ?? parsed.data.purchaseRate ?? 0),
+      autoCalculate: false,
+    });
+
+    return ok({ product, pricingAudit });
   } catch (err: any) {
-    if (err?.code === "P2002") return badRequest("A product with this name already exists");
-    console.error("[PUT /api/products/[id]]", err);
-    return apiError("INTERNAL_SERVER_ERROR", "Failed to update product", 500);
+    // P2002 is a unique-constraint clash; name and sku are both unique, so say
+    // which one actually collided instead of always blaming the name.
+    if (err?.code === "P2002") {
+      const fields: string[] = err?.meta?.target ?? [];
+      const which = fields.includes("sku") ? "SKU" : fields.includes("name") ? "name" : fields.join(", ");
+      return badRequest(`Another product already uses this ${which || "value"}`);
+    }
+
+    console.error("[PUT /api/products/[id]]", {
+      code: err?.code,
+      message: err?.message,
+      meta: err?.meta,
+    });
+
+    // A bare "Failed to update product" gives the user nothing to act on and
+    // gives support nothing to debug. Outside production, surface the cause.
+    return apiError(
+      "INTERNAL_SERVER_ERROR",
+      process.env.NODE_ENV === "production"
+        ? "Failed to update product"
+        : `Failed to update product: ${err?.code ?? ""} ${err?.message ?? "unknown error"}`.trim(),
+      500
+    );
   }
 }
 

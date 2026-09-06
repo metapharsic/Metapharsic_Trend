@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { Role } from "@prisma/client";
 
 const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "trend-mr-secure-access-token-secret-2026";
@@ -18,7 +19,7 @@ export function signAccessToken(payload: Omit<JWTPayload, "iat" | "exp">): strin
 }
 
 export function signRefreshToken(payload: Omit<JWTPayload, "iat" | "exp">): string {
-  return jwt.sign(payload, REFRESH_SECRET, { expiresIn: REFRESH_EXPIRES } as jwt.SignOptions);
+  return jwt.sign({ ...payload, jti: crypto.randomUUID() }, REFRESH_SECRET, { expiresIn: REFRESH_EXPIRES } as jwt.SignOptions);
 }
 
 export function verifyAccessToken(token: string): JWTPayload {

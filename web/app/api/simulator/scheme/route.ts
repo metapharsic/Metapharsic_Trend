@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, badRequest, notFound, apiError } from "@/lib/api-response";
 import { projectSchemeMargin } from "@/lib/scheme";
+import { costBasis } from "@/lib/pricing";
 import { z } from "zod";
 
 
@@ -31,10 +32,16 @@ async function simulateScheme(req: AuthedRequest) {
 
     const mrp = Number(product.mrp ?? product.price);
     const ptr = Number(product.ptr ?? product.price);
-    const pts = Number(product.pts ?? product.price);
+    // The cost side of the projection is resolved by lib/pricing, not here:
+    // purchaseRate -> pts -> ptr -> price, so a product priced only by
+    // purchase rate still simulates instead of being refused.
+    const basis = costBasis(product);
+    const pts = basis.value;
 
     if (pts <= 0) {
-      return badRequest("Product has no PTS (price-to-stockist) set; margin cannot be projected");
+      return badRequest(
+        "Product has no purchase rate, PTS, PTR or price set; margin cannot be projected"
+      );
     }
 
     const projection = projectSchemeMargin({ mrp, ptr, pts }, quantity, discountPercent);

@@ -35,8 +35,8 @@ async function getWarehouseDashboard(_req: AuthedRequest) {
     const toDispatch = (o: (typeof pendingOrders)[number], status: "PACKING" | "READY") => ({
       id: o.id,
       orderId: o.id.slice(0, 8).toUpperCase(),
-      distributor: o.chemist?.name ?? o.distributor.name,
-      location: o.chemist?.address ?? o.distributor.address,
+      distributor: o.chemist?.name ?? o.distributor?.name ?? "Direct / Central",
+      location: o.chemist?.address ?? o.distributor?.address ?? "Central Warehouse",
       itemsCount: o.items.reduce((sum, i) => sum + i.quantity, 0),
       status,
       createdAt: o.createdAt,

@@ -29,5 +29,3 @@ export * from "./reports/reports.agents";
 export * from "./reports/reports.service";
 export * from "./reports/reports.routes";
 
-// Agent-to-Agent (A2A) Protocol Layer
-export * from "./a2a";
