@@ -261,13 +261,11 @@ export class CommercialCalculatorService {
       const lineGoodsCost = round2(p.boxes * p.boxRate);
       goodsCostExclGst += lineGoodsCost;
 
-      // Rate charged to buyer per strip
-      // In direct to chemist: selling rate = MRP * (1 - chemistDiscount/100)
+      // Rate charged per strip: PTR is calculated 100% directly on MRP (PTS deferred)
       const ptr = round2(p.mrp * (1 - config.chemistDiscountPct / 100));
-      // Price to stockist: PTR * (1 - stockistMargin/100)
-      const pts = round2(ptr * (1 - config.stockistMarginPct / 100));
+      const pts = ptr; // PTS concept removed at present; deferred for future release
 
-      const sellingRate = config.routeToMarket === "STOCKIST" ? pts : ptr;
+      const sellingRate = ptr;
 
       // Scheme: Buy 10, Get X free
       const freeScheme = config.chemistFreeStrips;

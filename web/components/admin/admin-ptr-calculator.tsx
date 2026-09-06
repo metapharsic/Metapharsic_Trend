@@ -233,13 +233,48 @@ export function AdminPtrCalculator() {
           </div>
         </div>
 
+        {/* MRP Formula Banner */}
+        <div className="mt-5 bg-slate-900/90 rounded-2xl p-4 border border-indigo-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+              <Calculator size={20} />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-2">
+                <span>Pharma Commercial Pricing Formulas</span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Calculated 100% On MRP
+                </span>
+              </h3>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                PTR is calculated 100% directly on MRP (not on purchase). PTS concept is deferred for present release.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono">
+            <div className="bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-700/60">
+              <span className="text-slate-400 block text-[9px] uppercase font-sans">PTR Formula</span>
+              <span className="text-emerald-400 font-bold">PTR = MRP × (1 - Chemist%)</span>
+            </div>
+            <div className="bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-700/60">
+              <span className="text-slate-400 block text-[9px] uppercase font-sans">PTS Status</span>
+              <span className="text-amber-400 font-bold">PTS Concept Deferred</span>
+            </div>
+            <div className="bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-700/60">
+              <span className="text-slate-400 block text-[9px] uppercase font-sans">Cost Markup</span>
+              <span className="text-emerald-400 font-bold">Purchase Rate = PTR / (1 + Company%)</span>
+            </div>
+          </div>
+        </div>
+
         {/* Multi-Agent Status Console */}
-        <div className="mt-6 pt-5 border-t border-slate-800/80">
+        <div className="mt-5 pt-4 border-t border-slate-800/80">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-indigo-400" />
               <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Multi-Agent System Status &amp; Real-Time Execution Logs
+                Multi-Agent Intelligence System &amp; Formula Execution Logs
               </span>
             </div>
             <span className="text-[11px] text-slate-400 font-mono">

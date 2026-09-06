@@ -21,4 +21,4 @@ async function getStats(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getStats, [Role.ASM, Role.ADMIN, Role.MD]);
+export const GET = withAuth(getStats);

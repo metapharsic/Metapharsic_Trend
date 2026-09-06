@@ -44,6 +44,7 @@ import { apiClient } from "@/lib/api-client";
 import { exportCurrentPageToExcel } from "@/lib/excel-export";
 import { systemHealth, SystemErrorRecord } from "@/lib/system-health";
 import { SystemDiagnosticsModal } from "@/components/system-diagnostics-modal";
+import { SystemUpdateModal } from "@/components/system-update-modal";
 
 // Structured navigation categories
 const NAV_CATEGORY_ORDER = [
@@ -128,10 +129,19 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [recentErrors, setRecentErrors] = useState<SystemErrorRecord[]>([]);
   const [exportToast, setExportToast] = useState<string | null>(null);
+  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<any>(null);
 
   useEffect(() => {
     const unsub = systemHealth.subscribe(setRecentErrors);
     return unsub;
+  }, []);
+
+  useEffect(() => {
+    apiClient
+      .get("/api/system/update/check")
+      .then((res) => setUpdateStatus(res.data.data.updateStatus))
+      .catch(() => {});
   }, []);
 
   // Track expanded accordion sections
@@ -449,6 +459,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
           {/* Right Header Tools: Universal Excel Export + Quick Jot + System Health + Badges */}
           <div className="flex items-center gap-2 sm:gap-3 ml-auto shrink-0">
+            {/* OTA Software Update Pulse Badge */}
+            {updateStatus?.updateAvailable && (
+              <button
+                onClick={() => setUpdateModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs shadow-md transition-all animate-pulse shrink-0 border border-amber-400/40"
+                title="Over-The-Air Update Ready: Click to review code changes"
+              >
+                <Download size={14} className="shrink-0" />
+                <span className="hidden sm:inline">⚡ Update {updateStatus.targetVersion} Ready</span>
+              </button>
+            )}
+
             {/* Universal Excel Export — 1-Click on EVERY page of the App */}
             <button
               onClick={() => {
@@ -522,6 +544,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <SystemDiagnosticsModal
           isOpen={diagnosticsOpen}
           onClose={() => setDiagnosticsOpen(false)}
+        />
+
+        {/* Over-The-Air Software Version & Code Diff Review Modal */}
+        <SystemUpdateModal
+          isOpen={updateModalOpen}
+          onClose={() => setUpdateModalOpen(false)}
         />
 
         <main className="relative flex-1 p-4 sm:p-6 overflow-y-auto bg-gray-50/50">

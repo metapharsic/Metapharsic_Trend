@@ -2,86 +2,64 @@ import { db } from "@/lib/db";
 import { Role } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, unauthorized, apiError } from "@/lib/api-response";
-import { outstandingBalance, creditStatus } from "@/lib/credit";
-import { startOfIstDay } from "@/lib/date";
+import { CreditAgentsService } from "@/services/credit-agents.service";
 
 /**
- * MR's own credit/collections picture: per-chemist outstanding against limit,
- * today's collection total, and which chemists need attention.
+ * MR's own multi-agent credit & collections intelligence.
  */
 async function getCreditSummary(req: AuthedRequest) {
   try {
     const employee = await db.employee.findUnique({
       where: { userId: req.user.sub },
-      include: { territories: { select: { id: true } } },
     });
     if (!employee) return unauthorized("Employee record not found");
 
-    const territoryIds = employee.territories.map((t) => t.id);
-    const today = startOfIstDay();
-
-    const [chemists, orderItems, collections, todaysCollections, collectionsList] = await Promise.all([
-      db.chemist.findMany({
-        where: { territoryId: { in: territoryIds } },
-        select: { id: true, name: true, creditLimit: true },
-      }),
-      db.orderItem.findMany({
-        where: {
-          order: {
-            chemist: { territoryId: { in: territoryIds } },
-            status: { in: ["CONFIRMED", "SHIPPED", "DELIVERED"] },
-          },
-        },
-        select: { price: true, quantity: true, order: { select: { chemistId: true } } },
-      }),
-      db.collection.findMany({
-        where: { chemist: { territoryId: { in: territoryIds } } },
-        select: { amount: true, chemistId: true },
-      }),
-      db.collection.aggregate({
-        where: { employeeId: employee.id, createdAt: { gte: today } },
-        _sum: { amount: true },
-      }),
-      db.collection.findMany({
-        where: { employeeId: employee.id },
-        include: { chemist: { select: { name: true } } },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-      }),
-    ]);
-
-    const orderedByChemist = new Map<string, number>();
-    for (const item of orderItems) {
-      const key = item.order.chemistId;
-      if (!key) continue;
-      orderedByChemist.set(key, (orderedByChemist.get(key) ?? 0) + Number(item.price) * item.quantity);
-    }
-    const collectedByChemist = new Map<string, number>();
-    for (const c of collections) {
-      collectedByChemist.set(c.chemistId, (collectedByChemist.get(c.chemistId) ?? 0) + Number(c.amount));
-    }
-
-    const rows = chemists.map((c) => {
-      const outstanding = outstandingBalance(orderedByChemist.get(c.id) ?? 0, collectedByChemist.get(c.id) ?? 0);
-      const limit = c.creditLimit !== null ? Number(c.creditLimit) : null;
-      return {
-        chemistId: c.id,
-        name: c.name,
-        creditLimit: limit,
-        outstanding,
-        status: creditStatus({ creditLimit: limit, outstanding }),
-      };
+    const pipelineResponse = await CreditAgentsService.executeCreditPipeline({
+      employeeId: employee.id,
     });
+    const data = pipelineResponse.creditData;
 
-    const attentionNeeded = rows.filter((r) => r.status === "WARNING" || r.status === "BREACHED");
-    const totalOutstanding = rows.reduce((sum, r) => sum + r.outstanding, 0);
+    const chemists = data.chemists.map((c) => ({
+      chemistId: c.chemistId,
+      name: c.chemistName,
+      address: c.address,
+      territory: c.territoryName,
+      mr: c.mrName,
+      creditLimit: c.creditLimit,
+      limitUtilizationPct: c.limitUtilizationPct,
+      outstanding: c.totalOutstanding,
+      status: c.status,
+      aging0To30: c.current0To30,
+      aging31To60: c.overdue31To60,
+      aging61To90: c.overdue61To90,
+      aging90Plus: c.overdue90Plus,
+      dsoDays: c.dsoDays,
+      riskTier: c.riskTier,
+      riskScore: c.riskScore,
+      unpaidInvoicesCount: c.unpaidInvoicesCount,
+      openInvoices: c.openInvoices,
+      lastPaymentDate: c.lastPaymentDate,
+      lastPaymentAmount: c.lastPaymentAmount,
+    }));
+
+    const attentionNeeded = chemists.filter(
+      (r) => r.status === "WARNING" || r.status === "BREACHED" || r.riskTier === "CRITICAL"
+    );
 
     return ok({
-      chemists: rows.sort((a, b) => b.outstanding - a.outstanding),
-      totalOutstanding,
+      chemists,
+      totalOutstanding: data.summary.totalOutstanding,
+      aging0To30: data.summary.aging0To30,
+      aging31To60: data.summary.aging31To60,
+      aging61To90: data.summary.aging61To90,
+      aging90Plus: data.summary.aging90Plus,
       attentionNeeded,
-      todaysCollection: Number(todaysCollections._sum.amount ?? 0),
-      collectionsList,
+      todaysCollection: data.summary.todaysCollection,
+      monthCollection: data.summary.monthCollection,
+      collectionsList: data.recentCollections,
+      riskAlerts: data.riskAlerts,
+      agents: pipelineResponse.agents,
+      timestamp: pipelineResponse.timestamp,
     });
   } catch (err) {
     console.error("[GET /api/mr/credit-summary]", err);
@@ -89,4 +67,4 @@ async function getCreditSummary(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getCreditSummary, [Role.MR]);
+export const GET = withAuth(getCreditSummary, [Role.MR, Role.ASM, Role.ADMIN, Role.MD]);

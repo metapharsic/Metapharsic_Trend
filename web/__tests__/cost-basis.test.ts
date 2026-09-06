@@ -3,7 +3,7 @@
  *
  * Regression test for the invoice ledger reading -35% and -53% margins on
  * profitable orders: free goods are charged at cost, and the "cost" used was
- * the PTS, which already carries the ~40% company markup.
+ * derived by removing the company markup.
  */
 import {
   costBasis,
@@ -13,7 +13,7 @@ import {
 } from "@/lib/pricing";
 
 const DEFAULT_COMPANY = 40;
-const DEFAULT_STOCKIST = 10;
+const DEFAULT_STOCKIST = 0;
 const DEFAULT_CHEMIST = 20;
 
 function assertFinitePositive(n: number, label: string): void {
@@ -36,8 +36,8 @@ describe("costBasis", () => {
     expect(basis.derivedUsing).toBeUndefined();
   });
 
-  it("removes the company markup when deriving cost from PTS", () => {
-    // 40% markup on cost: pts = cost * 1.4, so 140 -> 100, NOT 140.
+  it("removes the company markup when deriving cost from PTS or PTR", () => {
+    // 40% markup on cost: ptr = cost * 1.4, so 140 -> 100, NOT 140.
     const basis = costBasis({ pts: 140 });
     expect(basis.value).toBe(100);
     expect(basis.source).toBe("pts");
@@ -49,25 +49,23 @@ describe("costBasis", () => {
     });
   });
 
-  it("steps PTR down through the stockist margin then the company markup", () => {
-    // ptr 100 -> pts 100 * 0.9 = 90 -> cost 90 / 1.4 = 64.29
+  it("steps PTR down through the company markup (PTR calculated 100% on MRP)", () => {
+    // ptr 100 -> cost 100 / 1.4 = 71.43
     const basis = costBasis({ ptr: 100 });
-    expect(basis.value).toBe(64.29);
+    expect(basis.value).toBe(71.43);
     expect(basis.source).toBe("ptr");
     expect(basis.exact).toBe(false);
-    expect(basis.value).toBeLessThan(90); // cost < pts
     expect(basis.value).toBeLessThan(100); // cost < ptr
   });
 
-  it("steps an MRP-like price down through chemist, stockist and company", () => {
-    // price 200 -> ptr 160 -> pts 144 -> cost 144 / 1.4 = 102.86
+  it("steps an MRP-like price down through chemist margin and company markup", () => {
+    // price (MRP) 200 -> ptr 200 * 0.8 = 160 -> cost 160 / 1.4 = 114.29
     const basis = costBasis({ price: 200 });
-    expect(basis.value).toBe(102.86);
+    expect(basis.value).toBe(114.29);
     expect(basis.source).toBe("price");
     expect(basis.exact).toBe(false);
-    // cost < pts < ptr < price
-    expect(basis.value).toBeLessThan(144);
-    expect(144).toBeLessThan(160);
+    // cost < ptr < price
+    expect(basis.value).toBeLessThan(160);
     expect(160).toBeLessThan(200);
   });
 
@@ -94,7 +92,7 @@ describe("costBasis", () => {
       pts: 125,
       marginStructure: JSON.stringify({
         chemistMarginPct: 15,
-        stockistMarginPct: 5,
+        stockistMarginPct: 0,
         companyMarginPct: 25,
       }),
     };
@@ -104,7 +102,7 @@ describe("costBasis", () => {
     expect(basis.source).toBe("pts");
     expect(basis.derivedUsing).toEqual({
       companyMarkupPct: 25,
-      stockistMarginPct: 5,
+      stockistMarginPct: 0,
       chemistMarginPct: 15,
     });
   });
@@ -117,12 +115,11 @@ describe("costBasis", () => {
 });
 
 describe("profitFor - the real invoice case", () => {
-  it("reports a POSITIVE profit for 10 billed + 5 free at pts 75.67", () => {
-    // Before the fix: cost 75.67 * 15 = 1135.05 against revenue 840.80 = -35%.
-    const product: PricedProduct = { pts: 75.67 };
+  it("reports a POSITIVE profit for 10 billed + 5 free at ptr 75.67", () => {
+    const product: PricedProduct = { ptr: 75.67 };
     const unitCost = costBasis(product);
     expect(unitCost.value).toBe(54.05); // 75.67 / 1.4
-    expect(unitCost.source).toBe("pts");
+    expect(unitCost.source).toBe("ptr");
     expect(unitCost.exact).toBe(false);
 
     const result = profitFor([
@@ -135,12 +132,12 @@ describe("profitFor - the real invoice case", () => {
     expect(result.profitPct).toBe(3.57);
     expect(result.profitAmount).toBeGreaterThan(0);
     expect(result.exact).toBe(false);
-    expect(result.sources).toEqual(["pts"]);
+    expect(result.sources).toEqual(["ptr"]);
   });
 
   it("keeps profitPct null when there is no revenue", () => {
     const result = profitFor([
-      { quantity: 0, price: 0, freeQty: 5, product: { pts: 140 } },
+      { quantity: 0, price: 0, freeQty: 5, product: { ptr: 140 } },
     ]);
     expect(result.revenue).toBe(0);
     expect(result.profitPct).toBeNull();

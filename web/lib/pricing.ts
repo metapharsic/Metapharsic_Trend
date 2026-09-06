@@ -137,18 +137,14 @@ export function marginsFor(product: PricedProduct | null | undefined): DerivedMa
 }
 
 /** cost = pts / (1 + companyMarkup/100). */
-function costFromPts(pts: number, m: DerivedMargins): number {
+/** cost = ptr / (1 + companyMarkup/100). */
+function costFromPtr(ptr: number, m: DerivedMargins): number {
   const divisor = 1 + m.companyMarkupPct / 100;
   if (!(divisor > 0)) return 0;
-  return pts / divisor;
+  return ptr / divisor;
 }
 
-/** pts = ptr * (1 - stockistMargin/100). */
-function ptsFromPtr(ptr: number, m: DerivedMargins): number {
-  return ptr * (1 - m.stockistMarginPct / 100);
-}
-
-/** ptr = mrp * (1 - chemistMargin/100). */
+/** ptr = price (MRP) * (1 - chemistMargin/100). */
 function ptrFromPrice(price: number, m: DerivedMargins): number {
   return price * (1 - m.chemistMarginPct / 100);
 }
@@ -175,21 +171,21 @@ export function costBasis(product: PricedProduct | null | undefined): CostBasis 
 
   const m = marginsFor(product);
 
-  const pts = num(product.pts);
-  if (pts !== null && pts > 0) {
-    const value = finite(costFromPts(pts, m));
-    if (value > 0) return { value, source: "pts", exact: false, derivedUsing: m };
-  }
-
   const ptr = num(product.ptr);
   if (ptr !== null && ptr > 0) {
-    const value = finite(costFromPts(ptsFromPtr(ptr, m), m));
+    const value = finite(costFromPtr(ptr, m));
     if (value > 0) return { value, source: "ptr", exact: false, derivedUsing: m };
+  }
+
+  const pts = num(product.pts);
+  if (pts !== null && pts > 0) {
+    const value = finite(costFromPtr(pts, m));
+    if (value > 0) return { value, source: "pts", exact: false, derivedUsing: m };
   }
 
   const price = num(product.price);
   if (price !== null && price > 0) {
-    const value = finite(costFromPts(ptsFromPtr(ptrFromPrice(price, m), m), m));
+    const value = finite(costFromPtr(ptrFromPrice(price, m), m));
     if (value > 0) return { value, source: "price", exact: false, derivedUsing: m };
   }
 
