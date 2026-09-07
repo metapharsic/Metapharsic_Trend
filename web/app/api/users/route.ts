@@ -41,7 +41,13 @@ async function getUsers(req: AuthedRequest) {
             }
           : {}),
       },
-      include: {
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isActive: true,
+        deviceUuid: true,
+        createdAt: true,
         employee: {
           select: {
             id: true,

@@ -139,6 +139,16 @@ export default function UserManagementPage() {
     }
   };
 
+  const resetDeviceBinding = async (user: UserRecord) => {
+    if (!confirm(`Reset device binding for ${user.employee?.firstName || user.email}?\n\nThis will allow them to log in from a new device.`)) return;
+    try {
+      await apiClient.put(`/api/users/${user.id}`, { resetDeviceUuid: true });
+      fetchUsers();
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || "Failed to reset device binding");
+    }
+  };
+
   const openCreateModal = () => {
     setFormData({
       email: "",
@@ -579,6 +589,15 @@ export default function UserManagementPage() {
                                   >
                                     <Edit3 size={15} />
                                   </button>
+                                  {u.deviceUuid && (
+                                    <button
+                                      onClick={() => resetDeviceBinding(u)}
+                                      className="p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                                      title="Reset Device UUID Binding"
+                                    >
+                                      <RotateCcw size={15} />
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => toggleActive(u)}
                                     className={`p-1.5 rounded-lg transition-colors ${
