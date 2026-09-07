@@ -104,11 +104,7 @@ export class SoftwareUpdateAgentsService {
     const behindOutput = this.safeExec("git rev-list --count HEAD..origin/main");
     let commitsCount = parseInt(behindOutput, 10) || 0;
 
-    let updateAvailable = commitsCount > 0 || currentCommitHash !== remoteCommitHash;
-    if (!updateAvailable) {
-      updateAvailable = true;
-      commitsCount = 6;
-    }
+    const updateAvailable = commitsCount > 0 || currentCommitHash !== remoteCommitHash;
 
     const latency = Date.now() - t0;
 
@@ -372,8 +368,10 @@ export class SoftwareUpdateAgentsService {
       }
     } else {
       // ---- SELF-UPDATE MODE: this process IS the VPS instance ----
-      const pull = this.runLocal("SelfUpdatePullAgent", "git pull --ff-only", 60000);
-      steps.push({ name: "git pull --ff-only", ok: pull.ok, detail: pull.output });
+      // NOTE: We skip `git pull` here because the VPS may not have GitHub SSH/token auth.
+      // The post-commit hook already mirrors all changed files directly via pscp.
+      // We just need to rebuild from the already-updated files on disk.
+      steps.push({ name: "git pull", ok: true, detail: "Skipped — files already mirrored by post-commit hook via pscp. No GitHub auth required on VPS." });
 
       const build = this.runLocal(
         "SelfUpdateBuildAgent",
@@ -383,9 +381,6 @@ export class SoftwareUpdateAgentsService {
       steps.push({ name: "install + migrate + build", ok: build.ok, detail: build.output });
 
       // Same rule as local-push mode: a failed build must NEVER trigger a restart.
-      // Restarting into a broken/missing .next is what took the site down with a
-      // 502 before -- if the build failed, the currently-running process (which
-      // still has the last-good build loaded) is left alone.
       if (build.ok) {
         const restartCmd =
           "(pm2 reload trend-mr --update-env && echo RESTARTED_VIA_PM2) || (systemctl restart trend-mr && echo RESTARTED_VIA_SYSTEMD) || (nohup npm start > /var/log/trend-mr-app.log 2>&1 & echo RESTARTED_VIA_NOHUP)";
@@ -400,7 +395,7 @@ export class SoftwareUpdateAgentsService {
         steps.push({
           name: "Self-restart",
           ok: false,
-          detail: "SKIPPED -- build failed, so the currently-running process was left untouched to avoid taking the live app down.",
+          detail: "SKIPPED — build failed, so the currently-running process was left untouched to avoid taking the live app down.",
         });
       }
     }

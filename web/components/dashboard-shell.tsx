@@ -138,10 +138,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    apiClient
-      .get("/api/system/update/check")
-      .then((res) => setUpdateStatus(res.data.data.updateStatus))
-      .catch(() => {});
+    const checkUpdate = () => {
+      apiClient
+        .get("/api/system/update/check")
+        .then((res) => setUpdateStatus(res.data.data.updateStatus))
+        .catch(() => {});
+    };
+    // Check immediately on mount, then every 5 minutes
+    checkUpdate();
+    const interval = setInterval(checkUpdate, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   // Track expanded accordion sections
