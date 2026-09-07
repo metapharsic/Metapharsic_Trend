@@ -63,14 +63,14 @@ export async function POST(req: NextRequest) {
         return badRequest("Device UUID is required for MR login");
       }
 
-      if (!user.deviceUuid) {
-        // First-time bind
+      // Soft device binding — always allow login, auto-update UUID to current device.
+      // This prevents lockouts when MRs change phones or reinstall the app.
+      // Admins can see the bound device in Users panel for audit purposes.
+      if (deviceUuid && user.deviceUuid !== deviceUuid) {
         await db.user.update({
           where: { id: user.id },
           data: { deviceUuid },
         });
-      } else if (user.deviceUuid !== deviceUuid) {
-        return badRequest("Device UUID mismatch. Please contact administrator to reset device binding.");
       }
     }
 
