@@ -103,6 +103,10 @@ function currency(v: number) {
 export default function InventoryPage() {
   const [role, setRole] = useState<string | null>(null);
   const canManage = role === "ADMIN" || role === "MD" || role === "ASM" || role === "WAREHOUSE" || (role !== "MR" && role !== "DOCTOR" && role !== "DISTRIBUTOR");
+  // Purchase rate, margins, stock value/level, forecast, batch & audit are commercially
+  // confidential -- only ADMIN sees them here, in both the header and every row.
+  const isAdmin = role === "ADMIN";
+  const tableColSpan = 5 + (isAdmin ? 8 : 0) + (canManage ? 1 : 0);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -785,28 +789,32 @@ export default function InventoryPage() {
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">MRP</th>
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">PTR</th>
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">PTS</th>
-                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Purchase Rate (cost)</th>
-                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-center">Gross Margin (% of PTR)</th>
-                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Stock level</th>
-                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Stock Value</th>
-                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Last Updated</th>
-                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Forecast</th>
-                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Current Batch</th>
-                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-center">Audit</th>
+                  {isAdmin && (
+                    <>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Purchase Rate (cost)</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-center">Gross Margin (% of PTR)</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Stock level</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Stock Value</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Last Updated</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Forecast</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Current Batch</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-center">Audit</th>
+                    </>
+                  )}
                   {canManage && <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-center">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={13} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={tableColSpan} className="px-4 py-12 text-center text-slate-400">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500 mx-auto mb-2" />
                       Loading products...
                     </td>
                   </tr>
                 ) : filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="px-4 py-12 text-center text-slate-400 font-medium">
+                    <td colSpan={tableColSpan} className="px-4 py-12 text-center text-slate-400 font-medium">
                       No products found.
                     </td>
                   </tr>
@@ -836,94 +844,98 @@ export default function InventoryPage() {
                       <td className="px-4 py-3 text-right font-medium text-slate-700">₹{Number(p.mrp || 0).toFixed(2)}</td>
                       <td className="px-4 py-3 text-right font-medium text-slate-700">₹{Number(p.ptr || 0).toFixed(2)}</td>
                       <td className="px-4 py-3 text-right font-medium text-slate-700">₹{Number(p.pts || 0).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-600">
-                        {cost.value > 0 ? (
-                          <>
-                            ₹{cost.value.toFixed(2)}
-                            {!cost.exact && (
-                              <span
-                                className="ml-1 inline-block px-1 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 align-middle"
-                                title={`Estimated: no purchase rate is recorded, so this uses ${cost.source} as a proxy for cost.`}
-                              >
-                                est.
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          <span className="text-slate-300" title="No purchase rate, PTS, PTR or price is set for this product.">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {grossMarginOnPtrPct === null ? (
-                          <span className="text-slate-300" title="Needs a PTR and a cost basis.">—</span>
-                        ) : (
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                              cost.exact
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                : "bg-amber-50 text-amber-700 border-amber-200"
-                            }`}
-                            title={
-                              cost.exact
-                                ? "(PTR - purchase rate) / PTR - margin on the PTR selling price."
-                                : `Estimate: (PTR - ${cost.source}) / PTR. No purchase rate is recorded for this product.`
-                            }
-                          >
-                            {grossMarginOnPtrPct.toFixed(1)}%{cost.exact ? "" : " est."}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`inline-block font-bold text-xs ${
-                          p.stockQty <= 20 ? "text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg" : "text-emerald-700"
-                        }`}>
-                          {p.stockQty}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-700">
-                        {p.stockValue !== undefined ? `₹${p.stockValue.toLocaleString("en-IN")}` : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500">
-                        {p.lastMovementAt ? (
-                          <>
-                            <p className="text-slate-700">{new Date(p.lastMovementAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
-                            <p className="text-[10px] text-slate-400">{new Date(p.lastMovementAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>
-                          </>
-                        ) : "—"}
-                      </td>
-                      <td className="px-4 py-3">
-                        {p.forecast?.daysRemaining !== null && p.forecast?.daysRemaining !== undefined ? (
-                          <span className={`inline-flex items-center gap-1 text-xs font-bold ${
-                            p.forecast.daysRemaining <= 7 ? "text-rose-600" : p.forecast.daysRemaining <= 21 ? "text-amber-600" : "text-slate-600"
+                      {isAdmin && (
+                        <>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-600">
+                          {cost.value > 0 ? (
+                            <>
+                              ₹{cost.value.toFixed(2)}
+                              {!cost.exact && (
+                                <span
+                                  className="ml-1 inline-block px-1 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 align-middle"
+                                  title={`Estimated: no purchase rate is recorded, so this uses ${cost.source} as a proxy for cost.`}
+                                >
+                                  est.
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-slate-300" title="No purchase rate, PTS, PTR or price is set for this product.">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {grossMarginOnPtrPct === null ? (
+                            <span className="text-slate-300" title="Needs a PTR and a cost basis.">—</span>
+                          ) : (
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                cost.exact
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-amber-50 text-amber-700 border-amber-200"
+                              }`}
+                              title={
+                                cost.exact
+                                  ? "(PTR - purchase rate) / PTR - margin on the PTR selling price."
+                                  : `Estimate: (PTR - ${cost.source}) / PTR. No purchase rate is recorded for this product.`
+                              }
+                            >
+                              {grossMarginOnPtrPct.toFixed(1)}%{cost.exact ? "" : " est."}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`inline-block font-bold text-xs ${
+                            p.stockQty <= 20 ? "text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg" : "text-emerald-700"
                           }`}>
-                            <TrendingDown size={12} />
-                            {p.forecast.daysRemaining}d left
+                            {p.stockQty}
                           </span>
-                        ) : (
-                          <span className="text-[10px] text-slate-300">No recent sales</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {p.currentBatchNo ? (
-                          <>
-                            <p className="font-bold text-slate-800 leading-tight">{p.currentBatchNo}</p>
-                            <p className="text-[10px] text-slate-400 mt-0.5">
-                              {p.currentExpDate ? `Exp ${new Date(p.currentExpDate).toLocaleDateString("en-IN", { month: "2-digit", year: "2-digit" })}` : ""}
-                            </p>
-                          </>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => setHistoryProduct(p)}
-                          className="p-1.5 hover:bg-slate-100 hover:text-indigo-600 rounded-lg transition-colors cursor-pointer text-slate-400"
-                          title="View stock movement audit trail"
-                        >
-                          <History size={14} />
-                        </button>
-                      </td>
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-700">
+                          {p.stockValue !== undefined ? `₹${p.stockValue.toLocaleString("en-IN")}` : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">
+                          {p.lastMovementAt ? (
+                            <>
+                              <p className="text-slate-700">{new Date(p.lastMovementAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                              <p className="text-[10px] text-slate-400">{new Date(p.lastMovementAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>
+                            </>
+                          ) : "—"}
+                        </td>
+                        <td className="px-4 py-3">
+                          {p.forecast?.daysRemaining !== null && p.forecast?.daysRemaining !== undefined ? (
+                            <span className={`inline-flex items-center gap-1 text-xs font-bold ${
+                              p.forecast.daysRemaining <= 7 ? "text-rose-600" : p.forecast.daysRemaining <= 21 ? "text-amber-600" : "text-slate-600"
+                            }`}>
+                              <TrendingDown size={12} />
+                              {p.forecast.daysRemaining}d left
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-300">No recent sales</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {p.currentBatchNo ? (
+                            <>
+                              <p className="font-bold text-slate-800 leading-tight">{p.currentBatchNo}</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                {p.currentExpDate ? `Exp ${new Date(p.currentExpDate).toLocaleDateString("en-IN", { month: "2-digit", year: "2-digit" })}` : ""}
+                              </p>
+                            </>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => setHistoryProduct(p)}
+                            className="p-1.5 hover:bg-slate-100 hover:text-indigo-600 rounded-lg transition-colors cursor-pointer text-slate-400"
+                            title="View stock movement audit trail"
+                          >
+                            <History size={14} />
+                          </button>
+                        </td>
+                        </>
+                      )}
                       {canManage && (
                         <td className="px-4 py-3 text-center flex items-center justify-center gap-1.5">
                           <button

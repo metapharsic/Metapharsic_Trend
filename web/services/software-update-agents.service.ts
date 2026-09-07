@@ -347,7 +347,7 @@ export class SoftwareUpdateAgentsService {
       // ---- LOCAL PUSH MODE: this machine drives the VPS over SSH ----
       const build = this.runRemote(
         "VpsBuildAgent",
-        `cd ${VPS_WEB_DIR} && git pull --ff-only && npm ci --omit=dev && npx prisma generate && npx prisma db push --skip-generate --accept-data-loss=false && npm run build`,
+        `cd ${VPS_WEB_DIR} && git pull --ff-only && npm ci && npx prisma generate && npx prisma db push --skip-generate --accept-data-loss=false && npm run build`,
         600000
       );
       steps.push({ name: "Pull + install + migrate + build on VPS", ok: build.ok, detail: build.output });
@@ -365,7 +365,7 @@ export class SoftwareUpdateAgentsService {
 
       const build = this.runLocal(
         "SelfUpdateBuildAgent",
-        "npm ci --omit=dev && npx prisma generate && npx prisma db push --skip-generate --accept-data-loss=false && npm run build",
+        "npm ci && npx prisma generate && npx prisma db push --skip-generate --accept-data-loss=false && npm run build",
         600000
       );
       steps.push({ name: "install + migrate + build", ok: build.ok, detail: build.output });

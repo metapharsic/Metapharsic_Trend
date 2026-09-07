@@ -107,7 +107,7 @@ async function getProducts(req: AuthedRequest) {
       const costBasisSource: CostBasisSource = costBasisExact ? "purchaseRate" : costBasis(p).source;
       const grossMarginPct = unitValue > 0 ? Math.round(((unitValue - purchaseRate) / unitValue) * 1000) / 10 : 0;
 
-      return {
+      const full = {
         ...p,
         purchaseRate,
         marginSettings,
@@ -122,6 +122,31 @@ async function getProducts(req: AuthedRequest) {
           daysRemaining: rate > 0 ? Math.floor(p.stockQty / rate) : null,
         },
       };
+
+      // Purchase rate, margins, stock value/level, movement history, forecast and
+      // batch/audit data are commercially confidential -- ADMIN only. Stripped here
+      // (not just hidden in the UI) so it never reaches a non-admin browser's network
+      // tab in the first place.
+      if (req.user.role !== Role.ADMIN) {
+        const {
+          purchaseRate: _purchaseRate,
+          marginSettings: _marginSettings,
+          grossMarginPct: _grossMarginPct,
+          costBasisExact: _costBasisExact,
+          costBasisSource: _costBasisSource,
+          stockValue: _stockValue,
+          stockValueAtCost: _stockValueAtCost,
+          lastMovementAt: _lastMovementAt,
+          forecast: _forecast,
+          currentBatchNo: _currentBatchNo,
+          currentMfgDate: _currentMfgDate,
+          currentExpDate: _currentExpDate,
+          ...restricted
+        } = full;
+        return restricted;
+      }
+
+      return full;
     });
 
     return ok({
