@@ -191,25 +191,31 @@ export class SoftwareUpdateAgentsService {
         hash: status.targetCommitHash,
         author: "Metapharsic Multi-Agent Core <dev@metapharsic.com>",
         date: new Date().toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }),
-        message: "feat(v1.2.0): Chemist Receivables payment retrieval & reversal with live multi-agent telemetry",
+        message: "💳 Chemist Receivables — Wrong payment? You can now retrieve & reverse it. Choose the affected invoice, enter the reason, and the system auto-corrects the ledger, outstanding balance, and receipt — no manual journal entry needed.",
       },
       {
         hash: "e82a910",
         author: "Metapharsic Multi-Agent Core <dev@metapharsic.com>",
         date: new Date(Date.now() - 3600000 * 2).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }),
-        message: "feat(inventory): direct manual stock entry, cost basis & box-to-unit pricing converter",
+        message: "📦 Inventory Management — Set stock manually for any medicine. Enter box count, units per box, MRP, and cost — the system calculates total units, stock value, and auto-sets pricing. No more wrong inventory numbers from computed entries.",
       },
       {
         hash: "d34b019",
         author: "Metapharsic Multi-Agent Core <dev@metapharsic.com>",
         date: new Date(Date.now() - 3600000 * 5).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }),
-        message: "fix(pricing): calculate PTR 100% directly on MRP and defer PTS concept for commercial release",
+        message: "💊 PTR Calculator — Pricing is now calculated top-down directly from MRP. Enter MRP and chemist margin % — PTR is computed accurately in one step. The simulator also shows Net Realisation and margin breakdown for every product.",
       },
       {
         hash: "7f410c2",
         author: "Metapharsic Multi-Agent Core <dev@metapharsic.com>",
         date: new Date(Date.now() - 3600000 * 10).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }),
-        message: "feat(tour-plans): provision MTP monthly tour plan matrix with multi-agent daily route optimizer",
+        message: "🗺️ Monthly Tour Plan (MTP) — MRs can now plan their full month in a visual calendar. Select each date, assign doctors or chemists for visits, and submit for ASM approval. Tour plans are stored, trackable, and visible to managers.",
+      },
+      {
+        hash: "524ffad",
+        author: "Metapharsic Multi-Agent Core <dev@metapharsic.com>",
+        date: new Date(Date.now() - 3600000 * 18).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }),
+        message: "🔐 Device Login Fix — MRs were being blocked on login if they changed phones or reinstalled the app. Login now works from any device automatically — no admin reset needed every time. Device is tracked silently for security audit only.",
       },
     ];
 
@@ -267,12 +273,12 @@ export class SoftwareUpdateAgentsService {
     const totalDeletions = fileDiffs.reduce((sum, f) => sum + f.deletions, 0);
 
     const releaseNotes = [
-      "⚡ Update v1.2.0: Multi-Agent Payment Retrieval & Reversal in Chemist Receivables.",
-      "Direct manual stock & cost basis inventory override panel with box-to-unit converter.",
-      "PTR commercial calculation aligned 100% directly on MRP.",
-      "Monthly MTP Tour Planning provisioned from database with day-by-day scheduler.",
-      "Git commit auto-sync hook active — every commit automatically transfers to VPS.",
-      "100% Data-Safe Code Move: Local PostgreSQL database and .env settings are preserved.",
+      "💳 Payment Retrieval & Reversal — If a payment was recorded on the wrong invoice or for the wrong amount, you can now retrieve it. The system auto-reverses the collection, restores the outstanding balance on the original invoice, and updates the ledger — all in one click with a clear audit trail.",
+      "📦 Manual Inventory Control — Set the exact stock count for any medicine directly. Enter how many boxes you have, units per box, MRP, and purchase cost. The system calculates everything else — total units on shelf, stock value, and auto-pricing. Fixes wrong inventory caused by billing mismatches.",
+      "💊 PTR Calculator (MRP-first) — Price-to-Retailer is now calculated correctly top-down from MRP. Enter the product MRP and chemist margin percentage — PTR is derived in one step. The simulator also shows net realisation and full margin breakdown so you can see exactly what stays with the company.",
+      "🗺️ Monthly Tour Plan (MTP) — MRs can plan their full month visit calendar in advance. Pick dates, assign doctors and chemists per day, and submit to their ASM for approval. Plans are stored and visible to all managers for tracking field coverage.",
+      "🔐 Device Login — MRs no longer get locked out when they change phones or reinstall the app. Login works seamlessly from any device. No admin intervention required.",
+      "🛡️ 100% Data-Safe — This is a code-only update. Your database records, order history, invoices, collections, and master data are completely untouched.",
     ];
 
     return {

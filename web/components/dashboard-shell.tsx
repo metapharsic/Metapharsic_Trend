@@ -144,9 +144,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         .then((res) => setUpdateStatus(res.data.data.updateStatus))
         .catch(() => {});
     };
-    // Check immediately on mount, then every 5 minutes
+    // Check immediately on mount, then twice a day (every 12 hours)
     checkUpdate();
-    const interval = setInterval(checkUpdate, 5 * 60 * 1000);
+    const interval = setInterval(checkUpdate, 12 * 60 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
