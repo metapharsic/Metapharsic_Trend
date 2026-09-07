@@ -12,6 +12,43 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // MR field-rep accounts do not go through the manager door (see
+  // app/api/auth/login/manager/route.ts) -- they carry a device-bound
+  // session instead. This page has one form for every role, so it tries
+  // the manager door first and falls back to the MR door only when the
+  // manager door explicitly rejects the account for being an MR role.
+  const getOrCreateDeviceUuid = () => {
+    const KEY = "mrDeviceUuid";
+    let id = localStorage.getItem(KEY);
+    if (!id) {
+      id =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(KEY, id);
+    }
+    return id;
+  };
+
+  const redirectForRole = (role: string) => {
+    const roleRoutes: Record<string, string> = {
+      ADMIN: "/admin",
+      MD: "/md",
+      NSM: "/nsm",
+      ZSM: "/zsm",
+      RM: "/rm",
+      ASM: "/asm",
+      HR: "/hr",
+      FINANCE: "/finance",
+      WAREHOUSE: "/warehouse",
+      MARKETING: "/marketing",
+      DOCTOR: "/doctor",
+      DISTRIBUTOR: "/distributor",
+      MR: "/mr",
+    };
+    router.push(roleRoutes[role] || "/territories");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -19,26 +56,29 @@ export default function LoginPage() {
     try {
       const res = await axios.post("/api/auth/login/manager", { email, password });
       localStorage.setItem("accessToken", res.data.data.accessToken);
-      const role = res.data.data.user.role;
-      const roleRoutes: Record<string, string> = {
-        ADMIN: "/admin",
-        MD: "/md",
-        NSM: "/nsm",
-        ZSM: "/zsm",
-        RM: "/rm",
-        ASM: "/asm",
-        HR: "/hr",
-        FINANCE: "/finance",
-        WAREHOUSE: "/warehouse",
-        MARKETING: "/marketing",
-        DOCTOR: "/doctor",
-        DISTRIBUTOR: "/distributor",
-        MR: "/mr",
-      };
-      const redirectPath = roleRoutes[role] || "/territories";
-      router.push(redirectPath);
+      redirectForRole(res.data.data.user.role);
     } catch (err: any) {
-      setError(err?.response?.data?.error?.message || "Login failed");
+      const managerMessage: string = err?.response?.data?.error?.message || "";
+      const isMrAccount = managerMessage.includes("Use the app assigned to your role");
+
+      if (!isMrAccount) {
+        setError(managerMessage || "Login failed");
+        setLoading(false);
+        return;
+      }
+
+      // Retry through the MR door with a stable per-device UUID.
+      try {
+        const mrRes = await axios.post("/api/auth/login/mr", {
+          email,
+          password,
+          deviceUuid: getOrCreateDeviceUuid(),
+        });
+        localStorage.setItem("accessToken", mrRes.data.data.accessToken);
+        redirectForRole(mrRes.data.data.user.role);
+      } catch (mrErr: any) {
+        setError(mrErr?.response?.data?.error?.message || "Login failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -86,17 +126,10 @@ export default function LoginPage() {
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
               Password
             </label>
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="text-xs text-primary-600 hover:text-primary-700 font-medium select-none"
-            >
-              {showPassword ? "Hide" : "Show"}
-            </button>
           </div>
           <div className="relative">
             <input
-              type={showPassword ? "text" : "password"}
+              type="password"
               autoComplete="current-password"
               required
               className="w-full border border-gray-200 rounded-lg px-3 py-3 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 pr-10"

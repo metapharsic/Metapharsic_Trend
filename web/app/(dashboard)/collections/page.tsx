@@ -143,6 +143,7 @@ function EnterpriseCreditDashboard({ role }: { role: string | null }) {
   const [expandedChemistId, setExpandedChemistId] = useState<string | null>(null);
   const [selectedChemistForDetail, setSelectedChemistForDetail] = useState<ChemistCreditRow | null>(null);
   const [editingCollection, setEditingCollection] = useState<any | null>(null);
+  const [selectedCollectionForReversal, setSelectedCollectionForReversal] = useState<CollectionReceiptRow | null>(null);
   const [showAgentLogs, setShowAgentLogs] = useState<string | null>(null);
 
   const isMR = role === "MR";
@@ -762,18 +763,19 @@ function EnterpriseCreditDashboard({ role }: { role: string | null }) {
                   <td className="py-3 px-4 text-center font-sans">
                     <div className="flex items-center justify-center gap-1.5">
                       <button
+                        onClick={() => setSelectedCollectionForReversal(col)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg font-bold text-[11px] transition border border-amber-200 cursor-pointer shadow-xs"
+                        title="Retrieve / Reverse Payment"
+                      >
+                        <RefreshCw size={12} />
+                        <span>Retrieve Payment</span>
+                      </button>
+                      <button
                         onClick={() => setEditingCollection(col)}
                         className="p-1 text-slate-400 hover:text-emerald-600 transition"
                         title="Edit Receipt"
                       >
                         <Edit2 size={14} />
-                      </button>
-                      <button
-                        onClick={() => deleteCollection(col.id)}
-                        className="p-1 text-slate-400 hover:text-rose-600 transition"
-                        title="Delete Receipt"
-                      >
-                        <Trash2 size={14} />
                       </button>
                     </div>
                   </td>
@@ -822,6 +824,18 @@ function EnterpriseCreditDashboard({ role }: { role: string | null }) {
           chemist={selectedChemistForDetail}
           onClose={() => setSelectedChemistForDetail(null)}
           onUpdateLimit={loadData}
+        />
+      )}
+
+      {/* ─── Retrieve Payment Reversal Modal ────────────────────────────────────── */}
+      {selectedCollectionForReversal && (
+        <RetrievePaymentModal
+          collection={selectedCollectionForReversal}
+          onClose={() => setSelectedCollectionForReversal(null)}
+          onSuccess={() => {
+            setSelectedCollectionForReversal(null);
+            loadData();
+          }}
         />
       )}
     </div>
@@ -1300,6 +1314,211 @@ function ChemistDetailModal({
             </button>
           </div>
           {msg && <p className="text-xs font-semibold text-emerald-700">{msg}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RetrievePaymentModal({
+  collection,
+  onClose,
+  onSuccess,
+}: {
+  collection: CollectionReceiptRow;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [reason, setReason] = useState("Payment recorded by mistake / wrong entry");
+  const [customReason, setCustomReason] = useState("");
+  const [reversing, setReversing] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleConfirmReversal = async () => {
+    const finalReason = reason === "OTHER" ? customReason.trim() || "User retrieval request" : reason;
+    setReversing(true);
+    setError("");
+
+    try {
+      await apiClient.post("/api/mr/collections/reverse", {
+        collectionId: collection.id,
+        reason: finalReason,
+      });
+      onSuccess();
+    } catch (err: any) {
+      console.error("Failed to retrieve payment collection:", err);
+      const msg = err?.response?.data?.error?.message || err?.response?.data?.message || "Failed to retrieve payment.";
+      setError(msg);
+    } finally {
+      setReversing(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 p-6 space-y-5">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-amber-100 text-amber-700">
+              <RefreshCw size={18} />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Retrieve &amp; Reverse Payment Receipt</h3>
+              <p className="text-xs text-slate-500">Multi-Agent Database Table Reversal &amp; Ledger Sync</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 rounded-xl">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Collection Summary Box */}
+        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-500 font-medium">Chemist Account:</span>
+            <span className="font-bold text-slate-900">{collection.chemistName}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-500 font-medium">Amount Collected:</span>
+            <span className="font-mono font-bold text-emerald-600 text-sm">{currency(collection.amount)}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-500 font-medium">Logged By:</span>
+            <span className="font-medium text-slate-800">{collection.mrName}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-500 font-medium">Ref / Instrument #:</span>
+            <span className="font-mono text-slate-700">{collection.refNumber || "CASH-RECEIPT"}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-500 font-medium">Logged Date:</span>
+            <span className="text-slate-600 font-sans">
+              {new Date(collection.createdAt).toLocaleDateString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </div>
+        </div>
+
+        {/* Reason Selection */}
+        <div className="space-y-2">
+          <label className="block text-xs font-bold text-slate-800">
+            Select Reversal / Retrieval Reason:
+          </label>
+          <select
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-indigo-500"
+          >
+            <option value="Payment recorded by mistake / wrong entry">
+              ⚠️ Payment recorded by mistake / wrong entry
+            </option>
+            <option value="Cheque bounced / instrument dishonored">
+              🔴 Cheque bounced / instrument dishonored
+            </option>
+            <option value="Duplicate payment entry">
+              📑 Duplicate payment entry
+            </option>
+            <option value="Customer requested refund / entry correction">
+              🔄 Customer requested refund / entry correction
+            </option>
+            <option value="OTHER">✍️ Custom reason...</option>
+          </select>
+
+          {reason === "OTHER" && (
+            <input
+              type="text"
+              placeholder="Enter custom reversal reason..."
+              value={customReason}
+              onChange={(e) => setCustomReason(e.target.value)}
+              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-indigo-500 mt-2"
+            />
+          )}
+        </div>
+
+        {/* Multi-Agent Telemetry Status Card */}
+        <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-3.5 rounded-2xl space-y-2 shadow-md">
+          <div className="flex items-center justify-between text-[11px]">
+            <div className="flex items-center gap-1.5">
+              <Sparkles size={14} className="text-amber-400 animate-pulse" />
+              <span className="font-bold">Multi-Agent Reversal Pipeline</span>
+            </div>
+            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              4 Agents Active
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 text-[9.5px]">
+            <div className="p-2 rounded-xl bg-white/10 border border-white/10 space-y-0.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-white">PaymentReversalAgent</span>
+                <span className="text-[8px] font-black px-1.5 py-0.2 rounded-full bg-amber-500/30 text-amber-300">
+                  REVERSED
+                </span>
+              </div>
+              <p className="text-[8.5px] text-slate-300 leading-tight">
+                Deletes payment receipt &amp; reverses ledger entries
+              </p>
+            </div>
+            <div className="p-2 rounded-xl bg-white/10 border border-white/10 space-y-0.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-white">InvoiceReconciliationAgent</span>
+                <span className="text-[8px] font-black px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-emerald-300">
+                  SYNCED
+                </span>
+              </div>
+              <p className="text-[8.5px] text-slate-300 leading-tight">
+                Restores unpaid invoice balances &amp; status
+              </p>
+            </div>
+            <div className="p-2 rounded-xl bg-white/10 border border-white/10 space-y-0.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-white">LedgerBalanceAgent</span>
+                <span className="text-[8px] font-black px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-emerald-300">
+                  AUDITED
+                </span>
+              </div>
+              <p className="text-[8.5px] text-slate-300 leading-tight">
+                Recalculates 0-90+ aging matrix &amp; DSO
+              </p>
+            </div>
+            <div className="p-2 rounded-xl bg-white/10 border border-white/10 space-y-0.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-white">AuditTrailAgent</span>
+                <span className="text-[8px] font-black px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-emerald-300">
+                  ONLINE
+                </span>
+              </div>
+              <p className="text-[8.5px] text-slate-300 leading-tight">
+                Logs audit trail &amp; system notification
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {error && <p className="text-xs text-rose-600 font-bold bg-rose-50 p-2.5 rounded-xl border border-rose-200">{error}</p>}
+
+        <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirmReversal}
+            disabled={reversing}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+          >
+            <RefreshCw size={13} className={reversing ? "animate-spin" : ""} />
+            <span>{reversing ? "Reversing Payment..." : "Confirm Payment Retrieval"}</span>
+          </button>
         </div>
       </div>
     </div>

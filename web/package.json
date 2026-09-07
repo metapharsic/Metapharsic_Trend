@@ -16,6 +16,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:sync-vps": "tsx scripts/sync-vps-to-local.ts",
+    "db:push-vps": "tsx scripts/push-local-to-vps.ts",
     "report:mr:agents": "tsx scripts/generate-mr-multiagent-report.ts"
   },
   "dependencies": {

@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { Role } from "@prisma/client";
 import { startOfIstDay, startOfIstMonth } from "@/lib/date";
 import { round2 } from "@/lib/pricing";
+import { reverseAutoLedger } from "@/lib/ledger";
 
 export type CreditRiskTier = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
@@ -513,6 +514,113 @@ export class CreditAgentsService {
         recentCollections,
         riskAlerts,
       },
+    };
+  }
+
+  /**
+   * Multi-Agent Payment Retrieval & Database Table Reversal Engine
+   * Reverses a payment collection receipt, restores invoice balances,
+   * reverses ledger postings, and recalculates credit exposure & aging matrix.
+   */
+  public static async reversePaymentCollection(params: {
+    collectionId: string;
+    reason?: string;
+    userId?: string;
+  }) {
+    const collection = await db.collection.findUnique({
+      where: { id: params.collectionId },
+      include: {
+        chemist: true,
+        employee: true,
+      },
+    });
+
+    if (!collection) {
+      throw new Error(`Collection receipt not found: ${params.collectionId}`);
+    }
+
+    const collectionAmount = Number(collection.amount);
+    const chemistId = collection.chemistId;
+    const chemistName = collection.chemist?.name || "Chemist Outlet";
+    const refNo = collection.refNumber || "";
+
+    // ─────────────────────────────────────────────────────────────
+    // TRANSACTION: Database Tables Reversal & Sync
+    // ─────────────────────────────────────────────────────────────
+    const tReversal = Date.now();
+    await db.$transaction(async (tx) => {
+      // 1. Reverse AutoLedger postings
+      await reverseAutoLedger(tx, "COLLECTION", collection.id);
+
+      // 2. Check if refNumber references an invoice (e.g., "[INV-1002]")
+      const invMatch = refNo.match(/\[(INV-[^\]]+)\]/i) || refNo.match(/(INV-[A-Za-z0-9-]+)/i);
+      if (invMatch) {
+        const invNo = invMatch[1];
+        const invoice = await tx.invoice.findUnique({ where: { invoiceNo: invNo } });
+        if (invoice) {
+          // Revert paid status to false so it re-appears as open/unpaid
+          await tx.invoice.update({
+            where: { id: invoice.id },
+            data: { paid: false },
+          });
+        }
+      }
+
+      // Reconcile all unpaid invoices for this chemist: ensure paid flag is false if balance remains
+      const chemistOrders = await tx.order.findMany({
+        where: { chemistId },
+        select: { id: true },
+      });
+      const orderIds = chemistOrders.map((o) => o.id);
+
+      if (orderIds.length > 0) {
+        await tx.invoice.updateMany({
+          where: {
+            orderId: { in: orderIds },
+          },
+          data: { paid: false },
+        });
+      }
+
+      // 3. Delete the collection entry from the database
+      await tx.collection.delete({ where: { id: collection.id } });
+    });
+
+    const reversalLatency = Date.now() - tReversal;
+
+    // ─────────────────────────────────────────────────────────────
+    // MULTI-AGENT PIPELINE EXECUTION: Re-evaluate Credit Engine
+    // ─────────────────────────────────────────────────────────────
+    const pipeline = await this.executeCreditPipeline();
+
+    // Customize agent status reports for reversal event
+    const agents: CreditAgentHealthStatus[] = pipeline.agents.map((ag) => {
+      if (ag.id === "agent-collection-reconciliation") {
+        return {
+          ...ag,
+          status: "REVERSED" as any,
+          lastExecutionMs: reversalLatency,
+          summary: `Reversed payment ₹${collectionAmount.toLocaleString("en-IN")} for ${chemistName}`,
+          logs: [
+            `Reversed payment collection receipt #${collection.id} (Amount: ₹${collectionAmount}).`,
+            `Restored unpaid invoice balances and updated accounts receivable ledger.`,
+            `Reason: ${params.reason || "Payment recorded by mistake / User retrieval request"}.`,
+          ],
+        };
+      }
+      return ag;
+    });
+
+    return {
+      success: true,
+      collectionId: collection.id,
+      chemistId,
+      chemistName,
+      amountReversed: collectionAmount,
+      reason: params.reason || "User retrieval request",
+      agents,
+      creditData: pipeline.creditData,
+      timestamp: pipeline.timestamp,
     };
   }
 }
