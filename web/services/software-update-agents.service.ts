@@ -352,12 +352,24 @@ export class SoftwareUpdateAgentsService {
       );
       steps.push({ name: "Pull + install + migrate + build on VPS", ok: build.ok, detail: build.output });
 
-      const restart = this.runRemote(
-        "VpsAppLifecycleAgent",
-        `cd ${VPS_WEB_DIR} && (pm2 reload trend-mr --update-env && echo RESTARTED_VIA_PM2) || (systemctl restart trend-mr && echo RESTARTED_VIA_SYSTEMD) || (pkill -f 'next-server|next start' ; sleep 1 ; nohup npm start > /var/log/trend-mr-app.log 2>&1 & echo RESTARTED_VIA_NOHUP)`,
-        60000
-      );
-      steps.push({ name: "Kill & restart VPS app process", ok: restart.ok, detail: restart.output });
+      // CRITICAL: never restart/kill the live process on a failed build. The old
+      // build is still on disk and still serving traffic -- restarting into a
+      // half-built or missing .next is exactly what caused the 502 outages before
+      // this fix. Leave the working process alone and report the failure instead.
+      if (build.ok) {
+        const restart = this.runRemote(
+          "VpsAppLifecycleAgent",
+          `cd ${VPS_WEB_DIR} && (pm2 reload trend-mr --update-env && echo RESTARTED_VIA_PM2) || (systemctl restart trend-mr && echo RESTARTED_VIA_SYSTEMD) || (pkill -f 'next-server|next start' ; sleep 1 ; nohup npm start > /var/log/trend-mr-app.log 2>&1 & echo RESTARTED_VIA_NOHUP)`,
+          60000
+        );
+        steps.push({ name: "Kill & restart VPS app process", ok: restart.ok, detail: restart.output });
+      } else {
+        steps.push({
+          name: "Kill & restart VPS app process",
+          ok: false,
+          detail: "SKIPPED -- build failed, so the previously-running process was left untouched to avoid taking the live app down.",
+        });
+      }
     } else {
       // ---- SELF-UPDATE MODE: this process IS the VPS instance ----
       const pull = this.runLocal("SelfUpdatePullAgent", "git pull --ff-only", 60000);
@@ -370,14 +382,26 @@ export class SoftwareUpdateAgentsService {
       );
       steps.push({ name: "install + migrate + build", ok: build.ok, detail: build.output });
 
-      // Restart is fired off detached so the response to the client's click can still return.
-      const restartCmd =
-        "(pm2 reload trend-mr --update-env && echo RESTARTED_VIA_PM2) || (systemctl restart trend-mr && echo RESTARTED_VIA_SYSTEMD) || (nohup npm start > /var/log/trend-mr-app.log 2>&1 & echo RESTARTED_VIA_NOHUP)";
-      try {
-        execSync(`(sleep 2 && ${restartCmd}) >/tmp/trend-mr-restart.log 2>&1 &`, { cwd: this.getCwd(), shell: "/bin/bash" as any });
-        steps.push({ name: "Self-restart scheduled (fires after response is sent)", ok: true, detail: "Detached restart queued." });
-      } catch (e: any) {
-        steps.push({ name: "Self-restart scheduled", ok: false, detail: e?.message || "Failed to schedule restart" });
+      // Same rule as local-push mode: a failed build must NEVER trigger a restart.
+      // Restarting into a broken/missing .next is what took the site down with a
+      // 502 before -- if the build failed, the currently-running process (which
+      // still has the last-good build loaded) is left alone.
+      if (build.ok) {
+        const restartCmd =
+          "(pm2 reload trend-mr --update-env && echo RESTARTED_VIA_PM2) || (systemctl restart trend-mr && echo RESTARTED_VIA_SYSTEMD) || (nohup npm start > /var/log/trend-mr-app.log 2>&1 & echo RESTARTED_VIA_NOHUP)";
+        try {
+          // Fired off detached so the response to the client's click can still return.
+          execSync(`(sleep 2 && ${restartCmd}) >/tmp/trend-mr-restart.log 2>&1 &`, { cwd: this.getCwd(), shell: "/bin/bash" as any });
+          steps.push({ name: "Self-restart scheduled (fires after response is sent)", ok: true, detail: "Detached restart queued." });
+        } catch (e: any) {
+          steps.push({ name: "Self-restart scheduled", ok: false, detail: e?.message || "Failed to schedule restart" });
+        }
+      } else {
+        steps.push({
+          name: "Self-restart",
+          ok: false,
+          detail: "SKIPPED -- build failed, so the currently-running process was left untouched to avoid taking the live app down.",
+        });
       }
     }
 
