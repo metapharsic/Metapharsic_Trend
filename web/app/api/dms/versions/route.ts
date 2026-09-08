@@ -44,4 +44,4 @@ async function getDmsVersions(_req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getDmsVersions, Object.values(Role));
+export const GET = withAuth(getDmsVersions, [Role.ADMIN]);

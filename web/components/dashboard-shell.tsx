@@ -108,7 +108,7 @@ const NAV_ITEMS = [
   { href: "/marketing", label: "Marketing Campaigns", icon: BarChart3, roles: ["MARKETING", "ADMIN"], category: "Analytics & Marketing" },
 
   // ── Administration & Profile ─────────────────────────────────
-  { href: "/dms", label: "Document Management (DMS)", icon: Folder, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "HR", "FINANCE", "WAREHOUSE", "MARKETING", "MR", "DISTRIBUTOR", "DOCTOR"], category: "Administration & Profile" },
+  { href: "/dms", label: "Document Management (DMS)", icon: Folder, roles: ["ADMIN"], category: "Administration & Profile" },
   { href: "/admin/ptr-calculator", label: "PTR & Scheme Simulator", icon: Calculator, roles: ["ADMIN", "MD"], category: "Administration & Profile" },
 
   { href: "/admin/accounts-jotter", label: "Quick Accounts Jotter", icon: BookOpen, roles: ["ADMIN", "FINANCE"], category: "Administration & Profile" },

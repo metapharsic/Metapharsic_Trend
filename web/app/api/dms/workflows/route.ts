@@ -34,4 +34,4 @@ async function getDmsWorkflows(_req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getDmsWorkflows, Object.values(Role));
+export const GET = withAuth(getDmsWorkflows, [Role.ADMIN]);

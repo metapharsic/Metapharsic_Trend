@@ -11,6 +11,7 @@ import { generateExcelCsv, downloadFile } from '@/lib/excel-export';
 
 export const DocumentsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'DOCUMENTS' | 'VERSION_HISTORY' | 'WORKFLOW' | 'REPORTS'>('DOCUMENTS');
+  const [isAccessDenied, setIsAccessDenied] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -71,6 +72,20 @@ export const DocumentsView: React.FC = () => {
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.role !== 'ADMIN') {
+          setIsAccessDenied(true);
+        }
+      } catch (e) {
+        console.error('Failed to parse token in DMS');
+      }
+    }
+  }, []);
+
   // Data Fetching
   const fetchDmsData = useCallback(async () => {
     setLoading(true);
@@ -84,6 +99,12 @@ export const DocumentsView: React.FC = () => {
         fetch('/api/dms/audits', { headers }),
         fetch('/api/dms/notifications', { headers })
       ]);
+
+      if (docsRes.status === 403 || docsRes.status === 401) {
+        setIsAccessDenied(true);
+        setLoading(false);
+        return;
+      }
 
       if (docsRes.ok) {
         const json = await docsRes.json();
@@ -116,10 +137,11 @@ export const DocumentsView: React.FC = () => {
     }
   }, [searchTerm, selectedCategory, selectedStatus]);
 
-
   useEffect(() => {
-    fetchDmsData();
-  }, [fetchDmsData]);
+    if (!isAccessDenied) {
+      fetchDmsData();
+    }
+  }, [fetchDmsData, isAccessDenied]);
 
   // Filtering & Sorting
   const filteredDocs = documents
@@ -295,6 +317,20 @@ export const DocumentsView: React.FC = () => {
       default: return <Folder className="w-4 h-4 text-slate-400" />;
     }
   };
+
+  if (isAccessDenied) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center space-y-4 bg-slate-950 text-slate-100 rounded-3xl border border-slate-800 my-8 shadow-2xl">
+        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shadow-xl">
+          <Shield className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-bold text-white">Access Restricted to System Administrators</h2>
+        <p className="text-sm text-slate-400 max-w-md">
+          The Document Management System (DMS) contains statutory compliance certificates, GST registration files, and confidential company records. Access is strictly reserved for System Administrators only.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6 bg-slate-950 text-slate-100 min-h-screen">

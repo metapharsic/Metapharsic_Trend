@@ -140,6 +140,6 @@ async function deleteDocument(req: AuthedRequest, context: Context) {
   }
 }
 
-export const GET = withAuth(getDocumentDetails, Object.values(Role));
-export const PUT = withAuth(updateDocument, [Role.ADMIN, Role.MD, Role.HR, Role.ASM, Role.ZSM, Role.NSM, Role.RM, Role.WAREHOUSE]);
-export const DELETE = withAuth(deleteDocument, [Role.ADMIN, Role.MD, Role.HR, Role.ASM, Role.ZSM, Role.NSM, Role.RM]);
+export const GET = withAuth(getDocumentDetails, [Role.ADMIN]);
+export const PUT = withAuth(updateDocument, [Role.ADMIN]);
+export const DELETE = withAuth(deleteDocument, [Role.ADMIN]);

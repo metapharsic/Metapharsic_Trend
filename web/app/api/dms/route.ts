@@ -153,6 +153,6 @@ async function createDocument(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getDocuments, Object.values(Role));
-export const POST = withAuth(createDocument, [Role.ADMIN, Role.MD, Role.HR, Role.ASM, Role.ZSM, Role.NSM, Role.RM, Role.WAREHOUSE]);
+export const GET = withAuth(getDocuments, [Role.ADMIN]);
+export const POST = withAuth(createDocument, [Role.ADMIN]);
 

@@ -28,4 +28,4 @@ async function getDmsAudits(_req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getDmsAudits, Object.values(Role));
+export const GET = withAuth(getDmsAudits, [Role.ADMIN]);

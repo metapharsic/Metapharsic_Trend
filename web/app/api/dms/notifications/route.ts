@@ -50,4 +50,4 @@ async function getExpiringNotifications(_req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getExpiringNotifications, Object.values(Role));
+export const GET = withAuth(getExpiringNotifications, [Role.ADMIN]);

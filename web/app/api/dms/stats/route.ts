@@ -59,4 +59,4 @@ async function getDmsStats(_req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getDmsStats, Object.values(Role));
+export const GET = withAuth(getDmsStats, [Role.ADMIN]);
