@@ -1,0 +1,192 @@
+{
+  "documents": [
+    {
+      "id": "DOC-001",
+      "title": "SOP for Tablet Compression",
+      "category": "SOP",
+      "type": "PDF",
+      "size": "2.4 MB",
+      "version": "2.1",
+      "uploadDate": "2026-10-15",
+      "expiryDate": "2027-10-15",
+      "author": "Dr. R. Singh",
+      "status": "Active"
+    },
+    {
+      "id": "DOC-004",
+      "title": "Fire Safety Certificate",
+      "category": "License",
+      "type": "PDF",
+      "size": "1.1 MB",
+      "version": "1.0",
+      "uploadDate": "2026-05-15",
+      "expiryDate": "2026-12-31",
+      "author": "Safety Officer",
+      "status": "Active"
+    },
+    {
+      "id": "DOC-005",
+      "title": "Employee Hygiene Policy",
+      "category": "Policy",
+      "type": "DOCX",
+      "size": "0.8 MB",
+      "version": "1.2",
+      "uploadDate": "2026-09-12",
+      "expiryDate": "2026-11-15",
+      "author": "HR Manager",
+      "status": "Active"
+    },
+    {
+      "id": "DOC-007",
+      "title": "Equipment Validation Protocol",
+      "category": "Compliance",
+      "type": "PDF",
+      "size": "4.5 MB",
+      "version": "1.0",
+      "uploadDate": "2026-07-15",
+      "expiryDate": "2026-07-25",
+      "author": "Validation Team",
+      "status": "Pending"
+    },
+    {
+      "id": "DOC-008",
+      "title": "Annual Environmental Compliance Report",
+      "category": "Report",
+      "type": "XLSX",
+      "size": "3.2 MB",
+      "version": "1.0",
+      "uploadDate": "2026-11-01",
+      "expiryDate": "2026-11-25",
+      "author": "EHS Head",
+      "status": "Pending"
+    },
+    {
+      "id": "DOC-009",
+      "title": "GMP Training Manual",
+      "category": "Policy",
+      "type": "PDF",
+      "size": "5.8 MB",
+      "version": "3.0",
+      "uploadDate": "2026-06-15",
+      "expiryDate": "2027-06-15",
+      "author": "Training Coordinator",
+      "status": "Active"
+    },
+    {
+      "id": "DOC-010",
+      "title": "Material Safety Data Sheet - API",
+      "category": "Compliance",
+      "type": "PDF",
+      "size": "1.5 MB",
+      "version": "2.0",
+      "uploadDate": "2026-09-25",
+      "expiryDate": "2027-09-25",
+      "author": "QC Department",
+      "status": "Active"
+    }
+  ],
+  "versions": [
+    {
+      "id": "1",
+      "documentId": "DOC-001",
+      "title": "SOP for Tablet Compression",
+      "version": "1.0",
+      "fileUrl": "/uploads/dms/DOC-001-v1.pdf",
+      "fileSize": 2097152,
+      "uploadedBy": "Dr. R. Singh",
+      "uploadDate": "2022-01-15",
+      "changeLog": "Initial SOP release",
+      "approvedBy": "QA Head",
+      "approvalDate": "2022-01-15",
+      "status": "Archived"
+    },
+    {
+      "id": "2",
+      "documentId": "DOC-001",
+      "title": "SOP for Tablet Compression",
+      "version": "2.0",
+      "fileUrl": "/uploads/dms/DOC-001-v2.pdf",
+      "fileSize": 2411724,
+      "uploadedBy": "Dr. R. Singh",
+      "uploadDate": "2023-05-10",
+      "changeLog": "Updated compression parameters",
+      "approvedBy": "QA Head",
+      "approvalDate": "2023-05-10",
+      "status": "Previous"
+    },
+    {
+      "id": "3",
+      "documentId": "DOC-001",
+      "title": "SOP for Tablet Compression",
+      "version": "2.1",
+      "fileUrl": "/uploads/dms/DOC-001-v2.1.pdf",
+      "fileSize": 2516582,
+      "uploadedBy": "Dr. R. Singh",
+      "uploadDate": "2023-10-16",
+      "changeLog": "Minor adjustments for humidity thresholds",
+      "approvedBy": "Quality Head",
+      "approvalDate": "2023-10-16",
+      "status": "Current"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "WF-001",
+      "documentId": "DOC-005",
+      "documentTitle": "Employee Hygiene Policy",
+      "currentStep": "Review",
+      "assignedTo": "HR Manager",
+      "dueDate": "2026-11-15",
+      "comments": [],
+      "status": "In Progress",
+      "createdAt": "2026-09-12",
+      "updatedAt": "2026-10-20"
+    },
+    {
+      "id": "WF-002",
+      "documentId": "DOC-008",
+      "documentTitle": "Annual Environmental Compliance Report",
+      "currentStep": "Approval",
+      "assignedTo": "EHS Head",
+      "dueDate": "2026-11-25",
+      "comments": [],
+      "status": "Pending",
+      "createdAt": "2026-11-01",
+      "updatedAt": "2026-11-01"
+    },
+    {
+      "id": "WF-003",
+      "documentId": "DOC-001",
+      "documentTitle": "SOP for Tablet Compression",
+      "currentStep": "Published",
+      "assignedTo": "QA Manager",
+      "dueDate": "2026-10-20",
+      "comments": [],
+      "status": "Completed",
+      "createdAt": "2026-10-10",
+      "updatedAt": "2026-10-16"
+    }
+  ],
+  "auditTrails": [
+    {
+      "id": "AT-001",
+      "documentId": "DOC-001",
+      "action": "Created",
+      "userId": "USR-001",
+      "userName": "Dr. R. Singh",
+      "timestamp": "2026-10-15T09:30:00",
+      "ipAddress": "192.168.1.100",
+      "details": "Document created with initial version 2.1"
+    },
+    {
+      "id": "AT-002",
+      "documentId": "DOC-001",
+      "action": "Viewed",
+      "userId": "USR-002",
+      "userName": "Production Manager",
+      "timestamp": "2026-10-15T10:15:00",
+      "ipAddress": "192.168.1.105",
+      "details": "Document viewed for implementation review"
+    }
+  ]
+}
