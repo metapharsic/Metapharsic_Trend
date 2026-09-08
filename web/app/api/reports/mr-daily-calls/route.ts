@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { Role } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, badRequest, apiError } from "@/lib/api-response";
+import { MrDailyCallsAgentsService } from "@/services/mr-daily-calls-agents.service";
 
 async function handler(req: AuthedRequest) {
   try {
@@ -11,10 +12,10 @@ async function handler(req: AuthedRequest) {
     const endDateParam = searchParams.get("endDate");
     const search = searchParams.get("search") ?? "";
 
-    // Date range: default to today (UTC)
+    // Date range: default to last 7 days UTC if not provided
     const now = new Date();
-    const defaultStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    const defaultEnd = new Date(defaultStart.getTime() + 86400000);
+    const defaultEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+    const defaultStart = new Date(defaultEnd.getTime() - 7 * 86400000);
 
     const startDate = startDateParam ? new Date(`${startDateParam}T00:00:00.000Z`) : defaultStart;
     const endDate = endDateParam ? new Date(`${endDateParam}T23:59:59.999Z`) : defaultEnd;
@@ -32,153 +33,23 @@ async function handler(req: AuthedRequest) {
         where: { userId: req.user.sub },
         select: { id: true },
       });
-      if (!emp) return badRequest("Employee record not found");
+      if (!emp) return badRequest("Employee record not found for MR user.");
       scopeEmployeeId = emp.id;
     } else if (mrId) {
       scopeEmployeeId = mrId;
     }
 
-    // Fetch visits with full timestamps, including seconds-level precision
-    const visits = await db.visit.findMany({
-      where: {
-        ...(scopeEmployeeId ? { employeeId: scopeEmployeeId } : {}),
-        createdAt: { gte: startDate, lt: endDate },
-        ...(search.length >= 2
-          ? {
-              employee: {
-                OR: [
-                  { firstName: { contains: search, mode: "insensitive" } },
-                  { lastName: { contains: search, mode: "insensitive" } },
-                ],
-              },
-            }
-          : {}),
-      },
-      select: {
-        id: true,
-        purpose: true,
-        startedAt: true,
-        endedAt: true,
-        createdAt: true,
-        durationMinutes: true,
-        boxesPlaced: true,
-        cqsScore: true,
-        doctorId: true,
-        chemistId: true,
-        hospitalId: true,
-        doctor: { select: { fullName: true } },
-        chemist: { select: { name: true } },
-        hospital: { select: { name: true } },
-        employee: { select: { id: true, firstName: true, lastName: true } },
-      },
-      orderBy: [{ employeeId: "asc" }, { createdAt: "asc" }],
+    // Execute Multi-Agent Council Report Generation Engine
+    const reportData = await MrDailyCallsAgentsService.generateReport({
+      startDate,
+      endDate,
+      scopeEmployeeId,
+      search,
+      userRole: req.user.role,
+      userId: req.user.sub,
     });
 
-    // Get all MRs for selector dropdown (managers only)
-    let allMrs: { id: string; firstName: string; lastName: string }[] = [];
-    if (!isSelfOnly) {
-      allMrs = await db.employee.findMany({
-        where: { user: { role: Role.MR, isActive: true } },
-        select: { id: true, firstName: true, lastName: true },
-        orderBy: { firstName: "asc" },
-      });
-    }
-
-    // Group by MR → date with full timestamp
-    type CallRow = {
-      id: string;
-      entityName: string;
-      purpose: string;
-      type: "DOCTOR" | "CHEMIST" | "HOSPITAL" | "OTHER";
-      startedAt: string; // full ISO with seconds
-      endedAt: string | null;
-      durationMinutes: number | null;
-      durationSeconds: number | null;
-      boxesPlaced: number | null;
-      cqsScore: number | null;
-    };
-
-    type DayGroup = {
-      date: string; // YYYY-MM-DD
-      calls: CallRow[];
-      totalCalls: number;
-    };
-
-    type MrGroup = {
-      mrId: string;
-      mrName: string;
-      totalCalls: number;
-      days: DayGroup[];
-    };
-
-    const byMr = new Map<string, MrGroup>();
-
-    for (const v of visits) {
-      const mrKey = v.employee.id;
-      const mrName = `${v.employee.firstName} ${v.employee.lastName}`;
-
-      const timestamp = v.startedAt ?? v.createdAt;
-      const dateKey = timestamp.toISOString().slice(0, 10);
-
-      // Compute duration in seconds from startedAt/endedAt if available
-      let durationSeconds: number | null = null;
-      if (v.startedAt && v.endedAt) {
-        durationSeconds = Math.round((v.endedAt.getTime() - v.startedAt.getTime()) / 1000);
-      } else if (v.durationMinutes != null) {
-        durationSeconds = v.durationMinutes * 60;
-      }
-
-      const entityName =
-        v.doctor?.fullName ?? v.chemist?.name ?? v.hospital?.name ?? "Unknown";
-      const callType: CallRow["type"] = v.doctorId
-        ? "DOCTOR"
-        : v.chemistId
-        ? "CHEMIST"
-        : v.hospitalId
-        ? "HOSPITAL"
-        : "OTHER";
-
-      const callRow: CallRow = {
-        id: v.id,
-        entityName,
-        purpose: v.purpose,
-        type: callType,
-        startedAt: timestamp.toISOString(),
-        endedAt: v.endedAt?.toISOString() ?? null,
-        durationMinutes: v.durationMinutes,
-        durationSeconds,
-        boxesPlaced: v.boxesPlaced,
-        cqsScore: v.cqsScore != null ? Number(v.cqsScore) : null,
-      };
-
-      if (!byMr.has(mrKey)) {
-        byMr.set(mrKey, { mrId: mrKey, mrName, totalCalls: 0, days: [] });
-      }
-      const mrGroup = byMr.get(mrKey)!;
-      mrGroup.totalCalls++;
-
-      const dayGroup = mrGroup.days.find((d) => d.date === dateKey);
-      if (dayGroup) {
-        dayGroup.calls.push(callRow);
-        dayGroup.totalCalls++;
-      } else {
-        mrGroup.days.push({ date: dateKey, calls: [callRow], totalCalls: 1 });
-      }
-    }
-
-    return ok({
-      meta: {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        totalVisits: visits.length,
-        totalMrs: byMr.size,
-      },
-      mrs: [...byMr.values()],
-      allMrs: allMrs.map((m) => ({
-        id: m.id,
-        name: `${m.firstName} ${m.lastName}`,
-      })),
-    });
+    return ok(reportData);
   } catch (err) {
     console.error("[GET /api/reports/mr-daily-calls]", err);
     return apiError("INTERNAL_SERVER_ERROR", "Failed to generate MR daily calls report", 500);
