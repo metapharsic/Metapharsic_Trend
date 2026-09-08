@@ -96,3 +96,40 @@ export async function saveCompanyLogo(file: File): Promise<LogoUploadResult> {
 export function logoUrl(relativePath: string): string {
   return `/uploads/company/${relativePath}?v=${Date.now()}`;
 }
+
+const DMS_ROOT = path.join(process.cwd(), "public", "uploads", "dms");
+const MAX_DMS_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB limit
+
+type DmsUploadResult =
+  | { ok: true; result: { relativePath: string; fileName: string; fileSize: number; fileType: string } }
+  | { ok: false; error: { message: string } };
+
+export async function saveDmsFile(file: File): Promise<DmsUploadResult> {
+  if (file.size > MAX_DMS_FILE_SIZE_BYTES) {
+    return { ok: false, error: { message: "File exceeds maximum allowed size of 50MB" } };
+  }
+
+  const fileExt = path.extname(file.name).substring(1).toUpperCase() || "BIN";
+  const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+  const storedFileName = `DOC-${uniqueSuffix}.${fileExt.toLowerCase()}`;
+  const destination = path.join(DMS_ROOT, storedFileName);
+
+  await mkdir(DMS_ROOT, { recursive: true });
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await writeFile(destination, buffer);
+
+  return {
+    ok: true,
+    result: {
+      relativePath: `/uploads/dms/${storedFileName}`,
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: fileExt,
+    },
+  };
+}
+
+export function dmsUrl(relativePath: string): string {
+  return relativePath;
+}
+

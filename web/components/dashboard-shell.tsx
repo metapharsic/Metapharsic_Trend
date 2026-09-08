@@ -39,7 +39,9 @@ import {
   Download,
   ShieldAlert,
   Activity,
+  Folder,
 } from "lucide-react";
+
 import { apiClient } from "@/lib/api-client";
 import { exportCurrentPageToExcel } from "@/lib/excel-export";
 import { systemHealth, SystemErrorRecord } from "@/lib/system-health";
@@ -106,7 +108,9 @@ const NAV_ITEMS = [
   { href: "/marketing", label: "Marketing Campaigns", icon: BarChart3, roles: ["MARKETING", "ADMIN"], category: "Analytics & Marketing" },
 
   // ── Administration & Profile ─────────────────────────────────
+  { href: "/dms", label: "Document Management (DMS)", icon: Folder, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "HR", "FINANCE", "WAREHOUSE", "MARKETING", "MR", "DISTRIBUTOR", "DOCTOR"], category: "Administration & Profile" },
   { href: "/admin/ptr-calculator", label: "PTR & Scheme Simulator", icon: Calculator, roles: ["ADMIN", "MD"], category: "Administration & Profile" },
+
   { href: "/admin/accounts-jotter", label: "Quick Accounts Jotter", icon: BookOpen, roles: ["ADMIN", "FINANCE"], category: "Administration & Profile" },
   { href: "/admin/diagnostics", label: "System Health & Diagnostics", icon: ShieldAlert, roles: ["ADMIN", "MD"], category: "Administration & Profile" },
   { href: "/admin/company-settings", label: "Company Settings", icon: Building2, roles: ["ADMIN"], category: "Administration & Profile" },

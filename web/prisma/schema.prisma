@@ -992,3 +992,123 @@ model RefreshToken {
   @@index([token])
   @@map("refresh_tokens")
 }
+
+enum DmsCategory {
+  SOP
+  License
+  Report
+  Compliance
+  Policy
+  Other
+}
+
+enum DmsStatus {
+  Active
+  Draft
+  Expiring
+  Archived
+  Pending
+  Deleted
+}
+
+enum DmsWorkflowStep {
+  Draft
+  Review
+  Approval
+  Published
+}
+
+enum DmsWorkflowStatus {
+  Pending
+  In_Progress
+  Completed
+  Rejected
+}
+
+enum DmsAuditAction {
+  Created
+  Modified
+  Viewed
+  Downloaded
+  Deleted
+  Approved
+  Rejected
+}
+
+model DmsDocument {
+  id             String          @id
+  title          String
+  category       DmsCategory     @default(SOP)
+  fileType       String
+  currentVersion String          @default("1.0")
+  status         DmsStatus       @default(Active)
+  expiryDate     DateTime?       @db.Date
+  authorId       String?
+  authorName     String?
+  fileUrl        String?
+  fileName       String?
+  fileSize       BigInt          @default(0)
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  versions       DmsVersion[]
+  workflows      DmsWorkflow[]
+  auditTrails    DmsAuditTrail[]
+
+  @@index([category])
+  @@index([status])
+  @@map("dms_documents")
+}
+
+model DmsVersion {
+  id            BigInt      @id @default(autoincrement())
+  documentId    String
+  document      DmsDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionLabel  String
+  fileUrl       String
+  fileSizeBytes BigInt?
+  changeLog     String?
+  uploadedBy    String?
+  uploadedName  String?
+  approvedBy    String?
+  approvalDate  DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@index([documentId])
+  @@map("dms_versions")
+}
+
+model DmsWorkflow {
+  id            String            @id
+  documentId    String
+  document      DmsDocument       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentTitle String
+  currentStep   DmsWorkflowStep   @default(Draft)
+  assignedTo    String?
+  dueDate       DateTime?         @db.Date
+  status        DmsWorkflowStatus @default(In_Progress)
+  comments      Json?             @default("[]")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([documentId])
+  @@index([status])
+  @@map("dms_workflows")
+}
+
+model DmsAuditTrail {
+  id         String         @id @default(uuid())
+  documentId String
+  document   DmsDocument    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  action     DmsAuditAction
+  userId     String?
+  userName   String?
+  details    String?
+  ipAddress  String?
+  createdAt  DateTime       @default(now())
+
+  @@index([documentId])
+  @@index([createdAt])
+  @@map("dms_audit_trail")
+}
+
