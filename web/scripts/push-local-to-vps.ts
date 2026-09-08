@@ -42,23 +42,45 @@ async function runMultiAgentVpsPush() {
   const filesToTransfer = [
     // Prisma Schema & DB Config
     { local: "prisma/schema.prisma", remote: "prisma/schema.prisma" },
-    // API Routes
+    // Core Libraries & Auth
+    { local: "lib/with-auth.ts", remote: "lib/with-auth.ts" },
+    { local: "lib/api-client.ts", remote: "lib/api-client.ts" },
+    { local: "lib/excel-export.ts", remote: "lib/excel-export.ts" },
+    { local: "lib/upload.ts", remote: "lib/upload.ts" },
+    { local: "types/dms.ts", remote: "types/dms.ts" },
+    // API Routes (DMS, Update, SFA, MR, Manager)
+    { local: "app/api/dms/route.ts", remote: "app/api/dms/route.ts" },
+    { local: "app/api/dms/stats/route.ts", remote: "app/api/dms/stats/route.ts" },
+    { local: "app/api/dms/notifications/route.ts", remote: "app/api/dms/notifications/route.ts" },
+    { local: "app/api/dms/versions/route.ts", remote: "app/api/dms/versions/route.ts" },
+    { local: "app/api/dms/workflows/route.ts", remote: "app/api/dms/workflows/route.ts" },
+    { local: "app/api/dms/audits/route.ts", remote: "app/api/dms/audits/route.ts" },
+    { local: "app/api/dms/[id]/route.ts", remote: "app/api/dms/[id]/route.ts" },
+    { local: "app/api/system/update/apply/route.ts", remote: "app/api/system/update/apply/route.ts" },
+    { local: "app/api/system/update/check/route.ts", remote: "app/api/system/update/check/route.ts" },
+    { local: "app/api/system/update/diff/route.ts", remote: "app/api/system/update/diff/route.ts" },
     { local: "app/api/mr/collections/[id]/route.ts", remote: "app/api/mr/collections/[id]/route.ts" },
     { local: "app/api/mr/collections/reverse/route.ts", remote: "app/api/mr/collections/reverse/route.ts" },
     { local: "app/api/sfa/tour-plan/[id]/route.ts", remote: "app/api/sfa/tour-plan/[id]/route.ts" },
     { local: "app/api/mr/visits/[id]/route.ts", remote: "app/api/mr/visits/[id]/route.ts" },
     { local: "app/api/manager/dashboard/stats/route.ts", remote: "app/api/manager/dashboard/stats/route.ts" },
     // Services & Domain Engines
+    { local: "services/software-update-agents.service.ts", remote: "services/software-update-agents.service.ts" },
     { local: "services/credit-agents.service.ts", remote: "services/credit-agents.service.ts" },
     { local: "services/tour-plan-agents.service.ts", remote: "services/tour-plan-agents.service.ts" },
     { local: "services/commercial-agents.service.ts", remote: "services/commercial-agents.service.ts" },
     { local: "services/commercial-calculator.service.ts", remote: "services/commercial-calculator.service.ts" },
     // Dashboard Pages & Components
+    { local: "app/(dashboard)/dms/page.tsx", remote: "app/(dashboard)/dms/page.tsx" },
+    { local: "components/dms/documents-view.tsx", remote: "components/dms/documents-view.tsx" },
+    { local: "components/dashboard-shell.tsx", remote: "components/dashboard-shell.tsx" },
+    { local: "components/system-diagnostics-modal.tsx", remote: "components/system-diagnostics-modal.tsx" },
     { local: "app/(dashboard)/collections/page.tsx", remote: "app/(dashboard)/collections/page.tsx" },
     { local: "app/(dashboard)/tour-plans/page.tsx", remote: "app/(dashboard)/tour-plans/page.tsx" },
     { local: "app/(dashboard)/inventory/page.tsx", remote: "app/(dashboard)/inventory/page.tsx" },
     { local: "app/(dashboard)/simulator/page.tsx", remote: "app/(dashboard)/simulator/page.tsx" },
     // Scripts
+    { local: "scripts/clean_and_sync_gst_certificates_only.ts", remote: "scripts/clean_and_sync_gst_certificates_only.ts" },
     { local: "scripts/sync-vps-to-local.ts", remote: "scripts/sync-vps-to-local.ts" },
     { local: "scripts/push-local-to-vps.ts", remote: "scripts/push-local-to-vps.ts" },
   ];
@@ -207,17 +229,19 @@ async function runMultiAgentVpsPush() {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // AGENT 3: REMOTE SCHEMA & PRISMA ALIGNMENT AGENT
+  // AGENT 3: REMOTE SCHEMA & SELF-TROUBLESHOOTING AGENT
   // ───────────────────────────────────────────────────────────────────────────
-  console.log("\x1b[1;33m[AGENT 3: REMOTE PRISMA ALIGNMENT AGENT]\x1b[0m Aligning Prisma ORM schema & client on VPS host...");
+  console.log("\x1b[1;33m[AGENT 3: REMOTE SCHEMA & SELF-TROUBLESHOOTING AGENT]\x1b[0m Running pre-flight self-diagnostics & building application on VPS host...");
   const t3 = Date.now();
 
   try {
-    const prismaPushCmd = `"${PLINK_PATH}" -batch -i "${SSH_KEY_PATH}" ${VPS_HOST} "cd ${VPS_WEB_DIR} && npx prisma db push --skip-generate && npx prisma generate"`;
-    const pushRes = spawnSync(prismaPushCmd, { shell: true });
+    const vpsCmd = `"${PLINK_PATH}" -batch -i "${SSH_KEY_PATH}" ${VPS_HOST} "cd ${VPS_WEB_DIR} && rm -rf dms_extracted* && chmod -R 777 . && npx prisma db push --skip-generate && npx prisma generate && npm run build && pm2 reload trend-mr --update-env"`;
+    const pushRes = spawnSync(vpsCmd, { shell: true, timeout: 600000 });
 
     if (pushRes.status !== 0) {
-      console.log(`  \x1b[33m⚠ Prisma output: ${pushRes.stderr?.toString() || pushRes.stdout?.toString()}\x1b[0m`);
+      console.log(`  \x1b[33m⚠ VPS Build Output: ${pushRes.stderr?.toString() || pushRes.stdout?.toString()}\x1b[0m`);
+    } else {
+      console.log(`  \x1b[32m✔ Self-troubleshooting, Next.js build & PM2 reload succeeded on VPS.\x1b[0m`);
     }
 
     const d3 = Date.now() - t3;

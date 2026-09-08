@@ -24,6 +24,12 @@ echo  - Target Remote : origin (%REMOTE_URL%)
 echo =======================================================================
 echo.
 
+echo [STEP 0/4] Pre-flight self-troubleshooting & workspace cleanup...
+if exist "web\dms_extracted" rmdir /s /q "web\dms_extracted" >nul 2>&1
+if exist "dms_extracted" rmdir /s /q "dms_extracted" >nul 2>&1
+echo  - Pre-flight cleanup complete.
+echo.
+
 set TARGET_BRANCH=%CURRENT_BRANCH%
 echo [STEP 1/4] Branch to pull: [%TARGET_BRANCH%]
 echo.

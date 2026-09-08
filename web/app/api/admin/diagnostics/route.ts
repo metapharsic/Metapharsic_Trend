@@ -3,6 +3,8 @@ import { Role } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, apiError } from "@/lib/api-response";
 
+export const dynamic = "force-dynamic";
+
 async function handler(req: AuthedRequest) {
   const startTime = Date.now();
   try {

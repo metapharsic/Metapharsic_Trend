@@ -14,4 +14,4 @@ async function getUpdateDiff(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getUpdateDiff, [Role.ADMIN, Role.MD, Role.ASM, Role.MR]);
+export const GET = withAuth(getUpdateDiff, [Role.ADMIN]);

@@ -24,6 +24,12 @@ echo  - Target Remote : origin (%REMOTE_URL%)
 echo =======================================================================
 echo.
 
+echo [STEP 0/5] Pre-flight self-troubleshooting & workspace cleanup...
+if exist "web\dms_extracted" rmdir /s /q "web\dms_extracted" >nul 2>&1
+if exist "dms_extracted" rmdir /s /q "dms_extracted" >nul 2>&1
+echo  - Pre-flight cleanup complete.
+echo.
+
 echo [STEP 1/5] Inspecting local workspace changes...
 echo.
 set HAS_UNCOMMITTED=no

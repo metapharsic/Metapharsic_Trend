@@ -142,6 +142,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (userRole !== "ADMIN") return;
     const checkUpdate = () => {
       apiClient
         .get("/api/system/update/check")
@@ -152,7 +153,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     checkUpdate();
     const interval = setInterval(checkUpdate, 12 * 60 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [userRole]);
 
   // Track expanded accordion sections
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
@@ -469,8 +470,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
           {/* Right Header Tools: Universal Excel Export + Quick Jot + System Health + Badges */}
           <div className="flex items-center gap-2 sm:gap-3 ml-auto shrink-0">
-            {/* OTA Software Update Pulse Badge */}
-            {updateStatus?.updateAvailable && (
+            {/* OTA Software Update Pulse Badge — Strictly ADMIN Privilege Only */}
+            {userRole === "ADMIN" && updateStatus?.updateAvailable && (
               <button
                 onClick={() => setUpdateModalOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs shadow-md transition-all animate-pulse shrink-0 border border-amber-400/40"

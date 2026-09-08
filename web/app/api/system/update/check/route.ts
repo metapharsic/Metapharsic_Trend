@@ -14,4 +14,4 @@ async function checkUpdate(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(checkUpdate, [Role.ADMIN, Role.MD, Role.ASM, Role.MR]);
+export const GET = withAuth(checkUpdate, [Role.ADMIN]);

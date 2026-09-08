@@ -14,4 +14,4 @@ async function applyUpdate(req: AuthedRequest) {
   }
 }
 
-export const POST = withAuth(applyUpdate, [Role.ADMIN, Role.MD, Role.ASM, Role.MR]);
+export const POST = withAuth(applyUpdate, [Role.ADMIN]);
