@@ -893,3 +893,59 @@ export function formatMultiAgentCouncilExecutiveDigest(reports: any[]): string {
   return sections.join("\n");
 }
 
+
+/**
+ * Builds a SHORT, brief nightly report for an individual MR -- a few lines only,
+ * not the full multi-agent council wall-of-text. Sent by the 23:00 IST night-brief job.
+ */
+export function formatIndividualMrBriefWhatsAppReport(data: IndividualMrEodData): string {
+  const dStr = fmtDate(data.date);
+  const paceEmoji =
+    data.targets.monthlyTarget > 0
+      ? data.targets.mtdPacePercent >= 100
+        ? "🔥"
+        : data.targets.mtdPacePercent >= 80
+        ? "⚡"
+        : "⚠️"
+      : "";
+
+  const lines = [
+    `📋 *Trend MR — Daily Brief* (${dStr})`,
+    `👤 ${data.mrName} | 📍 ${data.territoryName}`,
+    `🩺 Calls: *${data.visits.totalCalls}* (👨‍⚕️ ${data.visits.doctorCalls} | 💊 ${data.visits.chemistCalls})`,
+    `💰 Orders: *${fmtCurrency(data.orders.totalValue)}* | 💵 Collected: *${fmtCurrency(data.collections.totalAmount)}*`,
+  ];
+
+  if (data.targets.monthlyTarget > 0) {
+    lines.push(`🎯 MTD Pace: *${data.targets.mtdPacePercent.toFixed(0)}%* ${paceEmoji}`);
+  }
+
+  if (data.compliance.mockGpsDetected) {
+    lines.push(`⚠️ Mock GPS flagged today — please check with admin.`);
+  }
+
+  lines.push(`_Trend MR Pharma OS_`);
+
+  return lines.join("\n");
+}
+
+/**
+ * Builds a SHORT brief executive digest across the fleet -- a few lines per rep, no long sections.
+ */
+export function formatAdminExecutiveBriefWhatsAppDigest(data: AdminExecutiveDigestData): string {
+  const dStr = fmtDate(data.date);
+  const lines = [
+    `🏛️ *Trend MR — Fleet Night Brief* (${dStr})`,
+    `👥 Active: *${data.activeMrCount}/${data.totalMrCount}* | Leave: ${data.onLeaveCount} | Absent: ${data.absentCount}`,
+    `📈 Sales: *${fmtCurrency(data.totalFleetSales)}* | Collections: *${fmtCurrency(data.totalFleetCollections)}*`,
+    `🩺 Calls: *${data.totalDoctorCalls + data.totalChemistCalls}* (Dr ${data.totalDoctorCalls} | Chem ${data.totalChemistCalls})`,
+  ];
+  if (data.topPerformer) {
+    lines.push(`🏆 Top: *${data.topPerformer.name}* (${fmtCurrency(data.topPerformer.sales)})`);
+  }
+  if (data.anomalies.mockGpsCount > 0 || data.anomalies.zeroCallReps.length > 0) {
+    lines.push(`⚠️ Alerts: ${data.anomalies.mockGpsCount} mock-GPS | ${data.anomalies.zeroCallReps.length} zero-call reps`);
+  }
+  lines.push(`_Trend MR Pharma OS_`);
+  return lines.join("\n");
+}
