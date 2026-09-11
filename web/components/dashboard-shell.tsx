@@ -115,6 +115,7 @@ const NAV_ITEMS = [
   { href: "/admin/diagnostics", label: "System Health & Diagnostics", icon: ShieldAlert, roles: ["ADMIN", "MD"], category: "Administration & Profile" },
   { href: "/admin/company-settings", label: "Company Settings", icon: Building2, roles: ["ADMIN"], category: "Administration & Profile" },
   { href: "/admin/workflow-settings", label: "Workflow Settings", icon: Settings2, roles: ["ADMIN"], category: "Administration & Profile" },
+  { href: "/admin/system-config", label: "System Configuration", icon: Settings2, roles: ["ADMIN"], category: "Administration & Profile" },
   { href: "/profile", label: "My Profile", icon: UserCircle2, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "HR", "FINANCE", "WAREHOUSE", "MARKETING", "MR", "DISTRIBUTOR", "DOCTOR"], category: "Administration & Profile" },
 ];
 
@@ -472,14 +473,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 sm:gap-3 ml-auto shrink-0">
             {/* OTA Software Update Pulse Badge — Strictly ADMIN Privilege Only */}
             {userRole === "ADMIN" && updateStatus?.updateAvailable && (
-              <button
-                onClick={() => setUpdateModalOpen(true)}
+              <Link
+                href="/admin/system-config"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs shadow-md transition-all animate-pulse shrink-0 border border-amber-400/40"
-                title="Over-The-Air Update Ready: Click to review code changes"
+                title="⚡ Update v1.2.0 Ready: Open System Configuration to review code changes & auto-pull"
               >
                 <Download size={14} className="shrink-0" />
                 <span className="hidden sm:inline">⚡ Update {updateStatus.targetVersion} Ready</span>
-              </button>
+              </Link>
             )}
 
             {/* Universal Excel Export — 1-Click on EVERY page of the App */}

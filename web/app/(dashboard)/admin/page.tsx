@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { BarChart3, KeyRound, Calculator } from "lucide-react";
+import Link from "next/link";
+import { BarChart3, KeyRound, Calculator, Zap } from "lucide-react";
 import { ExecutiveKpiDashboard } from "@/components/executive-kpi-dashboard";
 import { AdminUserPasswords } from "@/components/admin/admin-user-passwords";
 import { AdminPtrCalculator } from "@/components/admin/admin-ptr-calculator";
@@ -50,6 +51,15 @@ export default function AdminDashboardPage() {
           <KeyRound size={15} />
           <span>Staff &amp; Passwords</span>
         </button>
+
+        <Link
+          href="/admin/system-config"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-sm sm:ml-auto"
+          title="Open System Configuration & OTA Update Center"
+        >
+          <Zap size={14} className="fill-amber-300 text-amber-200" />
+          <span>⚡ Update v1.2.0 &amp; System Config</span>
+        </Link>
       </div>
 
       {/* Tab Contents */}

@@ -1,0 +1,149 @@
+{
+  "appVersion": "v1.1.0",
+  "targetVersion": "v1.2.0",
+  "githubRepoUrl": "https://github.com/metapharsic/Metapharsic_Trend.git",
+  "targetBranch": "main",
+  "autoPullEnabled": true,
+  "autoPullSchedule": "TWICE_WEEKLY",
+  "autoSyncOnPull": false,
+  "lastCheckedAt": "2026-09-11T00:23:47.503Z",
+  "lastPulledAt": "2026-09-11T00:24:00.598Z",
+  "lastPullStatus": "NO_CHANGES",
+  "lastPulledFiles": [
+    {
+      "filename": "web/services/credit-agents.service.ts",
+      "status": "modified",
+      "additions": 115,
+      "deletions": 14,
+      "impactedComponent": "Chemist Receivables & Collections"
+    },
+    {
+      "filename": "web/app/(dashboard)/collections/page.tsx",
+      "status": "modified",
+      "additions": 165,
+      "deletions": 18,
+      "impactedComponent": "User Interface & Navigation Shell"
+    },
+    {
+      "filename": "web/services/tour-plan-agents.service.ts",
+      "status": "modified",
+      "additions": 142,
+      "deletions": 12,
+      "impactedComponent": "Tour Planning & MTP Engine"
+    },
+    {
+      "filename": "web/services/product-pricing-agents.service.ts",
+      "status": "modified",
+      "additions": 42,
+      "deletions": 15,
+      "impactedComponent": "PTR & Commercial Pricing Engine"
+    }
+  ],
+  "lastFetchedCommits": [
+    {
+      "hash": "85a4623",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-11",
+      "message": "sync: trend mr pharma os updates 2026-09-11_00:07"
+    },
+    {
+      "hash": "876a083",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-08",
+      "message": "sync: trend mr pharma os updates 2026-09-08_08:26"
+    },
+    {
+      "hash": "ef278fa",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-08",
+      "message": "security(dms): restrict Document Management System (DMS) UI and API endpoints exclusively to ADMIN role"
+    },
+    {
+      "hash": "52e0216",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-08",
+      "message": "feat(security): enforce ADMIN-only privilege for OTA system update, full-screen freeze lock & self-troubleshooting deployment"
+    },
+    {
+      "hash": "ac65b80",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-08",
+      "message": "982026-728"
+    }
+  ],
+  "pullHistory": [
+    {
+      "timestamp": "2026-09-11T00:24:00.598Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623",
+      "afterHash": "85a4623",
+      "status": "NO_CHANGES",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/services/credit-agents.service.ts",
+          "status": "modified",
+          "additions": 115,
+          "deletions": 14,
+          "impactedComponent": "Chemist Receivables & Collections"
+        },
+        {
+          "filename": "web/app/(dashboard)/collections/page.tsx",
+          "status": "modified",
+          "additions": 165,
+          "deletions": 18,
+          "impactedComponent": "User Interface & Navigation Shell"
+        },
+        {
+          "filename": "web/services/tour-plan-agents.service.ts",
+          "status": "modified",
+          "additions": 142,
+          "deletions": 12,
+          "impactedComponent": "Tour Planning & MTP Engine"
+        },
+        {
+          "filename": "web/services/product-pricing-agents.service.ts",
+          "status": "modified",
+          "additions": 42,
+          "deletions": 15,
+          "impactedComponent": "PTR & Commercial Pricing Engine"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "85a4623",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-11",
+          "message": "sync: trend mr pharma os updates 2026-09-11_00:07"
+        },
+        {
+          "hash": "876a083",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "sync: trend mr pharma os updates 2026-09-08_08:26"
+        },
+        {
+          "hash": "ef278fa",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "security(dms): restrict Document Management System (DMS) UI and API endpoints exclusively to ADMIN role"
+        },
+        {
+          "hash": "52e0216",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "feat(security): enforce ADMIN-only privilege for OTA system update, full-screen freeze lock & self-troubleshooting deployment"
+        },
+        {
+          "hash": "ac65b80",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "982026-728"
+        }
+      ],
+      "logMessage": "Already up to date.\n",
+      "id": "pull-1789086240599-q19qi"
+    }
+  ]
+}

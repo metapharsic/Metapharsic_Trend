@@ -5,5 +5,8 @@ export async function register() {
 
     const { startMrNightBriefJob } = await import("./jobs/mr-night-brief");
     startMrNightBriefJob();
+
+    const { startGitHubSyncJob } = await import("./jobs/github-sync");
+    startGitHubSyncJob();
   }
 }
