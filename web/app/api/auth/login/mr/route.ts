@@ -45,10 +45,18 @@ export async function POST(req: NextRequest) {
     // Soft device binding — always allow login, auto-update UUID to current device.
     // Prevents lockouts when MRs change phones or reinstall the app.
     if (deviceUuid && user.deviceUuid !== deviceUuid) {
-      await db.user.update({
-        where: { id: user.id },
-        data: { deviceUuid },
-      });
+      try {
+        await db.user.updateMany({
+          where: { deviceUuid, id: { not: user.id } },
+          data: { deviceUuid: null },
+        });
+        await db.user.update({
+          where: { id: user.id },
+          data: { deviceUuid },
+        });
+      } catch (deviceErr) {
+        console.warn("[POST /api/auth/login/mr] Soft device binding notice:", deviceErr);
+      }
     }
 
     const tokenPayload = { sub: user.id, role: user.role };
