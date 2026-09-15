@@ -44,6 +44,36 @@ interface Territory {
   name: string;
   region?: string;
   zone?: string;
+  employee?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  } | null;
+  _count?: {
+    doctors: number;
+    chemists: number;
+  };
+}
+
+interface AuditAnomaly {
+  userId: string;
+  email: string;
+  type: "MISSING_EMPLOYEE" | "INVALID_MANAGER" | "ORPHANED_TERRITORY" | "UNBOUND_MR" | "MULTIPLE_ASSIGNMENTS";
+  severity: "LOW" | "MEDIUM" | "HIGH";
+  details: string;
+}
+
+interface OrganizationAudit {
+  totalUsers: number;
+  activeUsers: number;
+  mrsCount: number;
+  asmsCount: number;
+  totalTerritories: number;
+  assignedTerritories: number;
+  unassignedTerritories: number;
+  anomalies: AuditAnomaly[];
+  healthScore: number;
+  auditedAt: string;
 }
 
 interface UserRecord {
@@ -68,6 +98,7 @@ interface UserRecord {
 export default function UserManagementPage() {
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [territories, setTerritories] = useState<Territory[]>([]);
+  const [auditData, setAuditData] = useState<OrganizationAudit | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("ALL");
@@ -123,12 +154,29 @@ export default function UserManagementPage() {
     return () => clearTimeout(timer);
   }, [fetchUsers]);
 
-  useEffect(() => {
+  const fetchTerritories = useCallback(() => {
     apiClient
       .get("/api/territories")
-      .then((res) => setTerritories(res.data.data.territories ?? []))
-      .catch(() => {});
+      .then((res) => setTerritories(res.data.data?.territories ?? []))
+      .catch(() => {
+        apiClient
+          .get("/api/manager/territories")
+          .then((res) => setTerritories(res.data.data?.territories ?? []))
+          .catch(() => setTerritories([]));
+      });
   }, []);
+
+  const fetchAudit = useCallback(() => {
+    apiClient
+      .get("/api/admin/users/audit")
+      .then((res) => setAuditData(res.data.data?.audit ?? null))
+      .catch(() => setAuditData(null));
+  }, []);
+
+  useEffect(() => {
+    fetchTerritories();
+    fetchAudit();
+  }, [fetchTerritories, fetchAudit]);
 
   const toggleActive = async (user: UserRecord) => {
     try {
@@ -192,11 +240,12 @@ export default function UserManagementPage() {
       if (editUser) {
         // Update user
         const payload: any = {
+          email: formData.email.trim(),
           role: formData.role,
           isActive: formData.isActive,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          phone: formData.phone,
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          phone: formData.phone.trim(),
           managerId: formData.managerId || null,
           territoryIds: formData.selectedTerritoryIds,
           resetDeviceUuid: formData.resetDeviceUuid,
@@ -223,6 +272,8 @@ export default function UserManagementPage() {
         setShowCreateModal(false);
       }
       fetchUsers();
+      fetchTerritories();
+      fetchAudit();
     } catch (err: any) {
       setFormError(err.response?.data?.error?.message || err.message || "Failed to save user");
     } finally {
@@ -409,6 +460,52 @@ export default function UserManagementPage() {
       ) : (
         /* ── Tab: User Directory & Management ── */
         <div className="space-y-4">
+          {/* Multi-Agent Organization Alignment & Integrity Card */}
+          {auditData && (
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start sm:items-center gap-3">
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
+                    auditData.healthScore >= 90
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : auditData.healthScore >= 75
+                      ? "bg-amber-50 text-amber-700 border border-amber-200"
+                      : "bg-red-50 text-red-700 border border-red-200"
+                  }`}
+                >
+                  {auditData.healthScore}%
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-gray-900 text-sm">Org Health & Territory Alignment</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 font-medium">
+                      Multi-Agent Verified
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {auditData.assignedTerritories} of {auditData.totalTerritories} territories active ({auditData.mrsCount} MRs, {auditData.asmsCount} ASMs).
+                    {auditData.anomalies.length > 0 && (
+                      <span className="text-amber-600 font-medium ml-1">
+                        • {auditData.anomalies.length} alignment notice{auditData.anomalies.length > 1 ? "s" : ""}.
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-end md:self-auto">
+                <button
+                  type="button"
+                  onClick={fetchAudit}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  <RotateCcw size={12} />
+                  Re-Audit
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Filters Bar */}
           <div className="flex flex-col md:flex-row gap-3 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
             <div className="relative flex-1">
@@ -691,11 +788,11 @@ export default function UserManagementPage() {
                   <input
                     type="email"
                     required
-                    disabled={!!editUser}
+                    disabled={myRole !== Role.ADMIN && !!editUser}
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className={`w-full px-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 ${
-                      editUser ? "opacity-60 cursor-not-allowed" : ""
+                      myRole !== Role.ADMIN && editUser ? "opacity-60 cursor-not-allowed" : ""
                     }`}
                     placeholder="user@mrtracker.com"
                   />
@@ -720,11 +817,16 @@ export default function UserManagementPage() {
                 </label>
                 <input
                   type="password"
+                  name="anti_autofill_new_password"
+                  id="anti_autofill_new_password"
+                  autoComplete="new-password"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                   required={!editUser}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full px-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
-                  placeholder="••••••••"
+                  placeholder={editUser ? "Leave empty to keep current password" : "••••••••"}
                 />
               </div>
 
@@ -786,15 +888,59 @@ export default function UserManagementPage() {
               {/* Territory Assignment (for MR / ASM / RM) */}
               {(formData.role === Role.MR || formData.role === Role.ASM || formData.role === Role.RM) && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Assigned Territories</label>
-                  <div className="max-h-36 overflow-y-auto p-2 bg-gray-50 border border-gray-200 rounded-xl space-y-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-gray-700">
+                      Assigned Territories ({formData.selectedTerritoryIds.length} selected)
+                    </label>
+                    {territories.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData({
+                              ...formData,
+                              selectedTerritoryIds: territories.map((t) => t.id),
+                            })
+                          }
+                          className="text-[11px] text-primary-600 hover:text-primary-700 font-medium"
+                        >
+                          Select All
+                        </button>
+                        <span className="text-gray-300">|</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData({
+                              ...formData,
+                              selectedTerritoryIds: [],
+                            })
+                          }
+                          className="text-[11px] text-gray-500 hover:text-gray-700 font-medium"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="max-h-48 overflow-y-auto p-2 bg-gray-50 border border-gray-200 rounded-xl space-y-1 divide-y divide-gray-100">
                     {territories.length === 0 ? (
-                      <p className="text-xs text-gray-400 p-1">No territories registered in system.</p>
+                      <div className="p-3 text-center">
+                        <MapPin size={16} className="mx-auto text-gray-400 mb-1" />
+                        <p className="text-xs text-gray-500">No territories registered in system.</p>
+                      </div>
                     ) : (
                       territories.map((t) => {
                         const isChecked = formData.selectedTerritoryIds.includes(t.id);
+                        const isAssignedToOther =
+                          t.employee &&
+                          t.employee.id !== (editUser?.employee?.id || "");
                         return (
-                          <label key={t.id} className="flex items-center gap-2 p-1.5 hover:bg-white rounded-lg text-xs cursor-pointer">
+                          <label
+                            key={t.id}
+                            className={`flex items-start gap-2.5 p-2 hover:bg-white rounded-lg text-xs cursor-pointer transition-colors ${
+                              isChecked ? "bg-white shadow-xs border border-primary-200" : ""
+                            }`}
+                          >
                             <input
                               type="checkbox"
                               checked={isChecked}
@@ -807,14 +953,39 @@ export default function UserManagementPage() {
                                 } else {
                                   setFormData({
                                     ...formData,
-                                    selectedTerritoryIds: formData.selectedTerritoryIds.filter((id) => id !== t.id),
+                                    selectedTerritoryIds: formData.selectedTerritoryIds.filter(
+                                      (id) => id !== t.id
+                                    ),
                                   });
                                 }
                               }}
-                              className="rounded text-primary-600 focus:ring-primary-500"
+                              className="mt-0.5 rounded text-primary-600 focus:ring-primary-500"
                             />
-                            <span className="font-medium text-gray-800">{t.name}</span>
-                            {t.region && <span className="text-[10px] text-gray-400">({t.region})</span>}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-semibold text-gray-800">{t.name}</span>
+                                {t.region && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                                    {t.region}
+                                  </span>
+                                )}
+                                {t.zone && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">
+                                    {t.zone}
+                                  </span>
+                                )}
+                                {t._count && (t._count.doctors > 0 || t._count.chemists > 0) && (
+                                  <span className="text-[10px] text-gray-400">
+                                    ({t._count.doctors} docs, {t._count.chemists} chem)
+                                  </span>
+                                )}
+                              </div>
+                              {isAssignedToOther && (
+                                <div className="text-[10px] text-amber-600 mt-0.5">
+                                  Currently assigned to: {t.employee?.firstName} {t.employee?.lastName}
+                                </div>
+                              )}
+                            </div>
                           </label>
                         );
                       })

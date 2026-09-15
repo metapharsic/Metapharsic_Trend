@@ -65,11 +65,6 @@ const COST_CHAIN_ALLOWLIST: { file: string; match: string; why: string }[] = [
   },
   {
     file: "services/item-history-agents.service.ts",
-    match: "Number(product.ptr || product.price || 100)",
-    why: "PTR shown in the item-history narrative; that report's cost figure uses purchaseRateVal, not this.",
-  },
-  {
-    file: "services/item-history-agents.service.ts",
     match: "Number(product.ptr || product.price || 0)",
     why: "Price-ladder echo in the report payload (mrp/ptr/pts trio). Display only.",
   },

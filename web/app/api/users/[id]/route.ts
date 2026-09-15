@@ -5,10 +5,13 @@ import { ok, badRequest, notFound, conflict, apiError } from "@/lib/api-response
 import { z } from "zod";
 import bcrypt from "bcrypt";
 
+import { UserProvisioningAgentsService } from "@/services/user-provisioning-agents.service";
+
 const UpdateUserSchema = z.object({
+  email: z.string().email().optional(),
   firstName: z.string().min(1).optional(),
   lastName: z.string().min(1).optional(),
-  phone: z.string().min(10).optional(),
+  phone: z.string().optional(),
   role: z.nativeEnum(Role).optional(),
   isActive: z.boolean().optional(),
   resetDeviceUuid: z.boolean().optional(),
@@ -72,45 +75,12 @@ async function updateUser(req: AuthedRequest, context: { params: Record<string, 
     const parsed = UpdateUserSchema.safeParse(body);
     if (!parsed.success) return badRequest("Validation error", parsed.error.flatten());
 
-    const { firstName, lastName, phone, role, isActive, resetDeviceUuid, password, managerId, territoryIds } = parsed.data;
-
-    const userUpdates: Record<string, unknown> = {};
-    if (role !== undefined && (req.user.role === Role.ADMIN)) userUpdates.role = role;
-    if (isActive !== undefined && req.user.role === Role.ADMIN) userUpdates.isActive = isActive;
-    if (resetDeviceUuid && req.user.role === Role.ADMIN) userUpdates.deviceUuid = null;
-    if (password) userUpdates.passwordHash = await bcrypt.hash(password, 12);
-
-    // territoryIds is only meaningful for ADMIN — same gate as role/isActive above.
-    const canSetTerritories = territoryIds !== undefined && req.user.role === Role.ADMIN;
-    const hasEmployeeUpdate = firstName || lastName || phone || managerId !== undefined || canSetTerritories;
-
-    const user = await db.user.update({
-      where: { id },
-      data: {
-        ...userUpdates,
-        ...(hasEmployeeUpdate
-          ? {
-              employee: {
-                update: {
-                  ...(firstName ? { firstName } : {}),
-                  ...(lastName ? { lastName } : {}),
-                  ...(phone ? { phone } : {}),
-                  ...(managerId !== undefined ? { managerId } : {}),
-                  ...(canSetTerritories ? { territories: { set: territoryIds.map((tid) => ({ id: tid })) } } : {}),
-                },
-              },
-            }
-          : {}),
-      },
-      include: {
-        employee: { select: { id: true, firstName: true, lastName: true, phone: true, territories: { select: { id: true, name: true } } } },
-      },
-    });
+    const user = await UserProvisioningAgentsService.updateUserDetails(id, parsed.data);
 
     return ok({ user });
-  } catch (err) {
+  } catch (err: any) {
     console.error("[PUT /api/users/:id]", err);
-    return apiError("INTERNAL_SERVER_ERROR", "Failed to update user", 500);
+    return apiError("INTERNAL_SERVER_ERROR", err.message || "Failed to update user", 500);
   }
 }
 
