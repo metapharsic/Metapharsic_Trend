@@ -11,13 +11,13 @@ describe("SoftwareUpdateAgentsService Multi-Agent Pipeline", () => {
 
     // 4 Agents verified
     expect(status.agentTelemetry.length).toBe(4);
-    expect(status.agentTelemetry[0].id).toBe("agent-github-sync");
-    expect(status.agentTelemetry[1].id).toBe("agent-codediff-review");
-    expect(status.agentTelemetry[2].id).toBe("agent-safety-guard");
-    expect(status.agentTelemetry[3].id).toBe("agent-deployment-orchestrator");
+    expect(status.agentTelemetry[0].id).toBe("agent-release-publisher");
+    expect(status.agentTelemetry[1].id).toBe("agent-vps-lifecycle");
+    expect(status.agentTelemetry[2].id).toBe("agent-git-hook-sync");
+    expect(status.agentTelemetry[3].id).toBe("agent-deployment-telemetry");
 
     expect(status.agentTelemetry[0].status).toBe("SYNCED");
-    expect(status.agentTelemetry[2].status).toBe("VERIFIED");
+    expect(status.agentTelemetry[2].status).toBe("ONLINE");
   });
 
   it("returns file diff breakdown and line-by-line review snippet", async () => {

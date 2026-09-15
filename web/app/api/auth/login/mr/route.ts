@@ -15,10 +15,16 @@ export async function POST(req: NextRequest) {
       return badRequest("Validation error", parsed.error.flatten());
     }
 
-    const { email, password, deviceUuid } = parsed.data;
+    const normalizedEmail = parsed.data.email.trim().toLowerCase();
+    const { password, deviceUuid } = parsed.data;
 
-    const user = await db.user.findUnique({
-      where: { email },
+    const user = await db.user.findFirst({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: "insensitive",
+        },
+      },
       include: { employee: true },
     });
 
@@ -58,7 +64,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return ok({
+    const response = ok({
       user: {
         id: user.id,
         email: user.email,
@@ -70,6 +76,16 @@ export async function POST(req: NextRequest) {
       accessToken,
       refreshToken,
     });
+
+    response.cookies.set("access_token", accessToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 15 * 60,
+      path: "/",
+    });
+
+    return response;
   } catch (err) {
     console.error("[POST /api/auth/login/mr]", err);
     return apiError("INTERNAL_SERVER_ERROR", "Login failed", 500);

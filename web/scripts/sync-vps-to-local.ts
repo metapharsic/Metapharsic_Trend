@@ -30,7 +30,7 @@ async function runMultiAgentSync() {
   console.log("\x1b[1;33m[AGENT 1: REMOTE EXTRACTOR AGENT]\x1b[0m Connecting to VPS & extracting live PostgreSQL database dump...");
   const startTime = Date.now();
 
-  const dumpCmd = `"${PLINK_PATH}" -batch -i "${SSH_KEY_PATH}" ${VPS_HOST} "PGPASSWORD=${VPS_DB_PASS} pg_dump -h localhost -U trend_mr_user -d trend_mr --schema=public --clean --if-exists --no-owner --no-acl"`;
+  const dumpCmd = `"${PLINK_PATH}" -batch -i "${SSH_KEY_PATH}" ${VPS_HOST} "PGPASSWORD=${VPS_DB_PASS} pg_dump -h 127.0.0.1 -U trend_mr_user -d trend_mr --schema=public --clean --if-exists --no-owner --no-acl"`;
 
   try {
     const dumpResult = spawnSync(dumpCmd, {

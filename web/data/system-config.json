@@ -6,7 +6,7 @@
   "autoPullEnabled": true,
   "autoPullSchedule": "TWICE_WEEKLY",
   "autoSyncOnPull": false,
-  "lastCheckedAt": "2026-09-11T00:23:47.503Z",
+  "lastCheckedAt": "2026-09-11T00:35:04.502Z",
   "lastPulledAt": "2026-09-11T00:24:00.598Z",
   "lastPullStatus": "NO_CHANGES",
   "lastPulledFiles": [
@@ -69,6 +69,48 @@
       "author": "Metapharsic Admin",
       "date": "2026-09-08",
       "message": "982026-728"
+    },
+    {
+      "hash": "2db30d3",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-08",
+      "message": "feat(dms): provision GST Certificate & Certificates documents and implement 15-day expiry alerts"
+    },
+    {
+      "hash": "f22f8ed",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-08",
+      "message": "feat(reports): enhanced MR Daily Calls Report with 6-agent Multi-Agent Council suite & high-standard analytics"
+    },
+    {
+      "hash": "da1e08e",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-07",
+      "message": "feat(ota): twice-daily poll + rich descriptive release notes for v1.2.0"
+    },
+    {
+      "hash": "621642d",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-07",
+      "message": "fix(ota): genuine updateAvailable check + 5min auto-poll + skip git pull in self-update mode"
+    },
+    {
+      "hash": "524ffad",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-07",
+      "message": "fix: replace hard UUID reject with soft auto-bind — MRs can always login, UUID auto-updates on device change"
+    },
+    {
+      "hash": "e5e2806",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-07",
+      "message": "sync: trend mr pharma os updates 2026-09-07_19:30"
+    },
+    {
+      "hash": "b4d2855",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-07",
+      "message": "feat: password policy — mr1234 for users, Oracle#19 for ADMIN (both local + VPS)"
     }
   ],
   "pullHistory": [

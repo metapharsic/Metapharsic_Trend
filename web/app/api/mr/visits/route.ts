@@ -10,6 +10,7 @@ import { calculateCqs } from "@/lib/cqs";
 import { ok, badRequest, unauthorized, forbidden, notFound, apiError } from "@/lib/api-response";
 import { getWorkflowSettings } from "@/lib/workflow-settings";
 import { startOfUtcDay, addUtcDays } from "@/lib/date";
+import { VisitDeduplicationAgentsService } from "@/services/visit-deduplication-agents.service";
 
 
 async function getVisits(req: AuthedRequest) {
@@ -97,13 +98,15 @@ async function getVisits(req: AuthedRequest) {
       areaCountMap[territory.id].count += 1;
     }
 
+    const purifiedVisits = VisitDeduplicationAgentsService.purifyVisitList(visits);
+
     return ok({
-      visits: visits.map((v) => ({
+      visits: purifiedVisits.map((v) => ({
         ...v,
         photoUrl: v.photoPath ? photoUrl(v.photoPath) : null,
         employeeName: v.employee ? `${v.employee.firstName} ${v.employee.lastName}` : null,
       })),
-      total,
+      total: purifiedVisits.length === visits.length ? total : total - (visits.length - purifiedVisits.length),
       page,
       limit,
       areaCounts: Object.values(areaCountMap).sort((a, b) => b.count - a.count),
@@ -213,6 +216,36 @@ async function createVisit(req: AuthedRequest) {
     const anomalyResult = { isAnomalous: false, reason: null, calculatedSpeed: 0 };
     const visitAnomalyFlag = false;
     const visitAnomalyDetails = null;
+
+    // 2. Multi-Agent Idempotency Check: Prevent duplicate submissions within short time window
+    const dupeCheck = await VisitDeduplicationAgentsService.findExistingDuplicateVisit({
+      employeeId: employee.id,
+      doctorId,
+      chemistId,
+      hospitalId,
+      purpose,
+    });
+    if (dupeCheck.isDuplicate && dupeCheck.existingVisitId) {
+      const existing = await db.visit.findUnique({
+        where: { id: dupeCheck.existingVisitId },
+        include: {
+          doctor: { select: { id: true, fullName: true, clinicAddress: true, territory: { select: { id: true, name: true } } } },
+          chemist: { select: { id: true, name: true, address: true, territory: { select: { id: true, name: true } } } },
+          lead: true,
+          samples: { include: { product: { select: { id: true, name: true } } } },
+        },
+      });
+      if (existing) {
+        return ok({
+          visit: {
+            ...existing,
+            photoUrl: existing.photoPath ? photoUrl(existing.photoPath) : null,
+          },
+          anomaly: { isAnomalous: false, reason: null, calculatedSpeed: 0 },
+          deduplicated: true,
+        });
+      }
+    }
 
     const visitId = randomUUID();
 

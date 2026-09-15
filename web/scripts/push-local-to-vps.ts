@@ -44,10 +44,14 @@ async function runMultiAgentVpsPush() {
     { local: "prisma/schema.prisma", remote: "prisma/schema.prisma" },
     // Core Libraries & Auth
     { local: "lib/with-auth.ts", remote: "lib/with-auth.ts" },
+    { local: "lib/validators.ts", remote: "lib/validators.ts" },
     { local: "lib/api-client.ts", remote: "lib/api-client.ts" },
     { local: "lib/excel-export.ts", remote: "lib/excel-export.ts" },
     { local: "lib/upload.ts", remote: "lib/upload.ts" },
+    { local: "lib/roles-responsibilities.ts", remote: "lib/roles-responsibilities.ts" },
     { local: "types/dms.ts", remote: "types/dms.ts" },
+    { local: "app/api/auth/login/manager/route.ts", remote: "app/api/auth/login/manager/route.ts" },
+    { local: "app/login/page.tsx", remote: "app/login/page.tsx" },
     // API Routes (DMS, Update, SFA, MR, Manager)
     { local: "app/api/dms/route.ts", remote: "app/api/dms/route.ts" },
     { local: "app/api/dms/stats/route.ts", remote: "app/api/dms/stats/route.ts" },
@@ -87,9 +91,8 @@ async function runMultiAgentVpsPush() {
     { local: "app/(dashboard)/tour-plans/page.tsx", remote: "app/(dashboard)/tour-plans/page.tsx" },
     { local: "app/(dashboard)/inventory/page.tsx", remote: "app/(dashboard)/inventory/page.tsx" },
     { local: "app/(dashboard)/simulator/page.tsx", remote: "app/(dashboard)/simulator/page.tsx" },
-    { local: "app/(dashboard)/admin/system-config/page.tsx", remote: "app/(dashboard)/admin/system-config/page.tsx" },
     { local: "app/(dashboard)/admin/page.tsx", remote: "app/(dashboard)/admin/page.tsx" },
-    // Scripts
+    { local: "data/system-config.json", remote: "data/system-config.json" },
     { local: "scripts/clean_and_sync_gst_certificates_only.ts", remote: "scripts/clean_and_sync_gst_certificates_only.ts" },
     { local: "scripts/sync-vps-to-local.ts", remote: "scripts/sync-vps-to-local.ts" },
     { local: "scripts/push-local-to-vps.ts", remote: "scripts/push-local-to-vps.ts" },

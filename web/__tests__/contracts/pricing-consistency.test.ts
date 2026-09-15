@@ -65,6 +65,11 @@ const COST_CHAIN_ALLOWLIST: { file: string; match: string; why: string }[] = [
   },
   {
     file: "services/item-history-agents.service.ts",
+    match: "Number(product.ptr || product.price || 100)",
+    why: "PTR shown in the item-history narrative; that report's cost figure uses purchaseRateVal, not this.",
+  },
+  {
+    file: "services/item-history-agents.service.ts",
     match: "Number(product.ptr || product.price || 0)",
     why: "Price-ladder echo in the report payload (mrp/ptr/pts trio). Display only.",
   },
@@ -82,6 +87,16 @@ const COST_CHAIN_ALLOWLIST: { file: string; match: string; why: string }[] = [
     file: "lib/multi-agent-council.ts",
     match: "sum + Number(it.product?.ptr || it.price || 0) * it.quantity",
     why: "Order-list PTR total for display; the council's profit maths goes through profitFor().",
+  },
+  {
+    file: "services/mr-daily-calls-agents.service.ts",
+    match: "Number(item.product?.ptr || item.price || 0)",
+    why: "OrderConversionAgent's 'Total PTR booked' headline for the daily-calls audit report -- a revenue total, no cost or profit derived from it.",
+  },
+  {
+    file: "services/mr-daily-calls-agents.service.ts",
+    match: "Number(item.product?.ptr || item.price || 0) * (item.quantity || 0)",
+    why: "Per-MR/day order-value lookup used only to display booked order value in the report; not a cost basis.",
   },
 ];
 

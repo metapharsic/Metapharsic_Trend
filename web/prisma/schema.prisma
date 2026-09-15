@@ -1111,4 +1111,3 @@ model DmsAuditTrail {
   @@index([createdAt])
   @@map("dms_audit_trail")
 }
-
