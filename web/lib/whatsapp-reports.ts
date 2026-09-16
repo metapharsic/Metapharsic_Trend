@@ -546,6 +546,7 @@ export interface MultiAgentSelectiveConfig {
   period?: "daily" | "weekly" | "monthly" | "custom" | "all";
   startDate?: string;
   endDate?: string;
+  customMessage?: string;
   includeDoctorVisits?: boolean;
   includeChemistCalls?: boolean;
   includeSalesOrders?: boolean;
@@ -598,6 +599,15 @@ export function formatMultiAgentCouncilWhatsAppReport(
     `🎖️ *COUNCIL VERDICT:* *Grade ${report.councilEvaluation?.overallGrade || "B"}* (${report.councilEvaluation?.councilScore || 0}/100) ${gradeEmoji}`,
     `📝 _${report.councilEvaluation?.executiveSummary || "Multi-Agent evaluation completed."}_`,
   ];
+
+  // Manager's Directive / Custom Daily Message
+  if (options?.customMessage && options.customMessage.trim()) {
+    sections.push(
+      ``,
+      `💬 *MANAGER'S DIRECTIVE & DAILY NOTE:*`,
+      `"${options.customMessage.trim()}"`
+    );
+  }
 
   // 1. 8-Domain Agent Evaluation Matrix
   if (options?.includeAgentScorecard !== false && report.councilEvaluation?.agentStatuses) {

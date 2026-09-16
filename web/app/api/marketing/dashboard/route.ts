@@ -73,6 +73,11 @@ async function getMarketingDashboard(req: AuthedRequest) {
       freeQty: 0,
     }));
 
+    const visualAidEngagement = Math.min(
+      95,
+      Math.max(45, Math.round((genuineEngagement * 0.9) + (visualAids.length > 0 ? 5 : 0)))
+    );
+
     // If visual aids exist, supplement campaigns
     for (const va of visualAids) {
       campaigns.push({
@@ -80,7 +85,7 @@ async function getMarketingDashboard(req: AuthedRequest) {
         name: `${va.title} (E-Detailing)`,
         type: "E_DETAILING" as const,
         targetAudience: va.product ? `Prescribers of ${va.product.name}` : "Key Opinion Leaders",
-        engagementRate: 85,
+        engagementRate: visualAidEngagement,
         status: "ACTIVE" as const,
         discountPct: 0,
         minQty: 1,
@@ -117,4 +122,13 @@ async function getMarketingDashboard(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getMarketingDashboard, [Role.MARKETING, Role.ADMIN, Role.MD]);
+export const GET = withAuth(getMarketingDashboard, [
+  Role.MARKETING,
+  Role.ADMIN,
+  Role.MD,
+  Role.NSM,
+  Role.ZSM,
+  Role.RM,
+  Role.ASM,
+]);
+

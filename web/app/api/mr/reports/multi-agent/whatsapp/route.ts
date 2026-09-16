@@ -15,6 +15,8 @@ const SendReportSchema = z.object({
   targetType: z.enum(["INDIVIDUAL_MR", "ALL_MRS", "ALL_MRS_INDIVIDUALLY", "EXECUTIVE_FLEET", "CUSTOM_PHONE"]),
   employeeId: z.string().optional(),
   customPhone: z.string().optional(),
+  customMessage: z.string().optional(),
+  selectedMrIds: z.array(z.string()).optional(),
   sendEmailToo: z.boolean().optional().default(false),
   period: z.enum(["daily", "weekly", "monthly", "custom", "all"]).optional().default("daily"),
   startDate: z.string().optional(),
@@ -50,6 +52,7 @@ async function getMultiAgentWhatsAppPreview(req: AuthedRequest) {
     const url = new URL(req.url, "http://localhost");
     const employeeId = url.searchParams.get("employeeId") || url.searchParams.get("mrId");
     const customPhone = url.searchParams.get("customPhone");
+    const customMessage = url.searchParams.get("customMessage") || undefined;
     const period = (url.searchParams.get("period") as any) || "daily";
     const startDate = url.searchParams.get("startDate") || undefined;
     const endDate = url.searchParams.get("endDate") || undefined;
@@ -63,6 +66,7 @@ async function getMultiAgentWhatsAppPreview(req: AuthedRequest) {
       period,
       startDate,
       endDate,
+      customMessage,
       includeDoctorVisits: parseBool(url.searchParams.get("includeDoctorVisits")),
       includeChemistCalls: parseBool(url.searchParams.get("includeChemistCalls")),
       includeSalesOrders: parseBool(url.searchParams.get("includeSalesOrders")),
@@ -190,6 +194,8 @@ async function dispatchMultiAgentWhatsAppReport(req: AuthedRequest) {
       targetType,
       employeeId,
       customPhone,
+      customMessage,
+      selectedMrIds,
       sendEmailToo,
       period = "daily",
       startDate,
@@ -207,6 +213,7 @@ async function dispatchMultiAgentWhatsAppReport(req: AuthedRequest) {
       period,
       startDate,
       endDate,
+      customMessage,
       ...selectiveOptions,
     };
 
@@ -216,7 +223,11 @@ async function dispatchMultiAgentWhatsAppReport(req: AuthedRequest) {
     // CASE A: DISPATCH INDIVIDUAL DAILY REPORT TO ALL MRS
     // ─────────────────────────────────────────────────────────────
     if (targetType === "ALL_MRS_INDIVIDUALLY" || targetType === "ALL_MRS") {
-      const allReports = await multiAgentCouncil.generateAllMrReports(timeFilter);
+      let allReports = await multiAgentCouncil.generateAllMrReports(timeFilter);
+      if (selectedMrIds && selectedMrIds.length > 0) {
+        const idSet = new Set(selectedMrIds);
+        allReports = allReports.filter((r) => idSet.has(r.mrId) || idSet.has(r.userId));
+      }
       const results: Array<{
         mrId: string;
         recipient: string;

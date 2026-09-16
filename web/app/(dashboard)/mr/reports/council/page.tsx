@@ -277,6 +277,8 @@ export default function MultiAgentMrReportPage() {
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [whatsAppTarget, setWhatsAppTarget] = useState<"ALL_MRS_INDIVIDUALLY" | "INDIVIDUAL_MR" | "EXECUTIVE_FLEET" | "CUSTOM_PHONE">("ALL_MRS_INDIVIDUALLY");
   const [customPhone, setCustomPhone] = useState("");
+  const [managerDirective, setManagerDirective] = useState("");
+  const [selectedDispatchMrIds, setSelectedDispatchMrIds] = useState<string[]>([]);
   const [whatsAppPreviewText, setWhatsAppPreviewText] = useState("");
   const [whatsAppUrl, setWhatsAppUrl] = useState("");
   const [loadingWhatsAppPreview, setLoadingWhatsAppPreview] = useState(false);
@@ -397,7 +399,8 @@ export default function MultiAgentMrReportPage() {
       target = whatsAppTarget,
       custom = customPhone,
       config = selectiveConfig,
-      period = selectedPeriod
+      period = selectedPeriod,
+      directive = managerDirective
     ) => {
       if (!currentReport && target !== "EXECUTIVE_FLEET" && target !== "ALL_MRS_INDIVIDUALLY") return;
       setLoadingWhatsAppPreview(true);
@@ -417,6 +420,10 @@ export default function MultiAgentMrReportPage() {
           includeAgentScorecard: String(config.includeAgentScorecard),
           includeRiskActionItems: String(config.includeRiskActionItems),
         };
+
+        if (directive.trim()) {
+          params.customMessage = directive.trim();
+        }
 
         if (period === "custom" && customStartDate && customEndDate) {
           params.startDate = customStartDate;
@@ -444,25 +451,38 @@ export default function MultiAgentMrReportPage() {
         setLoadingWhatsAppPreview(false);
       }
     },
-    [currentReport, whatsAppTarget, customPhone, selectiveConfig, selectedPeriod, customStartDate, customEndDate]
+    [currentReport, whatsAppTarget, customPhone, selectiveConfig, selectedPeriod, managerDirective, customStartDate, customEndDate]
   );
 
-  // Sync WhatsApp preview when toggles or target change
+  // Sync WhatsApp preview when toggles, target, or manager directive change
   useEffect(() => {
     if (isWhatsAppModalOpen) {
-      fetchWhatsAppPreview(whatsAppTarget, customPhone, selectiveConfig, selectedPeriod);
+      const timer = setTimeout(() => {
+        fetchWhatsAppPreview(whatsAppTarget, customPhone, selectiveConfig, selectedPeriod, managerDirective);
+      }, 200);
+      return () => clearTimeout(timer);
     }
-  }, [isWhatsAppModalOpen, whatsAppTarget, customPhone, selectiveConfig, selectedPeriod, fetchWhatsAppPreview]);
+  }, [isWhatsAppModalOpen, whatsAppTarget, customPhone, selectiveConfig, selectedPeriod, managerDirective, fetchWhatsAppPreview]);
+
+  // Keep selectedDispatchMrIds initialized when reports arrive
+  useEffect(() => {
+    if (reports.length > 0 && selectedDispatchMrIds.length === 0) {
+      setSelectedDispatchMrIds(reports.map((r) => r.mrId));
+    }
+  }, [reports, selectedDispatchMrIds.length]);
 
   const handleOpenWhatsAppModal = (target: "ALL_MRS_INDIVIDUALLY" | "INDIVIDUAL_MR" = "ALL_MRS_INDIVIDUALLY") => {
     setWhatsAppTarget(target);
     if (target === "ALL_MRS_INDIVIDUALLY") {
       setSelectedPeriod("daily");
+      if (reports.length > 0 && selectedDispatchMrIds.length === 0) {
+        setSelectedDispatchMrIds(reports.map((r) => r.mrId));
+      }
     }
     setBatchDispatchResults(null);
     setDispatchStatus(null);
     setIsWhatsAppModalOpen(true);
-    fetchWhatsAppPreview(target, "", selectiveConfig, target === "ALL_MRS_INDIVIDUALLY" ? "daily" : selectedPeriod);
+    fetchWhatsAppPreview(target, "", selectiveConfig, target === "ALL_MRS_INDIVIDUALLY" ? "daily" : selectedPeriod, managerDirective);
   };
 
   const handleCopyWhatsAppText = async () => {
@@ -496,6 +516,8 @@ export default function MultiAgentMrReportPage() {
         period: selectedPeriod,
         startDate: customStartDate || undefined,
         endDate: customEndDate || undefined,
+        customMessage: managerDirective.trim() || undefined,
+        selectedMrIds: whatsAppTarget === "ALL_MRS_INDIVIDUALLY" && selectedDispatchMrIds.length > 0 ? selectedDispatchMrIds : undefined,
         ...selectiveConfig,
       };
 
@@ -1672,21 +1694,337 @@ export default function MultiAgentMrReportPage() {
               </div>
             )}
 
-            {/* Custom Phone Input */}
-            {whatsAppTarget === "CUSTOM_PHONE" && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  Enter WhatsApp Number (with country code, e.g. +91 98765 43210):
-                </label>
-                <input
-                  type="text"
-                  placeholder="+919876543210"
-                  value={customPhone}
-                  onChange={(e) => setCustomPhone(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
-                />
+            {/* Recipient Selection Checkbox Grid (When batch sending to MRs) */}
+            {whatsAppTarget === "ALL_MRS_INDIVIDUALLY" && reports.length > 0 && (
+              <div className="space-y-2 rounded-2xl bg-slate-50 dark:bg-slate-800/40 p-4 border border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-indigo-500" />
+                    Select MR Recipients ({selectedDispatchMrIds.length} of {reports.length} selected):
+                  </label>
+                  <div className="flex items-center gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDispatchMrIds(reports.map((r) => r.mrId))}
+                      className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-slate-300 dark:text-slate-700">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDispatchMrIds([])}
+                      className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-semibold hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto pt-1">
+                  {reports.map((r) => {
+                    const isSelected = selectedDispatchMrIds.includes(r.mrId);
+                    return (
+                      <button
+                        key={r.mrId}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedDispatchMrIds(selectedDispatchMrIds.filter((id) => id !== r.mrId));
+                          } else {
+                            setSelectedDispatchMrIds([...selectedDispatchMrIds, r.mrId]);
+                          }
+                        }}
+                        className={`flex items-center justify-between p-2.5 rounded-xl border text-left text-xs transition-all ${
+                          isSelected
+                            ? "bg-emerald-500/10 border-emerald-500/60 text-slate-900 dark:text-white"
+                            : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 opacity-60"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          {isSelected ? (
+                            <CheckSquare className="h-4 w-4 text-emerald-500 shrink-0" />
+                          ) : (
+                            <Square className="h-4 w-4 text-slate-400 shrink-0" />
+                          )}
+                          <div className="truncate">
+                            <span className="font-bold block truncate">{r.fullName}</span>
+                            <span className="text-[10px] text-slate-400 block truncate">
+                              {r.territories?.[0]?.name || "Territory"} • {r.phone || "No phone"}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold text-indigo-500 ml-2 shrink-0">
+                          {r.dcrSummary?.totalVisits || 0} calls
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
+
+            {/* ── SELECT WHAT TO SEND: 10 GRANULAR SECTION TOGGLES ──────── */}
+            <div className="space-y-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 p-4 border border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sliders className="h-3.5 w-3.5 text-emerald-500" />
+                    Customize Daily Message Content (Select What to Send):
+                  </label>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    Choose precisely which audit modules and work summaries are synthesized into the message.
+                  </p>
+                </div>
+
+                {/* Preset Quick Actions */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectiveConfig({
+                        includeDoctorVisits: true,
+                        includeChemistCalls: true,
+                        includeSalesOrders: true,
+                        includeCollections: true,
+                        includeDutyTiming: true,
+                        includeExpenses: true,
+                        includeRoutingGeofence: true,
+                        includeFinancePnl: true,
+                        includeAgentScorecard: true,
+                        includeRiskActionItems: true,
+                      })
+                    }
+                    className="px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg text-[10px] font-bold transition border border-emerald-500/30"
+                  >
+                    All 10 Sections
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectiveConfig({
+                        includeDoctorVisits: true,
+                        includeChemistCalls: true,
+                        includeSalesOrders: false,
+                        includeCollections: false,
+                        includeDutyTiming: true,
+                        includeExpenses: true,
+                        includeRoutingGeofence: true,
+                        includeFinancePnl: false,
+                        includeAgentScorecard: true,
+                        includeRiskActionItems: true,
+                      })
+                    }
+                    className="px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-bold transition border border-indigo-500/30"
+                  >
+                    Field Activity Only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectiveConfig({
+                        includeDoctorVisits: false,
+                        includeChemistCalls: false,
+                        includeSalesOrders: true,
+                        includeCollections: true,
+                        includeDutyTiming: false,
+                        includeExpenses: false,
+                        includeRoutingGeofence: false,
+                        includeFinancePnl: true,
+                        includeAgentScorecard: false,
+                        includeRiskActionItems: false,
+                      })
+                    }
+                    className="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg text-[10px] font-bold transition border border-amber-500/30"
+                  >
+                    Commercial Only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectiveConfig({
+                        includeDoctorVisits: true,
+                        includeChemistCalls: false,
+                        includeSalesOrders: true,
+                        includeCollections: false,
+                        includeDutyTiming: false,
+                        includeExpenses: false,
+                        includeRoutingGeofence: false,
+                        includeFinancePnl: false,
+                        includeAgentScorecard: false,
+                        includeRiskActionItems: true,
+                      })
+                    }
+                    className="px-2 py-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg text-[10px] font-bold transition"
+                  >
+                    Quick Flash
+                  </button>
+                </div>
+              </div>
+
+              {/* Toggles Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 pt-1">
+                {[
+                  {
+                    key: "includeDoctorVisits",
+                    label: "Doctor Detailing",
+                    sub: "Dr calls, CQS, samples",
+                    icon: Stethoscope,
+                    color: "text-emerald-500",
+                  },
+                  {
+                    key: "includeChemistCalls",
+                    label: "Chemist Calls",
+                    sub: "POB bookings & orders",
+                    icon: Pill,
+                    color: "text-blue-500",
+                  },
+                  {
+                    key: "includeSalesOrders",
+                    label: "Secondary Orders",
+                    sub: "Booking value & SKU list",
+                    icon: ShoppingBag,
+                    color: "text-indigo-500",
+                  },
+                  {
+                    key: "includeCollections",
+                    label: "Collections",
+                    sub: "Cash / cheque receipts",
+                    icon: Wallet,
+                    color: "text-amber-500",
+                  },
+                  {
+                    key: "includeDutyTiming",
+                    label: "Duty Hours",
+                    sub: "Check-in/out timestamps",
+                    icon: Clock,
+                    color: "text-teal-500",
+                  },
+                  {
+                    key: "includeExpenses",
+                    label: "Field Expenses",
+                    sub: "DA/TA claim totals",
+                    icon: Receipt,
+                    color: "text-purple-500",
+                  },
+                  {
+                    key: "includeRoutingGeofence",
+                    label: "GPS & Routing",
+                    sub: "Tour adherence & geofence",
+                    icon: MapPin,
+                    color: "text-rose-500",
+                  },
+                  {
+                    key: "includeFinancePnl",
+                    label: "Financial P&L",
+                    sub: "PTR revenue & net margin",
+                    icon: Landmark,
+                    color: "text-cyan-500",
+                  },
+                  {
+                    key: "includeAgentScorecard",
+                    label: "Agent Scorecard",
+                    sub: "8-Domain pass/alert matrix",
+                    icon: Cpu,
+                    color: "text-violet-500",
+                  },
+                  {
+                    key: "includeRiskActionItems",
+                    label: "Risk & Actions",
+                    sub: "Anomalies & directives",
+                    icon: AlertTriangle,
+                    color: "text-orange-500",
+                  },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isChecked = Boolean((selectiveConfig as any)[item.key]);
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() =>
+                        setSelectiveConfig((prev) => ({
+                          ...prev,
+                          [item.key]: !isChecked,
+                        }))
+                      }
+                      className={`flex flex-col justify-between p-2.5 rounded-xl border text-left transition-all ${
+                        isChecked
+                          ? "bg-white dark:bg-slate-900 border-emerald-500/50 shadow-sm ring-1 ring-emerald-500/30"
+                          : "bg-slate-100/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-400 opacity-60"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <Icon className={`h-4 w-4 ${isChecked ? item.color : "text-slate-400"}`} />
+                        {isChecked ? (
+                          <CheckSquare className="h-3.5 w-3.5 text-emerald-500" />
+                        ) : (
+                          <Square className="h-3.5 w-3.5 text-slate-400" />
+                        )}
+                      </div>
+                      <div>
+                        <span className={`text-xs font-bold block ${isChecked ? "text-slate-900 dark:text-white" : "text-slate-500"}`}>
+                          {item.label}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          {item.sub}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── MANAGER'S DAILY DIRECTIVE / MESSAGE TEXTAREA ────────── */}
+            <div className="space-y-2 rounded-2xl bg-slate-50 dark:bg-slate-800/40 p-4 border border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                  Manager&apos;s Daily Directive &amp; Work Note (Optional):
+                </label>
+                {managerDirective && (
+                  <button
+                    type="button"
+                    onClick={() => setManagerDirective("")}
+                    className="text-[11px] text-rose-500 hover:underline font-semibold"
+                  >
+                    Clear Note
+                  </button>
+                )}
+              </div>
+
+              <textarea
+                rows={2}
+                value={managerDirective}
+                onChange={(e) => setManagerDirective(e.target.value)}
+                placeholder="Add personalized feedback, recognition, or focus areas for tomorrow (e.g. 'Great work on meeting Dr. Sharma today. Please prioritize following up on Chemist pending collections tomorrow morning.')..."
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none resize-none leading-relaxed"
+              />
+
+              {/* Quick Preset Chips for Manager Note */}
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Quick Add:</span>
+                {[
+                  "🌟 Great Doctor Coverage Today!",
+                  "💰 Prioritize Chemist Collections Tomorrow",
+                  "📦 Push Active Scheme Volume",
+                  "⏱️ Ensure Timely Duty Check-In",
+                  "🎯 Follow-up with KOL Prescribers",
+                ].map((chip) => (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => {
+                      setManagerDirective((prev) => (prev ? `${prev} ${chip}` : chip));
+                    }}
+                    className="px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 text-[10px] font-medium transition"
+                  >
+                    + {chip}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Formatted Live WhatsApp Preview Bubble */}
             <div className="space-y-2">

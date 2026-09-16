@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import {
   BarChart3,
   Search,
@@ -30,6 +31,8 @@ import {
   PieChart,
   Activity,
   CheckSquare,
+  MessageCircle,
+  ExternalLink,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 
@@ -471,6 +474,20 @@ export default function MrDailyCallsReportPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href={`/mr/reports/council?period=daily&startDate=${startDate}&endDate=${endDate}`}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all shadow-md"
+            >
+              <MessageCircle size={14} className="text-slate-950" />
+              Daily Council Dispatch &amp; WhatsApp
+            </Link>
+            <Link
+              href="/reports"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 border border-white/20 text-xs font-semibold hover:bg-white/20 transition-all shadow-sm"
+            >
+              <BarChart3 size={13} className="text-indigo-300" />
+              Executive BI
+            </Link>
             <button
               onClick={() => setShowAgentPanel((p) => !p)}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 border border-white/20 text-xs font-semibold hover:bg-white/20 transition-all shadow-sm"
@@ -746,7 +763,16 @@ export default function MrDailyCallsReportPage() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full">
+                    <Link
+                      href={`/mr/reports/council?period=daily&mrId=${mr.mrId}&startDate=${startDate}&endDate=${endDate}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-xl transition-all shadow-sm"
+                      title="Send or audit this MR's daily work report"
+                    >
+                      <MessageCircle size={13} className="text-emerald-600" />
+                      <span>Daily WhatsApp</span>
+                    </Link>
+                    <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl">
                       {mr.totalCalls} calls
                     </span>
                     {isExpanded ? (

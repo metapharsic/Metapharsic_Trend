@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
 import {
   BarChart,
   PieChart,
@@ -26,6 +27,9 @@ import {
   CheckCircle2,
   Table as TableIcon,
   BarChart3,
+  MessageCircle,
+  Calculator,
+  Cpu,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 
@@ -164,6 +168,33 @@ export default function ReportsDashboard() {
   // Sorting state
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  // Multi-Agent Council Telemetry state
+  const [councilSynthesis, setCouncilSynthesis] = useState<{
+    score: number;
+    grade: string;
+    summary: string;
+    totalMrs: number;
+  } | null>(null);
+
+  // Fetch Multi-Agent Council summary
+  useEffect(() => {
+    apiClient.get("/api/mr/reports/multi-agent?period=monthly")
+      .then((res) => {
+        const list = res.data?.data?.reports || (Array.isArray(res.data?.data) ? res.data.data : []);
+        if (list.length > 0) {
+          const avgScore = Math.round(list.reduce((s: number, r: any) => s + (r.councilEvaluation?.councilScore || 0), 0) / list.length);
+          const grade = avgScore >= 90 ? "A+" : avgScore >= 80 ? "A" : avgScore >= 70 ? "B" : "C";
+          setCouncilSynthesis({
+            score: avgScore,
+            grade,
+            summary: `Multi-Agent Council evaluated ${list.length} active field representatives across India.`,
+            totalMrs: list.length,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Fetch report list
   useEffect(() => {
@@ -360,6 +391,77 @@ export default function ReportsDashboard() {
           </button>
         </div>
       </div>
+
+      {/* ── Cross-Module Intelligence Navigation Bar ── */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs font-bold">
+        <span className="text-slate-400 font-medium mr-1 shrink-0 uppercase tracking-wider text-[10px]">Jump To:</span>
+        <span className="px-3 py-1.5 rounded-xl bg-primary-600 text-white shrink-0 border border-primary-500 flex items-center gap-1.5">
+          <BarChart3 size={13} />
+          <span>Executive BI Reports</span>
+        </span>
+        <Link
+          href="/reports/mr-daily-calls"
+          className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white shrink-0 border border-slate-800 transition flex items-center gap-1.5"
+        >
+          <BarChart3 size={13} className="text-indigo-400" />
+          <span>MR Daily Calls Analytics</span>
+        </Link>
+        <Link
+          href="/mr/reports/council"
+          className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white shrink-0 border border-slate-800 transition flex items-center gap-1.5"
+        >
+          <MessageCircle size={13} className="text-emerald-400" />
+          <span>Multi-Agent Council &amp; WhatsApp Dispatch</span>
+        </Link>
+        <Link
+          href="/simulator"
+          className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white shrink-0 border border-slate-800 transition flex items-center gap-1.5"
+        >
+          <Calculator size={13} className="text-fuchsia-400" />
+          <span>Scheme Simulator</span>
+        </Link>
+        <Link
+          href="/marketing"
+          className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white shrink-0 border border-slate-800 transition flex items-center gap-1.5"
+        >
+          <BarChart3 size={13} className="text-purple-400" />
+          <span>Marketing &amp; Campaign Intelligence</span>
+        </Link>
+      </div>
+
+      {/* ── Multi-Agent Council Telemetry Ribbon ── */}
+      {councilSynthesis && (
+        <div className="rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 p-4 border border-indigo-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center border border-indigo-500/30 shrink-0">
+              <Cpu className="w-5 h-5 text-indigo-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider">
+                  8-Domain AI Council Telemetry
+                </span>
+                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  Grade {councilSynthesis.grade} ({councilSynthesis.score}%)
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                {councilSynthesis.summary}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end md:self-auto">
+            <Link
+              href="/mr/reports/council"
+              className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+            >
+              <MessageCircle size={13} />
+              <span>Open Daily Dispatch</span>
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Main Grid Layout: Sidebar Report Catalog + Content Viewer */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

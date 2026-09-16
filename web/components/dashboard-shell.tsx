@@ -105,7 +105,7 @@ const NAV_ITEMS = [
   { href: "/reports", label: "Executive BI Reports", icon: BarChart3, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"], category: "Analytics & Marketing" },
   { href: "/reports/mr-daily-calls", label: "MR Daily Calls Report", icon: BarChart3, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "MR"], category: "Analytics & Marketing" },
   { href: "/simulator", label: "Scheme Margin Simulator", icon: Calculator, roles: ["ADMIN", "MD", "NSM", "FINANCE", "MARKETING"], category: "Analytics & Marketing" },
-  { href: "/marketing", label: "Marketing Campaigns", icon: BarChart3, roles: ["MARKETING", "ADMIN"], category: "Analytics & Marketing" },
+  { href: "/marketing", label: "Marketing & Campaign Intelligence", icon: BarChart3, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "MARKETING"], category: "Analytics & Marketing" },
 
   // ── Administration & Profile ─────────────────────────────────
   { href: "/dms", label: "Document Management (DMS)", icon: Folder, roles: ["ADMIN"], category: "Administration & Profile" },

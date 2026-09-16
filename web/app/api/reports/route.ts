@@ -442,9 +442,8 @@ const REPORTS = {
         const plannedDaysCount = emp.tourPlans.reduce((sum, tp) => sum + tp.days.length, 0);
         const actualVisitsCount = emp.visits.length;
         const approvalStatus = emp.tourPlans[0]?.status || "PENDING_ASM";
-        const complianceScore = plannedDaysCount > 0
-          ? Math.min(100, Math.round((actualVisitsCount / (plannedDaysCount * 6)) * 100))
-          : 85;
+        const expectedCalls = plannedDaysCount > 0 ? plannedDaysCount * 6 : 22 * 6;
+        const complianceScore = Math.min(100, Math.round((actualVisitsCount / expectedCalls) * 100));
 
         return {
           mr: `${emp.firstName} ${emp.lastName}`,
@@ -719,7 +718,7 @@ const REPORTS = {
         employee: r.employee,
         enrolled: r.enrolled,
         completed: r.completed,
-        quizScore: `${r.avgQuizScore || 85}%`,
+        quizScore: r.avgQuizScore ? `${r.avgQuizScore}%` : r.completed > 0 ? "100%" : "—",
         completionPercent: r.enrolled > 0 ? Math.round((r.completed / r.enrolled) * 100) : 0,
       }));
     },
