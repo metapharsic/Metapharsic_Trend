@@ -177,14 +177,19 @@ async function getMultiAgentWhatsAppPreview(req: AuthedRequest) {
 /**
  * POST /api/mr/reports/multi-agent/whatsapp
  * Dispatches Multi-Agent Council WhatsApp reports to MRs, Admins, or custom phone numbers.
- * STRICT ACCESS CONTROL: Only ADMIN (and MD) is permitted to dispatch reports.
- */
+  * STRICT ACCESS CONTROL: Management roles (ADMIN, MD, NSM, ZSM, RM, ASM) can dispatch fleet/individual reports.
+  * Field MRs can dispatch/preview their own individual report.
+  */
 async function dispatchMultiAgentWhatsAppReport(req: AuthedRequest) {
   try {
-    // 1. STRICT RBAC CHECK: Only Admin (and MD) has permission to trigger report dispatch
-    if (req.user.role !== Role.ADMIN && req.user.role !== Role.MD) {
-      return forbidden("Access Denied: Only Administrator has permission to dispatch Multi-Agent Council Reports.");
-    }
+    const isManager = ([
+      Role.ADMIN,
+      Role.MD,
+      Role.NSM,
+      Role.ZSM,
+      Role.RM,
+      Role.ASM,
+    ] as Role[]).includes(req.user.role as Role);
 
     const body = await req.json();
     const parsed = SendReportSchema.safeParse(body);
@@ -218,6 +223,10 @@ async function dispatchMultiAgentWhatsAppReport(req: AuthedRequest) {
     };
 
     const startTime = Date.now();
+
+    if ((targetType === "ALL_MRS_INDIVIDUALLY" || targetType === "ALL_MRS" || targetType === "EXECUTIVE_FLEET") && !isManager) {
+      return forbidden("Access Denied: Administrator or Manager privileges required to broadcast reports.");
+    }
 
     // ─────────────────────────────────────────────────────────────
     // CASE A: DISPATCH INDIVIDUAL DAILY REPORT TO ALL MRS
@@ -520,8 +529,14 @@ export const GET = withAuth(getMultiAgentWhatsAppPreview, [
   Role.MR,
 ]);
 
-// STRICT RBAC: Only ADMIN and MD have access to trigger WhatsApp report dispatch
+// Management roles and MRs authorized for WhatsApp dispatch
 export const POST = withAuth(dispatchMultiAgentWhatsAppReport, [
   Role.ADMIN,
   Role.MD,
+  Role.NSM,
+  Role.ZSM,
+  Role.RM,
+  Role.ASM,
+  Role.MR,
 ]);
+

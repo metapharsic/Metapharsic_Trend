@@ -332,7 +332,9 @@ export default function MultiAgentMrReportPage() {
     }
   }, []);
 
-  const isAdmin = currentUserRole === "ADMIN" || currentUserRole === "MD";
+  // Authorized supervisory management roles include ADMIN, MD, NSM, ZSM, RM, ASM
+  const isManager = !currentUserRole || ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"].includes(currentUserRole.toUpperCase());
+  const isAdmin = isManager;
 
   // Trigger Multi-Agent Progress Sequence
   const runAgentProgressAnimation = useCallback(() => {
@@ -454,15 +456,13 @@ export default function MultiAgentMrReportPage() {
     [currentReport, whatsAppTarget, customPhone, selectiveConfig, selectedPeriod, managerDirective, customStartDate, customEndDate]
   );
 
-  // Sync WhatsApp preview when toggles, target, or manager directive change
+  // Sync WhatsApp preview whenever report, toggles, target, or manager directive change
   useEffect(() => {
-    if (isWhatsAppModalOpen) {
-      const timer = setTimeout(() => {
-        fetchWhatsAppPreview(whatsAppTarget, customPhone, selectiveConfig, selectedPeriod, managerDirective);
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [isWhatsAppModalOpen, whatsAppTarget, customPhone, selectiveConfig, selectedPeriod, managerDirective, fetchWhatsAppPreview]);
+    const timer = setTimeout(() => {
+      fetchWhatsAppPreview(whatsAppTarget, customPhone, selectiveConfig, selectedPeriod, managerDirective);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [currentReport?.mrId, isWhatsAppModalOpen, whatsAppTarget, customPhone, selectiveConfig, selectedPeriod, managerDirective, fetchWhatsAppPreview]);
 
   // Keep selectedDispatchMrIds initialized when reports arrive
   useEffect(() => {
@@ -684,6 +684,7 @@ export default function MultiAgentMrReportPage() {
                 <button
                   onClick={() => handleOpenWhatsAppModal("ALL_MRS_INDIVIDUALLY")}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white px-4 py-2.5 text-sm font-bold shadow-lg shadow-emerald-900/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  title="Dispatch personalized daily reports to all active MRs"
                 >
                   <Send className="h-4 w-4" />
                   <span>Send Daily Report to All MRs</span>
@@ -692,16 +693,43 @@ export default function MultiAgentMrReportPage() {
                 <button
                   onClick={() => handleOpenWhatsAppModal("INDIVIDUAL_MR")}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2.5 text-sm font-semibold shadow-md transition-all hover:scale-[1.02]"
+                  title={`Send customized daily report to ${currentReport?.fullName || "selected MR"}`}
                 >
                   <MessageCircle className="h-4 w-4" />
                   <span>Send to MR</span>
                 </button>
+
+                <a
+                  href={whatsAppUrl || `https://wa.me/?text=${encodeURIComponent(whatsAppPreviewText)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 px-3.5 py-2.5 text-sm font-semibold border border-emerald-500/40 transition-all hover:scale-[1.02]"
+                  title="Open formatted report directly in WhatsApp Web"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span>WhatsApp Web</span>
+                </a>
               </>
             ) : (
-              <div className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800/80 px-3.5 py-2 text-xs text-slate-300 border border-slate-700">
-                <Lock className="h-3.5 w-3.5 text-amber-400" />
-                <span>Admin Dispatch Only</span>
-              </div>
+              <>
+                <button
+                  onClick={() => handleOpenWhatsAppModal("INDIVIDUAL_MR")}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 text-sm font-semibold shadow-md transition-all hover:scale-[1.02]"
+                >
+                  <Send className="h-4 w-4" />
+                  <span>Send My Daily Report</span>
+                </button>
+
+                <a
+                  href={whatsAppUrl || `https://wa.me/?text=${encodeURIComponent(whatsAppPreviewText)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 px-3.5 py-2.5 text-sm font-semibold border border-emerald-500/40 transition-all hover:scale-[1.02]"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span>WhatsApp Web</span>
+                </a>
+              </>
             )}
 
             <button
@@ -859,89 +887,233 @@ export default function MultiAgentMrReportPage() {
           </div>
         )}
 
-        {/* Selective Report Module Configurator Toggles */}
-        <div className="space-y-3 pt-2">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Sliders className="h-4 w-4 text-indigo-500" />
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                Selective Report Configurator (Pick what to include in report & WhatsApp):
-              </span>
+        {/* ── DAILY WORK MESSAGE & MULTI-AGENT WHATSAPP DISPATCH HUB ── */}
+        <div className="rounded-2xl bg-gradient-to-b from-slate-50 to-indigo-50/30 dark:from-slate-800/60 dark:to-indigo-950/20 p-5 border border-indigo-200/60 dark:border-indigo-900/40 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                <MessageCircle className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>Daily Work Message &amp; Multi-Agent WhatsApp Hub</span>
+                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-500">
+                    Live Wired
+                  </span>
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Select which audit modules to include, attach your directive, and dispatch personalized reports to MRs.
+                </p>
+              </div>
             </div>
 
             {/* Quick Presets */}
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[11px] text-slate-500 mr-1">Presets:</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Presets:</span>
               <button
+                type="button"
                 onClick={() => applyPreset("ALL")}
-                className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200"
+                className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold border border-emerald-500/30 transition"
               >
-                All Modules
+                🌟 All 10
               </button>
               <button
-                onClick={() => applyPreset("COMMERCIAL")}
-                className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200"
-              >
-                Commercial & P&L
-              </button>
-              <button
+                type="button"
                 onClick={() => applyPreset("FIELD")}
-                className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200"
+                className="px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-[11px] font-bold border border-blue-500/30 transition"
               >
-                Field CRM & DCR
+                🩺 Field DCR
               </button>
               <button
-                onClick={() => applyPreset("EXECUTIVE")}
-                className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200"
+                type="button"
+                onClick={() => applyPreset("COMMERCIAL")}
+                className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[11px] font-bold border border-amber-500/30 transition"
               >
-                Executive Verdict
+                💰 Commercial
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPreset("EXECUTIVE")}
+                className="px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 text-[11px] font-bold border border-purple-500/30 transition"
+              >
+                ⚡ Quick Flash
               </button>
             </div>
           </div>
 
-          {/* Module Toggle Badges */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
-            {[
-              { key: "includeDoctorVisits", label: "Doctor Detailing", icon: Stethoscope, color: "emerald" },
-              { key: "includeChemistCalls", label: "Chemist Calls & POB", icon: Pill, color: "teal" },
-              { key: "includeSalesOrders", label: "Secondary Sales", icon: ShoppingBag, color: "blue" },
-              { key: "includeCollections", label: "Collections Done", icon: Wallet, color: "indigo" },
-              { key: "includeDutyTiming", label: "Duty Timing / Logs", icon: Clock, color: "cyan" },
-              { key: "includeExpenses", label: "Expenses & Claims", icon: Receipt, color: "amber" },
-              { key: "includeRoutingGeofence", label: "Routing & Geofence", icon: MapPin, color: "violet" },
-              { key: "includeFinancePnl", label: "Financial P&L", icon: Landmark, color: "rose" },
-              { key: "includeAgentScorecard", label: "8-Agent Council", icon: Cpu, color: "fuchsia" },
-              { key: "includeRiskActionItems", label: "Risk & Action Items", icon: AlertTriangle, color: "orange" },
-            ].map((mod) => {
-              const active = (selectiveConfig as any)[mod.key];
-              const Icon = mod.icon;
-              return (
-                <button
-                  key={mod.key}
-                  onClick={() =>
-                    setSelectiveConfig((prev) => ({
-                      ...prev,
-                      [mod.key]: !active,
-                    }))
-                  }
-                  className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all ${
-                    active
-                      ? "bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-700 text-indigo-900 dark:text-indigo-200 font-semibold shadow-xs"
-                      : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800 text-slate-400 opacity-60 hover:opacity-100"
-                  }`}
-                >
-                  <div
-                    className={`h-4 w-4 rounded flex items-center justify-center text-xs ${
-                      active ? "bg-indigo-600 text-white" : "border border-slate-400"
+          {/* 10 Selectable Content Checkboxes / Toggles */}
+          <div>
+            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block mb-2">
+              Select What to Send in Message:
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+              {[
+                { key: "includeDoctorVisits", label: "Doctor Detailing", sub: "Visits, CQS, Samples", icon: Stethoscope, color: "text-emerald-500" },
+                { key: "includeChemistCalls", label: "Chemist Calls", sub: "Calls & POB Orders", icon: Pill, color: "text-teal-500" },
+                { key: "includeSalesOrders", label: "Secondary Orders", sub: "Bookings & Top SKUs", icon: ShoppingBag, color: "text-blue-500" },
+                { key: "includeCollections", label: "Collections Done", sub: "Chemist Cash/Cheque", icon: Wallet, color: "text-indigo-500" },
+                { key: "includeDutyTiming", label: "Duty Hours", sub: "Check-in/out Timestamps", icon: Clock, color: "text-cyan-500" },
+                { key: "includeExpenses", label: "Field Expenses", sub: "DA/TA Claims & ROI", icon: Receipt, color: "text-amber-500" },
+                { key: "includeRoutingGeofence", label: "GPS & Routing", sub: "Tour & Geofence", icon: MapPin, color: "text-rose-500" },
+                { key: "includeFinancePnl", label: "Financial P&L", sub: "Revenue & Net Margin", icon: Landmark, color: "text-purple-500" },
+                { key: "includeAgentScorecard", label: "8-Agent Council", icon: Cpu, sub: "Domain Scorecard", color: "text-violet-500" },
+                { key: "includeRiskActionItems", label: "Risk & Action", icon: AlertTriangle, sub: "Anomalies & Guidance", color: "text-orange-500" },
+              ].map((mod) => {
+                const isChecked = Boolean((selectiveConfig as any)[mod.key]);
+                const Icon = mod.icon;
+                return (
+                  <button
+                    key={mod.key}
+                    type="button"
+                    onClick={() =>
+                      setSelectiveConfig((prev) => ({
+                        ...prev,
+                        [mod.key]: !isChecked,
+                      }))
+                    }
+                    className={`flex items-center gap-2 p-2 rounded-xl border text-left transition-all ${
+                      isChecked
+                        ? "bg-white dark:bg-slate-900 border-emerald-500/60 text-slate-900 dark:text-white font-semibold shadow-xs ring-1 ring-emerald-500/30"
+                        : "bg-slate-100/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-400 opacity-60 hover:opacity-90"
                     }`}
                   >
-                    {active ? <Check className="h-3 w-3" /> : null}
-                  </div>
-                  <Icon className="h-4 w-4 shrink-0 text-indigo-500" />
-                  <span className="text-xs truncate">{mod.label}</span>
+                    <div
+                      className={`h-4 w-4 rounded flex items-center justify-center text-xs shrink-0 transition ${
+                        isChecked ? "bg-emerald-600 text-white" : "border border-slate-400"
+                      }`}
+                    >
+                      {isChecked ? <Check className="h-3 w-3" /> : null}
+                    </div>
+                    <Icon className={`h-4 w-4 shrink-0 ${isChecked ? mod.color : "text-slate-400"}`} />
+                    <div className="truncate">
+                      <span className="text-xs block truncate">{mod.label}</span>
+                      <span className="text-[10px] text-slate-400 block truncate">{mod.sub}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Manager's Directive Note Textarea with Quick Add Chips */}
+          <div className="rounded-xl bg-white dark:bg-slate-900 p-3.5 border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                Manager&apos;s Daily Directive &amp; Work Note:
+              </label>
+              {managerDirective && (
+                <button
+                  type="button"
+                  onClick={() => setManagerDirective("")}
+                  className="text-[11px] text-rose-500 hover:underline font-semibold"
+                >
+                  Clear Note
                 </button>
-              );
-            })}
+              )}
+            </div>
+
+            <textarea
+              rows={2}
+              value={managerDirective}
+              onChange={(e) => setManagerDirective(e.target.value)}
+              placeholder="Type personalized manager directive or feedback for today's work..."
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none resize-none leading-relaxed"
+            />
+
+            {/* Quick Prompt Chips */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+              <span className="text-[10px] font-bold text-slate-400 uppercase">Quick Add:</span>
+              {[
+                "🌟 Great Doctor Coverage Today!",
+                "💰 Prioritize Chemist Collections Tomorrow",
+                "📦 Push Active Scheme Volume",
+                "⏱️ Ensure Timely Duty Check-In",
+                "🎯 Follow-up with KOL Prescribers",
+              ].map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => {
+                    setManagerDirective((prev) => (prev ? `${prev} ${chip}` : chip));
+                  }}
+                  className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-medium transition border border-slate-200 dark:border-slate-700"
+                >
+                  + {chip}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Live Formatted WhatsApp Message Preview Bubble & Direct Dispatch Bar */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Eye className="h-3.5 w-3.5 text-emerald-500" />
+                Live Formatted WhatsApp Message Preview ({currentReport?.fullName || "Selected MR"}):
+              </span>
+              <button
+                type="button"
+                onClick={handleCopyWhatsAppText}
+                className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 hover:underline"
+              >
+                {copiedToast ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                <span>{copiedToast ? "Copied!" : "Copy Text"}</span>
+              </button>
+            </div>
+
+            <div className="rounded-xl bg-slate-950 p-3.5 border border-slate-800 font-mono text-xs text-slate-200 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed shadow-inner">
+              {loadingWhatsAppPreview ? (
+                <div className="flex items-center justify-center p-4 text-slate-400 gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin text-emerald-400" />
+                  <span>Synthesizing Multi-Agent WhatsApp message...</span>
+                </div>
+              ) : (
+                whatsAppPreviewText || "No preview generated yet."
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons inside the Hub */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              <span>8 Domain Agents Ready • Verified for WhatsApp API &amp; Web</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => handleOpenWhatsAppModal("ALL_MRS_INDIVIDUALLY")}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-900/30 transition hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Send className="h-3.5 w-3.5" />
+                <span>Dispatch to All MRs ({reports.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenWhatsAppModal("INDIVIDUAL_MR")}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-sm transition hover:scale-[1.02]"
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                <span>Send to {currentReport?.fullName?.split(" ")[0] || "MR"}</span>
+              </button>
+
+              <a
+                href={
+                  currentReport?.phone
+                    ? `https://wa.me/${currentReport.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(whatsAppPreviewText)}`
+                    : whatsAppUrl || `https://wa.me/?text=${encodeURIComponent(whatsAppPreviewText)}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition hover:scale-[1.02]"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                <span>Open in WhatsApp Web</span>
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -991,6 +1163,32 @@ export default function MultiAgentMrReportPage() {
               }`}
             >
               Grade {currentReport.councilEvaluation.overallGrade}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleOpenWhatsAppModal("INDIVIDUAL_MR")}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-sm transition hover:scale-[1.02]"
+                title={`Send Daily WhatsApp Report to ${currentReport.fullName}`}
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                <span>Send WhatsApp</span>
+              </button>
+              <a
+                href={
+                  currentReport.phone
+                    ? `https://wa.me/${currentReport.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(whatsAppPreviewText)}`
+                    : `https://wa.me/?text=${encodeURIComponent(whatsAppPreviewText)}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition hover:scale-[1.02]"
+                title="Open directly in WhatsApp Web"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                <span>Web</span>
+              </a>
             </div>
           </div>
         </div>
