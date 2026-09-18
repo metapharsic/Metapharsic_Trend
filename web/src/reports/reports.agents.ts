@@ -64,6 +64,7 @@ export interface GranularMrMultiAgentReport {
     deliveredOrdersCount: number;
     pendingOrdersCount: number;
     cancelledOrdersCount: number;
+    invoicedRevenuePtr?: number;
     totalRevenuePts: number;
     totalRevenuePtr: number;
     totalUnitsBooked: number;

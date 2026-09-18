@@ -277,10 +277,15 @@ export class ReportsService {
 
     let totalRevenuePts = 0;
     let totalRevenuePtr = 0;
+    let invoicedRevenuePtr = 0;
     let totalUnits = 0;
     const skuMap = new Map<string, any>();
 
     for (const ord of orders) {
+      const isInvoiced = ord.invoice != null;
+      const orderInvoiceVal = ord.invoice ? Number(ord.invoice.grandTotal ?? ord.invoice.amount ?? 0) : 0;
+      let orderItemsPtrSum = 0;
+
       for (const item of ord.items || []) {
         const ptrVal = Number(item.product?.ptr || item.price || 0);
         const ptsVal = Number(item.product?.pts || 0);
@@ -288,6 +293,7 @@ export class ReportsService {
         totalUnits += qty;
         totalRevenuePtr += ptrVal * qty;
         totalRevenuePts += ptsVal * qty;
+        orderItemsPtrSum += ptrVal * qty;
 
         const prodId = item.productId;
         const existing = skuMap.get(prodId) || {
@@ -304,6 +310,10 @@ export class ReportsService {
         existing.revenuePts += ptsVal * qty;
         existing.grossMargin = existing.revenuePtr - existing.revenuePts;
         skuMap.set(prodId, existing);
+      }
+
+      if (isInvoiced) {
+        invoicedRevenuePtr += orderInvoiceVal > 0 ? orderInvoiceVal : orderItemsPtrSum;
       }
     }
 
@@ -365,6 +375,7 @@ export class ReportsService {
         deliveredOrdersCount: deliveredOrders.length,
         pendingOrdersCount: pendingOrders.length,
         cancelledOrdersCount: cancelledOrders.length,
+        invoicedRevenuePtr: Math.round(invoicedRevenuePtr),
         totalRevenuePts: Math.round(totalRevenuePts),
         totalRevenuePtr: Math.round(totalRevenuePtr),
         totalUnitsBooked: totalUnits,
