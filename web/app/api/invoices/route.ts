@@ -138,7 +138,7 @@ async function getInvoices(req: AuthedRequest) {
     if (!isManager) {
       if (req.user.role === Role.DISTRIBUTOR) {
         const distributor = await db.distributor.findFirst({
-          where: { OR: [{ id: req.user.sub }, { email: req.user.email || "" }] },
+          where: { OR: [{ id: req.user.sub }, { userId: req.user.sub }] },
         });
         if (distributor) {
           filters.push({ order: { distributorId: distributor.id } });
