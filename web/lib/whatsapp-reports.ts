@@ -686,14 +686,16 @@ export function formatMultiAgentCouncilWhatsAppReport(
     }
   }
 
-  // 4. Secondary Sales Done
+  // 4. Secondary Sales Done (Invoiced vs Booked)
   if (options?.includeSalesOrders !== false) {
+    const invoicedSecondaryVal = report.commercialSummary?.invoicedRevenuePtr ?? report.commercialSummary?.totalRevenuePtr ?? 0;
     sections.push(
       ``,
       `━━━━━━━━━━━━━━━━━━━━`,
-      `💰 *SECONDARY SALES DONE*`,
+      `💰 *SECONDARY SALES DONE (INVOICED vs BOOKED)*`,
       `━━━━━━━━━━━━━━━━━━━━`,
-      `• Gross Sales (PTR): *${fmtCurrency(report.commercialSummary?.totalRevenuePtr || 0)}*`,
+      `• Invoiced Secondary Sales (Raised Invoices): *${fmtCurrency(invoicedSecondaryVal)}*`,
+      `• Booked Gross Sales (PTR): *${fmtCurrency(report.commercialSummary?.totalRevenuePtr || 0)}*`,
       `• Cost of Sales (PTS): *${fmtCurrency(report.commercialSummary?.totalRevenuePts || 0)}*`,
       `• Orders Booked: *${report.commercialSummary?.totalOrdersCount || 0}* (${report.commercialSummary?.deliveredOrdersCount || 0} Delivered | ${report.commercialSummary?.pendingOrdersCount || 0} Pending)`,
       `• Total Units Booked: *${report.commercialSummary?.totalUnitsBooked || 0} units*`
@@ -959,3 +961,60 @@ export function formatAdminExecutiveBriefWhatsAppDigest(data: AdminExecutiveDige
   lines.push(`_Trend MR Pharma OS_`);
   return lines.join("\n");
 }
+
+/**
+ * Builds a dedicated Historical Intelligence WhatsApp Dispatch Report on demand.
+ */
+export function formatHistoricalWhatsAppReport(
+  title: string,
+  repName: string,
+  startDateStr: string,
+  endDateStr: string,
+  metrics: {
+    totalInvoicedSales: number;
+    totalBookedSales: number;
+    totalOrdersCount: number;
+    invoicedOrdersCount: number;
+    totalDoctorCalls: number;
+    totalChemistCalls: number;
+    totalCollections: number;
+    multiAgentGrade?: string;
+    multiAgentScore?: number;
+  }
+): string {
+  const lines = [
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `📜 *TREND MR — HISTORICAL INTELLIGENCE DISPATCH*`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `📋 *Subject:* ${title}`,
+    `👤 *Rep / User:* ${repName}`,
+    `📅 *Period Range:* ${startDateStr} ➔ ${endDateStr}`,
+    ``,
+    `💰 *INVOICED SECONDARY SALES PERFORMANCE*`,
+    `• Raised Invoice Sales: *${fmtCurrency(metrics.totalInvoicedSales)}* (${metrics.invoicedOrdersCount} Invoices)`,
+    `• Booked Sales Revenue: *${fmtCurrency(metrics.totalBookedSales)}* (${metrics.totalOrdersCount} Orders)`,
+    `• Total Payments Collected: *${fmtCurrency(metrics.totalCollections)}*`,
+    ``,
+    `🩺 *FIELD COVERAGE SUMMARY*`,
+    `• Doctor Calls: *${metrics.totalDoctorCalls}*`,
+    `• Chemist Calls: *${metrics.totalChemistCalls}*`,
+    `• Total Field Visits: *${metrics.totalDoctorCalls + metrics.totalChemistCalls}*`,
+  ];
+
+  if (metrics.multiAgentGrade && metrics.multiAgentScore !== undefined) {
+    lines.push(
+      ``,
+      `🤖 *MULTI-AGENT EVALUATION AUDIT*`,
+      `• Audit Score: *${metrics.multiAgentScore}/100* (Grade *${metrics.multiAgentGrade}*)`
+    );
+  }
+
+  lines.push(
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `💡 _Trend MR Pharma OS — Autonomous Multi-Agent Intelligence Engine_`
+  );
+
+  return lines.join("\n");
+}
+

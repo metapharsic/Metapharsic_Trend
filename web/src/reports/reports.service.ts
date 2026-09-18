@@ -472,4 +472,103 @@ export class ReportsService {
       reports,
     };
   }
+
+  /**
+   * Log a dispatched WhatsApp intelligence message to PostgreSQL audit trail
+   */
+  static async logWhatsAppDispatch(input: {
+    senderId?: string | null;
+    employeeId?: string | null;
+    recipientPhone: string;
+    recipientName?: string | null;
+    targetType: string;
+    period?: string;
+    messageText: string;
+    sent?: boolean;
+    status?: string;
+    reason?: string | null;
+    multiAgentScore?: number | null;
+    multiAgentGrade?: string | null;
+  }) {
+    try {
+      return await db.whatsAppDispatchLog.create({
+        data: {
+          senderId: input.senderId ?? null,
+          employeeId: input.employeeId ?? null,
+          recipientPhone: input.recipientPhone,
+          recipientName: input.recipientName ?? null,
+          targetType: input.targetType,
+          period: input.period || "daily",
+          messageText: input.messageText,
+          sent: input.sent !== false,
+          status: input.status || (input.sent !== false ? "DELIVERED" : "FAILED"),
+          reason: input.reason ?? null,
+          multiAgentScore: input.multiAgentScore ?? null,
+          multiAgentGrade: input.multiAgentGrade ?? null,
+        },
+      });
+    } catch (err) {
+      console.error("[ReportsService.logWhatsAppDispatch]", err);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch WhatsApp dispatch audit history logs
+   */
+  static async getWhatsAppDispatchHistory(params?: {
+    employeeId?: string;
+    targetType?: string;
+    period?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = params?.page || 1;
+    const limit = params?.limit || 20;
+
+    const filters: any[] = [];
+    if (params?.employeeId) {
+      filters.push({ employeeId: params.employeeId });
+    }
+    if (params?.targetType) {
+      filters.push({ targetType: params.targetType });
+    }
+    if (params?.period) {
+      filters.push({ period: params.period });
+    }
+    if (params?.startDate) {
+      filters.push({ createdAt: { gte: new Date(params.startDate) } });
+    }
+    if (params?.endDate) {
+      filters.push({ createdAt: { lte: new Date(params.endDate) } });
+    }
+
+    const where = filters.length > 0 ? { AND: filters } : {};
+
+    const [logs, total] = await Promise.all([
+      db.whatsAppDispatchLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          employee: { select: { id: true, firstName: true, lastName: true, phone: true } },
+        },
+      }),
+      db.whatsAppDispatchLog.count({ where }),
+    ]);
+
+    return {
+      logs,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
 }
+

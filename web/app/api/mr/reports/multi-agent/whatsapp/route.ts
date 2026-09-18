@@ -6,13 +6,15 @@ import { multiAgentCouncil } from "@/lib/multi-agent-council";
 import {
   formatMultiAgentCouncilWhatsAppReport,
   formatMultiAgentCouncilExecutiveDigest,
+  formatHistoricalWhatsAppReport,
 } from "@/lib/whatsapp-reports";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { sendEmail } from "@/lib/mailer";
 import { db } from "@/lib/db";
+import { ReportsService } from "@/src/reports/reports.service";
 
 const SendReportSchema = z.object({
-  targetType: z.enum(["INDIVIDUAL_MR", "ALL_MRS", "ALL_MRS_INDIVIDUALLY", "EXECUTIVE_FLEET", "CUSTOM_PHONE"]),
+  targetType: z.enum(["INDIVIDUAL_MR", "ALL_MRS", "ALL_MRS_INDIVIDUALLY", "EXECUTIVE_FLEET", "CUSTOM_PHONE", "HISTORY_REQUEST"]),
   employeeId: z.string().optional(),
   customPhone: z.string().optional(),
   customMessage: z.string().optional(),
@@ -493,6 +495,19 @@ async function dispatchMultiAgentWhatsAppReport(req: AuthedRequest) {
       const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
       const waRes = await sendWhatsAppMessage(customPhone, messageText);
 
+      await ReportsService.logWhatsAppDispatch({
+        senderId: req.user.sub,
+        employeeId: employeeId || null,
+        recipientPhone: customPhone,
+        recipientName: "Custom Phone",
+        targetType: "CUSTOM_PHONE",
+        period: period,
+        messageText: messageText,
+        sent: waRes.sent,
+        status: waRes.sent ? "DELIVERED" : "FAILED",
+        reason: waRes.reason,
+      });
+
       return ok({
         success: true,
         message: `Report dispatched to ${customPhone}.`,
@@ -508,6 +523,85 @@ async function dispatchMultiAgentWhatsAppReport(req: AuthedRequest) {
           },
         ],
         whatsappText: messageText,
+        whatsappUrl: waUrl,
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // CASE E: DISPATCH HISTORICAL INTELLIGENCE REPORT
+    // ─────────────────────────────────────────────────────────────
+    if (targetType === "HISTORY_REQUEST") {
+      const targetEmpId = employeeId || (req.user.role === Role.MR ? req.user.sub : undefined);
+      if (!targetEmpId) return badRequest("employeeId is required for HISTORY_REQUEST");
+
+      const report = await multiAgentCouncil.generateMrReport(targetEmpId, timeFilter);
+      if (!report) return notFound("Historical report could not be compiled");
+
+      const recipientPhone = customPhone || report.phone;
+      if (!recipientPhone) return badRequest(`No phone number for ${report.fullName}`);
+
+      const startDateStr = startDate || "Earliest Record";
+      const endDateStr = endDate || new Date().toISOString().split("T")[0];
+
+      const historicalText = formatHistoricalWhatsAppReport(
+        customMessage || `Historical Intelligence Audit (${period.toUpperCase()})`,
+        report.fullName,
+        startDateStr,
+        endDateStr,
+        {
+          totalInvoicedSales: report.commercialSummary?.invoicedRevenuePtr ?? report.commercialSummary?.totalRevenuePtr ?? 0,
+          totalBookedSales: report.commercialSummary?.totalRevenuePtr || 0,
+          totalOrdersCount: report.commercialSummary?.totalOrdersCount || 0,
+          invoicedOrdersCount: report.commercialSummary?.orders?.filter((o: any) => o.invoice != null)?.length || report.commercialSummary?.totalOrdersCount || 0,
+          totalDoctorCalls: report.dcrSummary?.doctorVisits || 0,
+          totalChemistCalls: report.dcrSummary?.chemistVisits || 0,
+          totalCollections: report.commercialSummary?.collections?.totalCollected || 0,
+          multiAgentGrade: report.councilEvaluation?.overallGrade,
+          multiAgentScore: report.councilEvaluation?.councilScore,
+        }
+      );
+
+      const cleanPhone = sanitizePhoneForWhatsAppUrl(recipientPhone);
+      const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(historicalText)}`;
+      const waRes = await sendWhatsAppMessage(recipientPhone, historicalText);
+
+      await ReportsService.logWhatsAppDispatch({
+        senderId: req.user.sub,
+        employeeId: report.mrId,
+        recipientPhone,
+        recipientName: report.fullName,
+        targetType: "HISTORY_REQUEST",
+        period,
+        messageText: historicalText,
+        sent: waRes.sent,
+        status: waRes.sent ? "DELIVERED" : "FAILED",
+        reason: waRes.reason,
+        multiAgentScore: report.councilEvaluation?.councilScore,
+        multiAgentGrade: report.councilEvaluation?.overallGrade,
+      });
+
+      if (sendEmailToo && report.email) {
+        await sendEmail(report.email, `Trend MR — Historical Intelligence Report (${report.fullName})`, historicalText);
+      }
+
+      return ok({
+        success: true,
+        message: `Historical Intelligence Report dispatched to ${report.fullName} (${recipientPhone}).`,
+        mode: "HISTORY_REQUEST",
+        timeframe: period,
+        dispatchedCount: waRes.sent ? 1 : 0,
+        totalTargets: 1,
+        details: [
+          {
+            mrId: report.mrId,
+            recipient: report.fullName,
+            phone: recipientPhone,
+            sent: waRes.sent,
+            reason: waRes.reason,
+            whatsappUrl: waUrl,
+          },
+        ],
+        whatsappText: historicalText,
         whatsappUrl: waUrl,
       });
     }

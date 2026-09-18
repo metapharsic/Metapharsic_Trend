@@ -136,13 +136,24 @@ async function getInvoices(req: AuthedRequest) {
     const filters: Prisma.InvoiceWhereInput[] = [];
 
     if (!isManager) {
-      // Find MR employee record — an MR only ever sees invoices for orders
-      // they booked themselves (same scope as /api/orders/secondary).
-      const employee = await db.employee.findUnique({
-        where: { userId: req.user.sub },
-      });
-      if (!employee) return unauthorized("Employee record not found");
-      filters.push({ order: { employeeId: employee.id } });
+      if (req.user.role === Role.DISTRIBUTOR) {
+        const distributor = await db.distributor.findFirst({
+          where: { OR: [{ id: req.user.sub }, { email: req.user.email || "" }] },
+        });
+        if (distributor) {
+          filters.push({ order: { distributorId: distributor.id } });
+        } else {
+          return unauthorized("Distributor record not found");
+        }
+      } else {
+        // Find MR employee record — an MR only ever sees invoices for orders
+        // they booked themselves (same scope as /api/orders/secondary).
+        const employee = await db.employee.findUnique({
+          where: { userId: req.user.sub },
+        });
+        if (!employee) return unauthorized("Employee record not found");
+        filters.push({ order: { employeeId: employee.id } });
+      }
     }
 
     const like = (value: string) => ({ contains: value, mode: "insensitive" as const });

@@ -147,6 +147,12 @@ export class RoleAuthAgent {
       score -= 15;
     }
 
+    if (mr.user.role === Role.ADMIN || mr.user.role === Role.MD) {
+      findings.push("Global Executive Access: Authorized to view fleet-wide invoices and all secondary sales.");
+    } else {
+      findings.push("Scoped Rep Access: Authorized strictly for owned orders & raised invoices.");
+    }
+
     const execTime = Math.round(performance.now() - t0);
     const status: AgentStatusType = score >= 85 ? "ONLINE_PASS" : score >= 60 ? "ONLINE_WARNING" : "ONLINE_ALERT";
 
@@ -163,6 +169,7 @@ export class RoleAuthAgent {
         territoriesCount: mr.territories?.length || 0,
         hasDeviceUuid: !!mr.user.deviceUuid,
         hasManager: !!mr.manager,
+        isExecutiveAdmin: mr.user.role === Role.ADMIN || mr.user.role === Role.MD,
       },
       findings,
       warnings,
@@ -365,17 +372,25 @@ export class CommercialSalesAgent {
     let score = 100;
 
     const orders = mr.orders || [];
+    const invoicedOrders = orders.filter((o: any) => o.invoice != null);
+    const uninvoicedOrders = orders.filter((o: any) => o.invoice == null && o.status !== OrderStatus.CANCELLED);
     const deliveredOrders = orders.filter((o: any) => o.status === OrderStatus.DELIVERED);
     const pendingOrders = orders.filter((o: any) => o.status === OrderStatus.PENDING);
     const cancelledOrders = orders.filter((o: any) => o.status === OrderStatus.CANCELLED);
 
     let totalRevenuePts = 0;
     let totalRevenuePtr = 0;
+    let invoicedRevenuePtr = 0;
+    let invoicedRevenuePts = 0;
     let totalUnits = 0;
 
     const skuMap = new Map<string, { name: string; sku: string; units: number; ptr: number; pts: number }>();
 
     for (const ord of orders) {
+      const isInvoiced = ord.invoice != null;
+      const orderInvoiceVal = ord.invoice ? Number(ord.invoice.grandTotal ?? ord.invoice.amount ?? 0) : 0;
+      let orderItemsPtrSum = 0;
+
       for (const item of ord.items || []) {
         const ptrVal = Number(item.product?.ptr || item.price || 0);
         const ptsVal = Number(item.product?.pts || 0);
@@ -384,6 +399,10 @@ export class CommercialSalesAgent {
         totalUnits += qty;
         totalRevenuePtr += ptrVal * qty;
         totalRevenuePts += ptsVal * qty;
+        orderItemsPtrSum += ptrVal * qty;
+        if (isInvoiced) {
+          invoicedRevenuePts += ptsVal * qty;
+        }
 
         const prodId = item.productId;
         const existing = skuMap.get(prodId) || {
@@ -398,10 +417,15 @@ export class CommercialSalesAgent {
         existing.pts += ptsVal * qty;
         skuMap.set(prodId, existing);
       }
+
+      if (isInvoiced) {
+        invoicedRevenuePtr += orderInvoiceVal > 0 ? orderInvoiceVal : orderItemsPtrSum;
+      }
     }
 
-    findings.push(`Commercial Output: ${orders.length} total orders booked (${deliveredOrders.length} delivered, ${pendingOrders.length} pending, ${cancelledOrders.length} cancelled).`);
-    findings.push(`Total Secondary Sales Revenue (PTR): ₹${Math.round(totalRevenuePtr).toLocaleString("en-IN")}`);
+    findings.push(`Commercial Output: ${orders.length} total orders booked (${invoicedOrders.length} Invoiced, ${uninvoicedOrders.length} Uninvoiced, ${cancelledOrders.length} Cancelled).`);
+    findings.push(`Invoiced Secondary Sales (Raised Invoices): ₹${Math.round(invoicedRevenuePtr).toLocaleString("en-IN")}`);
+    findings.push(`Booked Sales Revenue (PTR): ₹${Math.round(totalRevenuePtr).toLocaleString("en-IN")}`);
     findings.push(`Total Volume: ${totalUnits} units across ${skuMap.size} distinct SKUs.`);
 
     if (orders.length === 0) {
@@ -431,9 +455,12 @@ export class CommercialSalesAgent {
       score: Math.max(score, 0),
       metrics: {
         totalOrders: orders.length,
+        invoicedOrdersCount: invoicedOrders.length,
+        uninvoicedOrdersCount: uninvoicedOrders.length,
         deliveredOrders: deliveredOrders.length,
         pendingOrders: pendingOrders.length,
         cancelledOrders: cancelledOrders.length,
+        invoicedRevenuePtr: Math.round(invoicedRevenuePtr),
         totalRevenuePtr: Math.round(totalRevenuePtr),
         totalRevenuePts: Math.round(totalRevenuePts),
         totalUnits,

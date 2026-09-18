@@ -119,6 +119,7 @@ model Employee {
   inventoryMovements InventoryMovement[]
   sampleAllocationsReceived SampleAllocationLog[] @relation("SampleRecipient")
   sampleAllocationsGiven    SampleAllocationLog[] @relation("SampleAllocator")
+  whatsAppLogs      WhatsAppDispatchLog[]
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 }
@@ -1111,3 +1112,28 @@ model DmsAuditTrail {
   @@index([createdAt])
   @@map("dms_audit_trail")
 }
+
+model WhatsAppDispatchLog {
+  id               String    @id @default(uuid())
+  senderId         String?
+  employeeId       String?
+  employee         Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  recipientPhone   String
+  recipientName    String?
+  targetType       String    // INDIVIDUAL_MR, ALL_MRS, EXECUTIVE_FLEET, CUSTOM_PHONE, HISTORY_REQUEST
+  period           String    @default("daily") // daily, weekly, monthly, custom, all
+  messageText      String    @db.Text
+  sent             Boolean   @default(true)
+  status           String    @default("DELIVERED") // DELIVERED, FAILED, SKIPPED
+  reason           String?
+  multiAgentScore  Int?
+  multiAgentGrade  String?
+  createdAt        DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([employeeId])
+  @@index([targetType])
+  @@index([sent, createdAt])
+  @@map("whatsapp_dispatch_logs")
+}
+
