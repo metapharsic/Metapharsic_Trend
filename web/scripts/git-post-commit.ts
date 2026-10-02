@@ -59,6 +59,8 @@ async function runPostCommitSync() {
   let syncedCount = 0;
   let schemaChanged = false;
 
+  let packageChanged = false;
+
   for (const relPath of files) {
     // Only mirror files inside web directory or root config files
     const repoRoot = path.resolve(__dirname, "../..");
@@ -71,6 +73,9 @@ async function runPostCommitSync() {
 
     if (relPath.includes("schema.prisma")) {
       schemaChanged = true;
+    }
+    if (relPath.includes("package.json") || relPath.includes("package-lock.json")) {
+      packageChanged = true;
     }
 
     // Determine target relative path inside VPS web directory
@@ -94,6 +99,17 @@ async function runPostCommitSync() {
       log(`  \x1b[32m✔ Auto-Transferred: ${relPath} -> VPS:${VPS_WEB_DIR}/${vpsRelPath}\x1b[0m`);
     } catch (err: any) {
       log(`  \x1b[31m✖ Transfer error for ${relPath}: ${err.message}\x1b[0m`);
+    }
+  }
+
+  if (packageChanged) {
+    log("\x1b[1;33mPackage dependency change detected. Running remote npm install on VPS...\x1b[0m");
+    const installCmd = `"${PLINK_PATH}" -batch -i "${SSH_KEY_PATH}" ${VPS_HOST} "cd ${VPS_WEB_DIR} && npm install --prefer-offline --no-audit"`;
+    const installRes = spawnSync(installCmd, { shell: true, encoding: "utf8", timeout: 300000 });
+    if (installRes.status === 0) {
+      log("\x1b[32m✔ Remote dependencies installed successfully.\x1b[0m");
+    } else {
+      log(`\x1b[31m✖ Remote npm install FAILED: ${(installRes.stderr || installRes.stdout || "").slice(0, 500)}\x1b[0m`);
     }
   }
 

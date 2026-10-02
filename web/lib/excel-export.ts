@@ -737,6 +737,15 @@ export function generateExcelReportWithDashboard(options: ExcelDashboardExportOp
   return BOM + lines.join("\r\n");
 }
 
+export function generateExcelCsv(headers: string[], rows: (string | number)[][], title?: string): string {
+  return generateExcelReportWithDashboard({
+    reportTitle: title || "Data Export",
+    kpis: [],
+    detailHeaders: headers,
+    detailRows: rows,
+  });
+}
+
 export function downloadFile(content: string, filename: string, mimeType = "text/csv;charset=utf-8;") {
   if (typeof window === "undefined") return;
   const blob = new Blob([content], { type: mimeType });

@@ -244,10 +244,11 @@ async function createVisit(req: AuthedRequest) {
     }
 
     // Silent GPS Telemetry Agent: Background capture for admin compliance
+    const rawAccuracy = formData.get("accuracy") || formData.get("gpsAccuracy");
     const gpsTelemetry = CallComplianceAgentsService.processSilentGpsTelemetry({
       latitude,
       longitude,
-      accuracy: formData.get("accuracy") || formData.get("gpsAccuracy"),
+      accuracy: rawAccuracy ? rawAccuracy.toString() : undefined,
     });
 
     const distanceMeters = 0;
