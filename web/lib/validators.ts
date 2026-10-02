@@ -33,6 +33,10 @@ export const RefreshTokenSchema = z.object({
 export const UpdateVisitSchema = z.object({
   purpose: z.string().min(1, "Purpose is required").optional(),
   feedback: z.string().optional(),
+  phone: z.string().optional(),
+  latitude: z.coerce.number().optional(),
+  longitude: z.coerce.number().optional(),
+  locationUnavailable: z.boolean().optional(),
   durationMinutes: z.coerce.number().int().min(0).max(600).optional(),
   boxesPlaced: z.coerce.number().int().min(0).optional(),
 });
@@ -42,6 +46,7 @@ export const CreateVisitSchema = z.object({
   chemistId: z.string().uuid("Valid chemist ID required").optional(),
   hospitalId: z.string().uuid("Valid hospital ID required").optional(),
   purpose: z.string().min(1, "Purpose is required"),
+  phone: z.string().optional(),
   feedback: z.string().optional(),
   latitude: z.coerce.number().optional().default(0),
   longitude: z.coerce.number().optional().default(0),

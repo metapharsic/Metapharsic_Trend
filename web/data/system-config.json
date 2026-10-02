@@ -6,114 +6,1740 @@
   "autoPullEnabled": true,
   "autoPullSchedule": "TWICE_WEEKLY",
   "autoSyncOnPull": false,
-  "lastCheckedAt": "2026-09-11T00:35:04.502Z",
-  "lastPulledAt": "2026-09-11T00:24:00.598Z",
-  "lastPullStatus": "NO_CHANGES",
+  "lastCheckedAt": "2026-09-19T17:32:34.586Z",
+  "lastPulledAt": "2026-09-30T21:30:01.161Z",
+  "lastPullStatus": "FAILED",
   "lastPulledFiles": [
     {
-      "filename": "web/services/credit-agents.service.ts",
-      "status": "modified",
-      "additions": 115,
-      "deletions": 14,
-      "impactedComponent": "Chemist Receivables & Collections"
+      "filename": "web/__tests__/whatsapp-intelligence-history.test.ts",
+      "status": "added",
+      "additions": 260,
+      "deletions": 0,
+      "impactedComponent": "Core Application Platform"
     },
     {
-      "filename": "web/app/(dashboard)/collections/page.tsx",
+      "filename": "web/app/api/invoices/route.ts",
       "status": "modified",
-      "additions": 165,
-      "deletions": 18,
-      "impactedComponent": "User Interface & Navigation Shell"
+      "additions": 18,
+      "deletions": 7,
+      "impactedComponent": "Core Application Platform"
     },
     {
-      "filename": "web/services/tour-plan-agents.service.ts",
+      "filename": "web/app/api/mr/reports/multi-agent/whatsapp/route.ts",
       "status": "modified",
-      "additions": 142,
-      "deletions": 12,
-      "impactedComponent": "Tour Planning & MTP Engine"
+      "additions": 95,
+      "deletions": 1,
+      "impactedComponent": "Field Force & DCR CRM"
     },
     {
-      "filename": "web/services/product-pricing-agents.service.ts",
+      "filename": "web/app/api/whatsapp/history/route.ts",
+      "status": "added",
+      "additions": 68,
+      "deletions": 0,
+      "impactedComponent": "Core Application Platform"
+    },
+    {
+      "filename": "web/lib/whatsapp-reports.ts",
       "status": "modified",
-      "additions": 42,
-      "deletions": 15,
-      "impactedComponent": "PTR & Commercial Pricing Engine"
+      "additions": 62,
+      "deletions": 3,
+      "impactedComponent": "Core Application Platform"
+    },
+    {
+      "filename": "web/prisma/schema.prisma",
+      "status": "modified",
+      "additions": 26,
+      "deletions": 0,
+      "impactedComponent": "Database Architecture & Schema"
+    },
+    {
+      "filename": "web/src/reports/reports.agents.ts",
+      "status": "modified",
+      "additions": 29,
+      "deletions": 2,
+      "impactedComponent": "Core Application Platform"
+    },
+    {
+      "filename": "web/src/reports/reports.service.ts",
+      "status": "modified",
+      "additions": 99,
+      "deletions": 0,
+      "impactedComponent": "Core Application Platform"
     }
   ],
   "lastFetchedCommits": [
     {
-      "hash": "85a4623",
+      "hash": "ae381f82",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-18",
+      "message": "sync: trend mr pharma os updates 2026-09-18_20:00"
+    },
+    {
+      "hash": "787cc571",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-18",
+      "message": "feat(whatsapp): add multi-agent whatsapp intelligence dispatch history and invoiced secondary sales control"
+    },
+    {
+      "hash": "c31548ac",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-16",
+      "message": "feat(multi-agent): enhance Master Profiles, My Claims, Call Reports, and Council WhatsApp Hub with full CRUD provisions and 100% test coverage"
+    },
+    {
+      "hash": "1e5fddc2",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-16",
+      "message": "feat(intelligence): enhance multi-agent cross-module wiring, daily work dispatch customization, and scheme simulator DB provisioning"
+    },
+    {
+      "hash": "d2714190",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-16",
+      "message": "fix(auth): guard soft device binding against unique constraint collision"
+    },
+    {
+      "hash": "ace7dc0a",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-16",
+      "message": "feat(users): wire multi-agent user provisioning, territory alignment, and autofill protection"
+    },
+    {
+      "hash": "eb0fd634",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-16",
+      "message": "feat(visits): wire up Multi-Agent Call Deduplication Suite, resolve 'My Calls' duplicate entries, and fix MR auth cookie sync"
+    },
+    {
+      "hash": "95e3ea07",
+      "author": "Metapharsic Admin",
+      "date": "2026-09-11",
+      "message": "feat(system-config): add GitHub auto-pull scheduler, ad-hoc commit inspector, and app sync v1.2.0"
+    },
+    {
+      "hash": "85a4623b",
       "author": "Metapharsic Admin",
       "date": "2026-09-11",
       "message": "sync: trend mr pharma os updates 2026-09-11_00:07"
     },
     {
-      "hash": "876a083",
+      "hash": "876a083d",
       "author": "Metapharsic Admin",
       "date": "2026-09-08",
       "message": "sync: trend mr pharma os updates 2026-09-08_08:26"
     },
     {
-      "hash": "ef278fa",
+      "hash": "ef278fa6",
       "author": "Metapharsic Admin",
       "date": "2026-09-08",
       "message": "security(dms): restrict Document Management System (DMS) UI and API endpoints exclusively to ADMIN role"
     },
     {
-      "hash": "52e0216",
+      "hash": "52e02165",
       "author": "Metapharsic Admin",
       "date": "2026-09-08",
       "message": "feat(security): enforce ADMIN-only privilege for OTA system update, full-screen freeze lock & self-troubleshooting deployment"
-    },
-    {
-      "hash": "ac65b80",
-      "author": "Metapharsic Admin",
-      "date": "2026-09-08",
-      "message": "982026-728"
-    },
-    {
-      "hash": "2db30d3",
-      "author": "Metapharsic Admin",
-      "date": "2026-09-08",
-      "message": "feat(dms): provision GST Certificate & Certificates documents and implement 15-day expiry alerts"
-    },
-    {
-      "hash": "f22f8ed",
-      "author": "Metapharsic Admin",
-      "date": "2026-09-08",
-      "message": "feat(reports): enhanced MR Daily Calls Report with 6-agent Multi-Agent Council suite & high-standard analytics"
-    },
-    {
-      "hash": "da1e08e",
-      "author": "Metapharsic Admin",
-      "date": "2026-09-07",
-      "message": "feat(ota): twice-daily poll + rich descriptive release notes for v1.2.0"
-    },
-    {
-      "hash": "621642d",
-      "author": "Metapharsic Admin",
-      "date": "2026-09-07",
-      "message": "fix(ota): genuine updateAvailable check + 5min auto-poll + skip git pull in self-update mode"
-    },
-    {
-      "hash": "524ffad",
-      "author": "Metapharsic Admin",
-      "date": "2026-09-07",
-      "message": "fix: replace hard UUID reject with soft auto-bind — MRs can always login, UUID auto-updates on device change"
-    },
-    {
-      "hash": "e5e2806",
-      "author": "Metapharsic Admin",
-      "date": "2026-09-07",
-      "message": "sync: trend mr pharma os updates 2026-09-07_19:30"
-    },
-    {
-      "hash": "b4d2855",
-      "author": "Metapharsic Admin",
-      "date": "2026-09-07",
-      "message": "feat: password policy — mr1234 for users, Oracle#19 for ADMIN (both local + VPS)"
     }
   ],
   "pullHistory": [
+    {
+      "timestamp": "2026-09-30T21:30:01.161Z",
+      "type": "AUTO",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/__tests__/whatsapp-intelligence-history.test.ts",
+          "status": "added",
+          "additions": 260,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/invoices/route.ts",
+          "status": "modified",
+          "additions": 18,
+          "deletions": 7,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/mr/reports/multi-agent/whatsapp/route.ts",
+          "status": "modified",
+          "additions": 95,
+          "deletions": 1,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/api/whatsapp/history/route.ts",
+          "status": "added",
+          "additions": 68,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/whatsapp-reports.ts",
+          "status": "modified",
+          "additions": 62,
+          "deletions": 3,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/prisma/schema.prisma",
+          "status": "modified",
+          "additions": 26,
+          "deletions": 0,
+          "impactedComponent": "Database Architecture & Schema"
+        },
+        {
+          "filename": "web/src/reports/reports.agents.ts",
+          "status": "modified",
+          "additions": 29,
+          "deletions": 2,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/src/reports/reports.service.ts",
+          "status": "modified",
+          "additions": 99,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..ae381f82\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/(dashboard)/entities/page.tsx\n\tweb/app/(dashboard)/marketing/page.tsx\n\tweb/app/(dashboard)/mr/claims/page.tsx\n\tweb/app/(dashboard)/mr/reports/council/page.tsx\n\tweb/app/(dashboard)/mr/reports/page.tsx\n\tweb/app/(dashboard)/reports/mr-daily-calls/page.tsx\n\tweb/app/(dashboard)/reports/page.tsx\n\tweb/app/(dashboard)/simulator/page.tsx\n\tweb/app/(dashboard)/users/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/invoices/route.ts\n\tweb/app/api/manager/entities/[id]/route.ts\n\tweb/app/api/manager/entities/route.ts\n\tweb/app/api/marketing/dashboard/route.ts\n\tweb/app/api/mr/claims/route.ts\n\tweb/app/api/mr/reports/calls/route.ts\n\tweb/app/api/mr",
+      "id": "pull-1790803801162-zeuqe"
+    },
+    {
+      "timestamp": "2026-09-27T21:30:01.115Z",
+      "type": "AUTO",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/__tests__/whatsapp-intelligence-history.test.ts",
+          "status": "added",
+          "additions": 260,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/invoices/route.ts",
+          "status": "modified",
+          "additions": 18,
+          "deletions": 7,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/mr/reports/multi-agent/whatsapp/route.ts",
+          "status": "modified",
+          "additions": 95,
+          "deletions": 1,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/api/whatsapp/history/route.ts",
+          "status": "added",
+          "additions": 68,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/whatsapp-reports.ts",
+          "status": "modified",
+          "additions": 62,
+          "deletions": 3,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/prisma/schema.prisma",
+          "status": "modified",
+          "additions": 26,
+          "deletions": 0,
+          "impactedComponent": "Database Architecture & Schema"
+        },
+        {
+          "filename": "web/src/reports/reports.agents.ts",
+          "status": "modified",
+          "additions": 29,
+          "deletions": 2,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/src/reports/reports.service.ts",
+          "status": "modified",
+          "additions": 99,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..ae381f82\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/(dashboard)/entities/page.tsx\n\tweb/app/(dashboard)/marketing/page.tsx\n\tweb/app/(dashboard)/mr/claims/page.tsx\n\tweb/app/(dashboard)/mr/reports/council/page.tsx\n\tweb/app/(dashboard)/mr/reports/page.tsx\n\tweb/app/(dashboard)/reports/mr-daily-calls/page.tsx\n\tweb/app/(dashboard)/reports/page.tsx\n\tweb/app/(dashboard)/simulator/page.tsx\n\tweb/app/(dashboard)/users/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/invoices/route.ts\n\tweb/app/api/manager/entities/[id]/route.ts\n\tweb/app/api/manager/entities/route.ts\n\tweb/app/api/marketing/dashboard/route.ts\n\tweb/app/api/mr/claims/route.ts\n\tweb/app/api/mr/reports/calls/route.ts\n\tweb/app/api/mr",
+      "id": "pull-1790544601119-4a32j"
+    },
+    {
+      "timestamp": "2026-09-23T21:30:00.880Z",
+      "type": "AUTO",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/__tests__/whatsapp-intelligence-history.test.ts",
+          "status": "added",
+          "additions": 260,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/invoices/route.ts",
+          "status": "modified",
+          "additions": 18,
+          "deletions": 7,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/mr/reports/multi-agent/whatsapp/route.ts",
+          "status": "modified",
+          "additions": 95,
+          "deletions": 1,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/api/whatsapp/history/route.ts",
+          "status": "added",
+          "additions": 68,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/whatsapp-reports.ts",
+          "status": "modified",
+          "additions": 62,
+          "deletions": 3,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/prisma/schema.prisma",
+          "status": "modified",
+          "additions": 26,
+          "deletions": 0,
+          "impactedComponent": "Database Architecture & Schema"
+        },
+        {
+          "filename": "web/src/reports/reports.agents.ts",
+          "status": "modified",
+          "additions": 29,
+          "deletions": 2,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/src/reports/reports.service.ts",
+          "status": "modified",
+          "additions": 99,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..ae381f82\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/(dashboard)/entities/page.tsx\n\tweb/app/(dashboard)/marketing/page.tsx\n\tweb/app/(dashboard)/mr/claims/page.tsx\n\tweb/app/(dashboard)/mr/reports/council/page.tsx\n\tweb/app/(dashboard)/mr/reports/page.tsx\n\tweb/app/(dashboard)/reports/mr-daily-calls/page.tsx\n\tweb/app/(dashboard)/reports/page.tsx\n\tweb/app/(dashboard)/simulator/page.tsx\n\tweb/app/(dashboard)/users/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/invoices/route.ts\n\tweb/app/api/manager/entities/[id]/route.ts\n\tweb/app/api/manager/entities/route.ts\n\tweb/app/api/marketing/dashboard/route.ts\n\tweb/app/api/mr/claims/route.ts\n\tweb/app/api/mr/reports/calls/route.ts\n\tweb/app/api/mr",
+      "id": "pull-1790199000881-6hc4z"
+    },
+    {
+      "timestamp": "2026-09-20T21:30:00.935Z",
+      "type": "AUTO",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/__tests__/whatsapp-intelligence-history.test.ts",
+          "status": "added",
+          "additions": 260,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/invoices/route.ts",
+          "status": "modified",
+          "additions": 18,
+          "deletions": 7,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/mr/reports/multi-agent/whatsapp/route.ts",
+          "status": "modified",
+          "additions": 95,
+          "deletions": 1,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/api/whatsapp/history/route.ts",
+          "status": "added",
+          "additions": 68,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/whatsapp-reports.ts",
+          "status": "modified",
+          "additions": 62,
+          "deletions": 3,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/prisma/schema.prisma",
+          "status": "modified",
+          "additions": 26,
+          "deletions": 0,
+          "impactedComponent": "Database Architecture & Schema"
+        },
+        {
+          "filename": "web/src/reports/reports.agents.ts",
+          "status": "modified",
+          "additions": 29,
+          "deletions": 2,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/src/reports/reports.service.ts",
+          "status": "modified",
+          "additions": 99,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..ae381f82\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/(dashboard)/entities/page.tsx\n\tweb/app/(dashboard)/marketing/page.tsx\n\tweb/app/(dashboard)/mr/claims/page.tsx\n\tweb/app/(dashboard)/mr/reports/council/page.tsx\n\tweb/app/(dashboard)/mr/reports/page.tsx\n\tweb/app/(dashboard)/reports/mr-daily-calls/page.tsx\n\tweb/app/(dashboard)/reports/page.tsx\n\tweb/app/(dashboard)/simulator/page.tsx\n\tweb/app/(dashboard)/users/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/invoices/route.ts\n\tweb/app/api/manager/entities/[id]/route.ts\n\tweb/app/api/manager/entities/route.ts\n\tweb/app/api/marketing/dashboard/route.ts\n\tweb/app/api/mr/claims/route.ts\n\tweb/app/api/mr/reports/calls/route.ts\n\tweb/app/api/mr",
+      "id": "pull-1789939800936-pyouy"
+    },
+    {
+      "timestamp": "2026-09-19T17:32:38.478Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/__tests__/whatsapp-intelligence-history.test.ts",
+          "status": "added",
+          "additions": 260,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/invoices/route.ts",
+          "status": "modified",
+          "additions": 18,
+          "deletions": 7,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/mr/reports/multi-agent/whatsapp/route.ts",
+          "status": "modified",
+          "additions": 95,
+          "deletions": 1,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/api/whatsapp/history/route.ts",
+          "status": "added",
+          "additions": 68,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/whatsapp-reports.ts",
+          "status": "modified",
+          "additions": 62,
+          "deletions": 3,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/prisma/schema.prisma",
+          "status": "modified",
+          "additions": 26,
+          "deletions": 0,
+          "impactedComponent": "Database Architecture & Schema"
+        },
+        {
+          "filename": "web/src/reports/reports.agents.ts",
+          "status": "modified",
+          "additions": 29,
+          "deletions": 2,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/src/reports/reports.service.ts",
+          "status": "modified",
+          "additions": 99,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..ae381f82\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/(dashboard)/entities/page.tsx\n\tweb/app/(dashboard)/marketing/page.tsx\n\tweb/app/(dashboard)/mr/claims/page.tsx\n\tweb/app/(dashboard)/mr/reports/council/page.tsx\n\tweb/app/(dashboard)/mr/reports/page.tsx\n\tweb/app/(dashboard)/reports/mr-daily-calls/page.tsx\n\tweb/app/(dashboard)/reports/page.tsx\n\tweb/app/(dashboard)/simulator/page.tsx\n\tweb/app/(dashboard)/users/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/invoices/route.ts\n\tweb/app/api/manager/entities/[id]/route.ts\n\tweb/app/api/manager/entities/route.ts\n\tweb/app/api/marketing/dashboard/route.ts\n\tweb/app/api/mr/claims/route.ts\n\tweb/app/api/mr/reports/calls/route.ts\n\tweb/app/api/mr",
+      "id": "pull-1789839158478-7g38a"
+    },
+    {
+      "timestamp": "2026-09-18T14:32:14.389Z",
+      "type": "MANUAL",
+      "branch": "787cc571",
+      "beforeHash": "85a4623b",
+      "afterHash": "787cc571",
+      "status": "SUCCESS",
+      "filesCount": 8,
+      "files": [
+        {
+          "filename": "web/__tests__/whatsapp-intelligence-history.test.ts",
+          "status": "added",
+          "additions": 260,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/invoices/route.ts",
+          "status": "modified",
+          "additions": 18,
+          "deletions": 7,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/mr/reports/multi-agent/whatsapp/route.ts",
+          "status": "modified",
+          "additions": 95,
+          "deletions": 1,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/api/whatsapp/history/route.ts",
+          "status": "added",
+          "additions": 68,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/whatsapp-reports.ts",
+          "status": "modified",
+          "additions": 62,
+          "deletions": 3,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/prisma/schema.prisma",
+          "status": "modified",
+          "additions": 26,
+          "deletions": 0,
+          "impactedComponent": "Database Architecture & Schema"
+        },
+        {
+          "filename": "web/src/reports/reports.agents.ts",
+          "status": "modified",
+          "additions": 29,
+          "deletions": 2,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/src/reports/reports.service.ts",
+          "status": "modified",
+          "additions": 99,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "787cc571",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-18",
+          "message": "feat(whatsapp): add multi-agent whatsapp intelligence dispatch history and invoiced secondary sales control"
+        }
+      ],
+      "logMessage": "🎉 Successful Note: Commit #787cc571 is fully applied and verified live on PM2 with zero downtime!\n\n✔ The commit #787cc571 is applied with the below changes:\n  • [ADDED] web/__tests__/whatsapp-intelligence-history.test.ts (+260/-0) — Core Application Platform\n  • [MODIFIED] web/app/api/invoices/route.ts (+18/-7) — Core Application Platform\n  • [MODIFIED] web/app/api/mr/reports/multi-agent/whatsapp/route.ts (+95/-1) — Field Force & DCR CRM\n  • [ADDED] web/app/api/whatsapp/history/route.ts (+68/-0) — Core Application Platform\n  • [MODIFIED] web/lib/whatsapp-reports.ts (+62/-3) — Core Application Platform\n  • [MODIFIED] web/prisma/schema.prisma (+26/-0) — Database Architecture & Schema\n  • [MODIFIED] web/src/reports/reports.agents.ts (+29/-2) — Core Application Platform\n  • [MODIFIED] web/src/reports/reports.service.ts (+99/-0) — Core Application Platform",
+      "id": "pull-1789741934391-y4q0y"
+    },
+    {
+      "timestamp": "2026-09-16T21:30:00.913Z",
+      "type": "AUTO",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/__tests__/contracts/pricing-consistency.test.ts",
+          "status": "modified",
+          "additions": 0,
+          "deletions": 5,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/__tests__/user-provisioning-agents.test.ts",
+          "status": "added",
+          "additions": 47,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/users/page.tsx",
+          "status": "modified",
+          "additions": 188,
+          "deletions": 17,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/admin/users/audit/route.ts",
+          "status": "added",
+          "additions": 16,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/territories/route.ts",
+          "status": "added",
+          "additions": 36,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/users/[id]/route.ts",
+          "status": "modified",
+          "additions": 7,
+          "deletions": 37,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/user-provisioning-agents.service.ts",
+          "status": "added",
+          "additions": 310,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..d2714190\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/(dashboard)/users/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/mr/visits/route.ts\n\tweb/app/api/users/[id]/route.ts\n\tweb/components/dashboard-shell.tsx\n\tweb/instrumentation.ts\n\tweb/package.json\n\tweb/prisma/schema.prisma\n\tweb/scripts/push-local-to-vps.ts\n\tweb/scripts/sync-vps-to-local.ts\n\tweb/services/software-update-agents.service.ts\nPlease commit your changes or stash them before you merge.\nerror: The following untracked working tree files would be overwritten by merge:\n\tweb/__tests__/user-provisioning-agents.test.ts\n\tweb/__tests__/visit-deduplication-agents.test.ts\n\tweb/app/(dashboard)/admin/system-config/page.tsx\n\tweb/app/",
+      "id": "pull-1789594200913-vi6je"
+    },
+    {
+      "timestamp": "2026-09-16T05:11:01.135Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/__tests__/contracts/pricing-consistency.test.ts",
+          "status": "modified",
+          "additions": 0,
+          "deletions": 5,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/__tests__/user-provisioning-agents.test.ts",
+          "status": "added",
+          "additions": 47,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/users/page.tsx",
+          "status": "modified",
+          "additions": 188,
+          "deletions": 17,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/admin/users/audit/route.ts",
+          "status": "added",
+          "additions": 16,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/territories/route.ts",
+          "status": "added",
+          "additions": 36,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/users/[id]/route.ts",
+          "status": "modified",
+          "additions": 7,
+          "deletions": 37,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/user-provisioning-agents.service.ts",
+          "status": "added",
+          "additions": 310,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..d2714190\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/(dashboard)/users/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/mr/visits/route.ts\n\tweb/app/api/users/[id]/route.ts\n\tweb/components/dashboard-shell.tsx\n\tweb/instrumentation.ts\n\tweb/package.json\n\tweb/prisma/schema.prisma\n\tweb/scripts/push-local-to-vps.ts\n\tweb/scripts/sync-vps-to-local.ts\n\tweb/services/software-update-agents.service.ts\nPlease commit your changes or stash them before you merge.\nerror: The following untracked working tree files would be overwritten by merge:\n\tweb/__tests__/user-provisioning-agents.test.ts\n\tweb/__tests__/visit-deduplication-agents.test.ts\n\tweb/app/(dashboard)/admin/system-config/page.tsx\n\tweb/app/",
+      "id": "pull-1789535461135-3v2zt"
+    },
+    {
+      "timestamp": "2026-09-16T05:10:56.381Z",
+      "type": "MANUAL",
+      "branch": "c31548a",
+      "beforeHash": "85a4623b",
+      "afterHash": "c31548a",
+      "status": "SUCCESS",
+      "filesCount": 7,
+      "files": [
+        {
+          "filename": "web/__tests__/contracts/pricing-consistency.test.ts",
+          "status": "modified",
+          "additions": 0,
+          "deletions": 5,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/__tests__/user-provisioning-agents.test.ts",
+          "status": "added",
+          "additions": 47,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/users/page.tsx",
+          "status": "modified",
+          "additions": 188,
+          "deletions": 17,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/admin/users/audit/route.ts",
+          "status": "added",
+          "additions": 16,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/territories/route.ts",
+          "status": "added",
+          "additions": 36,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/users/[id]/route.ts",
+          "status": "modified",
+          "additions": 7,
+          "deletions": 37,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/user-provisioning-agents.service.ts",
+          "status": "added",
+          "additions": 310,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "d2714190",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-16",
+          "message": "fix(auth): guard soft device binding against unique constraint collision"
+        }
+      ],
+      "logMessage": "🎉 Successful Note: Commit #c31548a is fully applied and verified live on PM2 with zero downtime!\n\n✔ The commit #c31548a is applied with the below changes:\n  • [MODIFIED] web/__tests__/contracts/pricing-consistency.test.ts (+0/-5) — Core Application Platform\n  • [ADDED] web/__tests__/user-provisioning-agents.test.ts (+47/-0) — Core Application Platform\n  • [MODIFIED] web/app/(dashboard)/users/page.tsx (+188/-17) — Core Application Platform\n  • [ADDED] web/app/api/admin/users/audit/route.ts (+16/-0) — Core Application Platform\n  • [ADDED] web/app/api/territories/route.ts (+36/-0) — Core Application Platform\n  • [MODIFIED] web/app/api/users/[id]/route.ts (+7/-37) — Core Application Platform\n  • [ADDED] web/services/user-provisioning-agents.service.ts (+310/-0) — Core Application Platform",
+      "id": "pull-1789535456382-xgl68"
+    },
+    {
+      "timestamp": "2026-09-15T21:17:41.550Z",
+      "type": "MANUAL",
+      "branch": "ace7dc0a",
+      "beforeHash": "85a4623b",
+      "afterHash": "ace7dc0a",
+      "status": "SUCCESS",
+      "filesCount": 7,
+      "files": [
+        {
+          "filename": "web/__tests__/contracts/pricing-consistency.test.ts",
+          "status": "modified",
+          "additions": 0,
+          "deletions": 5,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/__tests__/user-provisioning-agents.test.ts",
+          "status": "added",
+          "additions": 47,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/users/page.tsx",
+          "status": "modified",
+          "additions": 188,
+          "deletions": 17,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/admin/users/audit/route.ts",
+          "status": "added",
+          "additions": 16,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/territories/route.ts",
+          "status": "added",
+          "additions": 36,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/users/[id]/route.ts",
+          "status": "modified",
+          "additions": 7,
+          "deletions": 37,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/user-provisioning-agents.service.ts",
+          "status": "added",
+          "additions": 310,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "ace7dc0a",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-16",
+          "message": "feat(users): wire multi-agent user provisioning, territory alignment, and autofill protection"
+        }
+      ],
+      "logMessage": "🎉 Successful Note: Commit #ace7dc0a is fully applied and verified live on PM2 with zero downtime!\n\n✔ The commit #ace7dc0a is applied with the below changes:\n  • [MODIFIED] web/__tests__/contracts/pricing-consistency.test.ts (+0/-5) — Core Application Platform\n  • [ADDED] web/__tests__/user-provisioning-agents.test.ts (+47/-0) — Core Application Platform\n  • [MODIFIED] web/app/(dashboard)/users/page.tsx (+188/-17) — Core Application Platform\n  • [ADDED] web/app/api/admin/users/audit/route.ts (+16/-0) — Core Application Platform\n  • [ADDED] web/app/api/territories/route.ts (+36/-0) — Core Application Platform\n  • [MODIFIED] web/app/api/users/[id]/route.ts (+7/-37) — Core Application Platform\n  • [ADDED] web/services/user-provisioning-agents.service.ts (+310/-0) — Core Application Platform",
+      "id": "pull-1789507061550-03t0m"
+    },
+    {
+      "timestamp": "2026-09-15T21:17:28.802Z",
+      "type": "MANUAL",
+      "branch": "ace7dc0a",
+      "beforeHash": "85a4623b",
+      "afterHash": "ace7dc0a",
+      "status": "SUCCESS",
+      "filesCount": 7,
+      "files": [
+        {
+          "filename": "web/__tests__/contracts/pricing-consistency.test.ts",
+          "status": "modified",
+          "additions": 0,
+          "deletions": 5,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/__tests__/user-provisioning-agents.test.ts",
+          "status": "added",
+          "additions": 47,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/users/page.tsx",
+          "status": "modified",
+          "additions": 188,
+          "deletions": 17,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/admin/users/audit/route.ts",
+          "status": "added",
+          "additions": 16,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/territories/route.ts",
+          "status": "added",
+          "additions": 36,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/users/[id]/route.ts",
+          "status": "modified",
+          "additions": 7,
+          "deletions": 37,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/user-provisioning-agents.service.ts",
+          "status": "added",
+          "additions": 310,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "ace7dc0a",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-16",
+          "message": "feat(users): wire multi-agent user provisioning, territory alignment, and autofill protection"
+        }
+      ],
+      "logMessage": "🎉 Successful Note: Commit #ace7dc0a is fully applied and verified live on PM2 with zero downtime!\n\n✔ The commit #ace7dc0a is applied with the below changes:\n  • [MODIFIED] web/__tests__/contracts/pricing-consistency.test.ts (+0/-5) — Core Application Platform\n  • [ADDED] web/__tests__/user-provisioning-agents.test.ts (+47/-0) — Core Application Platform\n  • [MODIFIED] web/app/(dashboard)/users/page.tsx (+188/-17) — Core Application Platform\n  • [ADDED] web/app/api/admin/users/audit/route.ts (+16/-0) — Core Application Platform\n  • [ADDED] web/app/api/territories/route.ts (+36/-0) — Core Application Platform\n  • [MODIFIED] web/app/api/users/[id]/route.ts (+7/-37) — Core Application Platform\n  • [ADDED] web/services/user-provisioning-agents.service.ts (+310/-0) — Core Application Platform",
+      "id": "pull-1789507048803-m4asm"
+    },
+    {
+      "timestamp": "2026-09-15T21:17:20.940Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/__tests__/contracts/pricing-consistency.test.ts",
+          "status": "modified",
+          "additions": 0,
+          "deletions": 5,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/__tests__/user-provisioning-agents.test.ts",
+          "status": "added",
+          "additions": 47,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/users/page.tsx",
+          "status": "modified",
+          "additions": 188,
+          "deletions": 17,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/admin/users/audit/route.ts",
+          "status": "added",
+          "additions": 16,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/territories/route.ts",
+          "status": "added",
+          "additions": 36,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/users/[id]/route.ts",
+          "status": "modified",
+          "additions": 7,
+          "deletions": 37,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/user-provisioning-agents.service.ts",
+          "status": "added",
+          "additions": 310,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..d2714190\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/(dashboard)/users/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/mr/visits/route.ts\n\tweb/app/api/users/[id]/route.ts\n\tweb/components/dashboard-shell.tsx\n\tweb/instrumentation.ts\n\tweb/package.json\n\tweb/prisma/schema.prisma\n\tweb/scripts/push-local-to-vps.ts\n\tweb/scripts/sync-vps-to-local.ts\n\tweb/services/software-update-agents.service.ts\nPlease commit your changes or stash them before you merge.\nerror: The following untracked working tree files would be overwritten by merge:\n\tweb/__tests__/user-provisioning-agents.test.ts\n\tweb/__tests__/visit-deduplication-agents.test.ts\n\tweb/app/(dashboard)/admin/system-config/page.tsx\n\tweb/app/",
+      "id": "pull-1789507040941-367jh"
+    },
+    {
+      "timestamp": "2026-09-15T21:16:38.786Z",
+      "type": "MANUAL",
+      "branch": "ace7dc0a",
+      "beforeHash": "85a4623b",
+      "afterHash": "ace7dc0a",
+      "status": "SUCCESS",
+      "filesCount": 7,
+      "files": [
+        {
+          "filename": "web/__tests__/contracts/pricing-consistency.test.ts",
+          "status": "modified",
+          "additions": 0,
+          "deletions": 5,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/__tests__/user-provisioning-agents.test.ts",
+          "status": "added",
+          "additions": 47,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/users/page.tsx",
+          "status": "modified",
+          "additions": 188,
+          "deletions": 17,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/admin/users/audit/route.ts",
+          "status": "added",
+          "additions": 16,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/territories/route.ts",
+          "status": "added",
+          "additions": 36,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/users/[id]/route.ts",
+          "status": "modified",
+          "additions": 7,
+          "deletions": 37,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/user-provisioning-agents.service.ts",
+          "status": "added",
+          "additions": 310,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "ace7dc0a",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-16",
+          "message": "feat(users): wire multi-agent user provisioning, territory alignment, and autofill protection"
+        }
+      ],
+      "logMessage": "🎉 Successful Note: Commit #ace7dc0a is fully applied and verified live on PM2 with zero downtime!\n\n✔ The commit #ace7dc0a is applied with the below changes:\n  • [MODIFIED] web/__tests__/contracts/pricing-consistency.test.ts (+0/-5) — Core Application Platform\n  • [ADDED] web/__tests__/user-provisioning-agents.test.ts (+47/-0) — Core Application Platform\n  • [MODIFIED] web/app/(dashboard)/users/page.tsx (+188/-17) — Core Application Platform\n  • [ADDED] web/app/api/admin/users/audit/route.ts (+16/-0) — Core Application Platform\n  • [ADDED] web/app/api/territories/route.ts (+36/-0) — Core Application Platform\n  • [MODIFIED] web/app/api/users/[id]/route.ts (+7/-37) — Core Application Platform\n  • [ADDED] web/services/user-provisioning-agents.service.ts (+310/-0) — Core Application Platform",
+      "id": "pull-1789506998786-yqqzm"
+    },
+    {
+      "timestamp": "2026-09-15T21:13:51.776Z",
+      "type": "MANUAL",
+      "branch": "d2714190",
+      "beforeHash": "85a4623b",
+      "afterHash": "d2714190",
+      "status": "SUCCESS",
+      "filesCount": 1,
+      "files": [
+        {
+          "filename": "web/app/api/auth/login/mr/route.ts",
+          "status": "modified",
+          "additions": 12,
+          "deletions": 4,
+          "impactedComponent": "Field Force & DCR CRM"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "d2714190",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-16",
+          "message": "fix(auth): guard soft device binding against unique constraint collision"
+        }
+      ],
+      "logMessage": "🎉 Successful Note: Commit #d2714190 is fully applied and verified live on PM2 with zero downtime!\n\n✔ The commit #d2714190 is applied with the below changes:\n  • [MODIFIED] web/app/api/auth/login/mr/route.ts (+12/-4) — Field Force & DCR CRM",
+      "id": "pull-1789506831776-akcn9"
+    },
+    {
+      "timestamp": "2026-09-15T21:13:37.457Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "Trend_MR_PowerBI_Report.pbix",
+          "status": "added",
+          "additions": 0,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "Trend_MR_PowerBI_Report_v2.pbix",
+          "status": "added",
+          "additions": 0,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/__tests__/contracts/pricing-consistency.test.ts",
+          "status": "modified",
+          "additions": 15,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/__tests__/software-update-agents.test.ts",
+          "status": "modified",
+          "additions": 5,
+          "deletions": 5,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/__tests__/visit-deduplication-agents.test.ts",
+          "status": "added",
+          "additions": 86,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/admin/page.tsx",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/auth/login/mr/route.ts",
+          "status": "modified",
+          "additions": 20,
+          "deletions": 4,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/api/mr/visits/route.ts",
+          "status": "modified",
+          "additions": 35,
+          "deletions": 2,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/data/system-config.json",
+          "status": "modified",
+          "additions": 43,
+          "deletions": 1,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/package.json",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/prisma/schema.prisma",
+          "status": "modified",
+          "additions": 0,
+          "deletions": 1,
+          "impactedComponent": "Database Architecture & Schema"
+        },
+        {
+          "filename": "web/scripts/deduplicate-visits-agent.ts",
+          "status": "added",
+          "additions": 57,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/scripts/push-local-to-vps.ts",
+          "status": "modified",
+          "additions": 5,
+          "deletions": 2,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/scripts/sync-vps-to-local.ts",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/visit-deduplication-agents.service.ts",
+          "status": "added",
+          "additions": 259,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..d2714190\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/(dashboard)/users/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/mr/visits/route.ts\n\tweb/app/api/users/[id]/route.ts\n\tweb/components/dashboard-shell.tsx\n\tweb/instrumentation.ts\n\tweb/package.json\n\tweb/prisma/schema.prisma\n\tweb/scripts/push-local-to-vps.ts\n\tweb/scripts/sync-vps-to-local.ts\n\tweb/services/software-update-agents.service.ts\nPlease commit your changes or stash them before you merge.\nerror: The following untracked working tree files would be overwritten by merge:\n\tweb/__tests__/user-provisioning-agents.test.ts\n\tweb/__tests__/visit-deduplication-agents.test.ts\n\tweb/app/(dashboard)/admin/system-config/page.tsx\n\tweb/app/",
+      "id": "pull-1789506817457-grlfl"
+    },
+    {
+      "timestamp": "2026-09-15T20:38:10.561Z",
+      "type": "MANUAL",
+      "branch": "eb0fd634",
+      "beforeHash": "85a4623b",
+      "afterHash": "eb0fd634",
+      "status": "SUCCESS",
+      "filesCount": 15,
+      "files": [
+        {
+          "filename": "Trend_MR_PowerBI_Report.pbix",
+          "status": "added",
+          "additions": 0,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "Trend_MR_PowerBI_Report_v2.pbix",
+          "status": "added",
+          "additions": 0,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/__tests__/contracts/pricing-consistency.test.ts",
+          "status": "modified",
+          "additions": 15,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/__tests__/software-update-agents.test.ts",
+          "status": "modified",
+          "additions": 5,
+          "deletions": 5,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/__tests__/visit-deduplication-agents.test.ts",
+          "status": "added",
+          "additions": 86,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/admin/page.tsx",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/auth/login/mr/route.ts",
+          "status": "modified",
+          "additions": 20,
+          "deletions": 4,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/api/mr/visits/route.ts",
+          "status": "modified",
+          "additions": 35,
+          "deletions": 2,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/data/system-config.json",
+          "status": "modified",
+          "additions": 43,
+          "deletions": 1,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/package.json",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/prisma/schema.prisma",
+          "status": "modified",
+          "additions": 0,
+          "deletions": 1,
+          "impactedComponent": "Database Architecture & Schema"
+        },
+        {
+          "filename": "web/scripts/deduplicate-visits-agent.ts",
+          "status": "added",
+          "additions": 57,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/scripts/push-local-to-vps.ts",
+          "status": "modified",
+          "additions": 5,
+          "deletions": 2,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/scripts/sync-vps-to-local.ts",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/visit-deduplication-agents.service.ts",
+          "status": "added",
+          "additions": 259,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "eb0fd634",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-16",
+          "message": "feat(visits): wire up Multi-Agent Call Deduplication Suite, resolve 'My Calls' duplicate entries, and fix MR auth cookie sync"
+        }
+      ],
+      "logMessage": "🎉 Successful Note: Commit #eb0fd634 is fully applied and verified live on PM2 with zero downtime!\n\n✔ The commit #eb0fd634 is applied with the below changes:\n  • [ADDED] Trend_MR_PowerBI_Report.pbix (+0/-0) — Core Application Platform\n  • [ADDED] Trend_MR_PowerBI_Report_v2.pbix (+0/-0) — Core Application Platform\n  • [MODIFIED] web/__tests__/contracts/pricing-consistency.test.ts (+15/-0) — Core Application Platform\n  • [MODIFIED] web/__tests__/software-update-agents.test.ts (+5/-5) — Core Application Platform\n  • [ADDED] web/__tests__/visit-deduplication-agents.test.ts (+86/-0) — Core Application Platform\n  • [MODIFIED] web/app/(dashboard)/admin/page.tsx (+1/-1) — Core Application Platform\n  • [MODIFIED] web/app/api/auth/login/mr/route.ts (+20/-4) — Field Force & DCR CRM\n  • [MODIFIED] web/app/api/mr/visits/route.ts (+35/-2) — Field Force & DCR CRM\n  • [MODIFIED] web/data/system-config.json (+43/-1) — Core Application Platform\n  • [MODIFIED] web/package.json (+1/-0) — Core Application Platform\n  • [MODIFIED] web/prisma/schema.prisma (+0/-1) — Database Architecture & Schema\n  • [ADDED] web/scripts/deduplicate-visits-agent.ts (+57/-0) — Core Application Platform\n  • [MODIFIED] web/scripts/push-local-to-vps.ts (+5/-2) — Core Application Platform\n  • [MODIFIED] web/scripts/sync-vps-to-local.ts (+1/-1) — Core Application Platform\n  • [ADDED] web/services/visit-deduplication-agents.service.ts (+259/-0) — Core Application Platform",
+      "id": "pull-1789504690561-xwymd"
+    },
+    {
+      "timestamp": "2026-09-15T20:37:34.508Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/services/credit-agents.service.ts",
+          "status": "modified",
+          "additions": 115,
+          "deletions": 14,
+          "impactedComponent": "Chemist Receivables & Collections"
+        },
+        {
+          "filename": "web/app/(dashboard)/collections/page.tsx",
+          "status": "modified",
+          "additions": 165,
+          "deletions": 18,
+          "impactedComponent": "User Interface & Navigation Shell"
+        },
+        {
+          "filename": "web/services/tour-plan-agents.service.ts",
+          "status": "modified",
+          "additions": 142,
+          "deletions": 12,
+          "impactedComponent": "Tour Planning & MTP Engine"
+        },
+        {
+          "filename": "web/services/product-pricing-agents.service.ts",
+          "status": "modified",
+          "additions": 42,
+          "deletions": 15,
+          "impactedComponent": "PTR & Commercial Pricing Engine"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..eb0fd634\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/mr/visits/route.ts\n\tweb/components/dashboard-shell.tsx\n\tweb/instrumentation.ts\n\tweb/package.json\n\tweb/prisma/schema.prisma\n\tweb/scripts/push-local-to-vps.ts\n\tweb/scripts/sync-vps-to-local.ts\n\tweb/services/software-update-agents.service.ts\nPlease commit your changes or stash them before you merge.\nerror: The following untracked working tree files would be overwritten by merge:\n\tweb/__tests__/visit-deduplication-agents.test.ts\n\tweb/app/(dashboard)/admin/system-config/page.tsx\n\tweb/app/api/system/config/route.ts\n\tweb/app/api/system/update/apply-commit/route.ts\n\tweb/app/api/system/update/fetch-commit/r",
+      "id": "pull-1789504654509-gqjhx"
+    },
+    {
+      "timestamp": "2026-09-15T20:37:32.452Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/services/credit-agents.service.ts",
+          "status": "modified",
+          "additions": 115,
+          "deletions": 14,
+          "impactedComponent": "Chemist Receivables & Collections"
+        },
+        {
+          "filename": "web/app/(dashboard)/collections/page.tsx",
+          "status": "modified",
+          "additions": 165,
+          "deletions": 18,
+          "impactedComponent": "User Interface & Navigation Shell"
+        },
+        {
+          "filename": "web/services/tour-plan-agents.service.ts",
+          "status": "modified",
+          "additions": 142,
+          "deletions": 12,
+          "impactedComponent": "Tour Planning & MTP Engine"
+        },
+        {
+          "filename": "web/services/product-pricing-agents.service.ts",
+          "status": "modified",
+          "additions": 42,
+          "deletions": 15,
+          "impactedComponent": "PTR & Commercial Pricing Engine"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..eb0fd634\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/mr/visits/route.ts\n\tweb/components/dashboard-shell.tsx\n\tweb/instrumentation.ts\n\tweb/package.json\n\tweb/prisma/schema.prisma\n\tweb/scripts/push-local-to-vps.ts\n\tweb/scripts/sync-vps-to-local.ts\n\tweb/services/software-update-agents.service.ts\nPlease commit your changes or stash them before you merge.\nerror: The following untracked working tree files would be overwritten by merge:\n\tweb/__tests__/visit-deduplication-agents.test.ts\n\tweb/app/(dashboard)/admin/system-config/page.tsx\n\tweb/app/api/system/config/route.ts\n\tweb/app/api/system/update/apply-commit/route.ts\n\tweb/app/api/system/update/fetch-commit/r",
+      "id": "pull-1789504652453-7iott"
+    },
+    {
+      "timestamp": "2026-09-15T20:37:26.689Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/services/credit-agents.service.ts",
+          "status": "modified",
+          "additions": 115,
+          "deletions": 14,
+          "impactedComponent": "Chemist Receivables & Collections"
+        },
+        {
+          "filename": "web/app/(dashboard)/collections/page.tsx",
+          "status": "modified",
+          "additions": 165,
+          "deletions": 18,
+          "impactedComponent": "User Interface & Navigation Shell"
+        },
+        {
+          "filename": "web/services/tour-plan-agents.service.ts",
+          "status": "modified",
+          "additions": 142,
+          "deletions": 12,
+          "impactedComponent": "Tour Planning & MTP Engine"
+        },
+        {
+          "filename": "web/services/product-pricing-agents.service.ts",
+          "status": "modified",
+          "additions": 42,
+          "deletions": 15,
+          "impactedComponent": "PTR & Commercial Pricing Engine"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..eb0fd634\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/mr/visits/route.ts\n\tweb/components/dashboard-shell.tsx\n\tweb/instrumentation.ts\n\tweb/package.json\n\tweb/prisma/schema.prisma\n\tweb/scripts/push-local-to-vps.ts\n\tweb/scripts/sync-vps-to-local.ts\n\tweb/services/software-update-agents.service.ts\nPlease commit your changes or stash them before you merge.\nerror: The following untracked working tree files would be overwritten by merge:\n\tweb/__tests__/visit-deduplication-agents.test.ts\n\tweb/app/(dashboard)/admin/system-config/page.tsx\n\tweb/app/api/system/config/route.ts\n\tweb/app/api/system/update/apply-commit/route.ts\n\tweb/app/api/system/update/fetch-commit/r",
+      "id": "pull-1789504646690-8uds0"
+    },
+    {
+      "timestamp": "2026-09-15T20:37:23.765Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/services/credit-agents.service.ts",
+          "status": "modified",
+          "additions": 115,
+          "deletions": 14,
+          "impactedComponent": "Chemist Receivables & Collections"
+        },
+        {
+          "filename": "web/app/(dashboard)/collections/page.tsx",
+          "status": "modified",
+          "additions": 165,
+          "deletions": 18,
+          "impactedComponent": "User Interface & Navigation Shell"
+        },
+        {
+          "filename": "web/services/tour-plan-agents.service.ts",
+          "status": "modified",
+          "additions": 142,
+          "deletions": 12,
+          "impactedComponent": "Tour Planning & MTP Engine"
+        },
+        {
+          "filename": "web/services/product-pricing-agents.service.ts",
+          "status": "modified",
+          "additions": 42,
+          "deletions": 15,
+          "impactedComponent": "PTR & Commercial Pricing Engine"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..eb0fd634\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/mr/visits/route.ts\n\tweb/components/dashboard-shell.tsx\n\tweb/instrumentation.ts\n\tweb/package.json\n\tweb/prisma/schema.prisma\n\tweb/scripts/push-local-to-vps.ts\n\tweb/scripts/sync-vps-to-local.ts\n\tweb/services/software-update-agents.service.ts\nPlease commit your changes or stash them before you merge.\nerror: The following untracked working tree files would be overwritten by merge:\n\tweb/__tests__/visit-deduplication-agents.test.ts\n\tweb/app/(dashboard)/admin/system-config/page.tsx\n\tweb/app/api/system/config/route.ts\n\tweb/app/api/system/update/apply-commit/route.ts\n\tweb/app/api/system/update/fetch-commit/r",
+      "id": "pull-1789504643765-zy0l6"
+    },
+    {
+      "timestamp": "2026-09-15T20:37:18.851Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/services/credit-agents.service.ts",
+          "status": "modified",
+          "additions": 115,
+          "deletions": 14,
+          "impactedComponent": "Chemist Receivables & Collections"
+        },
+        {
+          "filename": "web/app/(dashboard)/collections/page.tsx",
+          "status": "modified",
+          "additions": 165,
+          "deletions": 18,
+          "impactedComponent": "User Interface & Navigation Shell"
+        },
+        {
+          "filename": "web/services/tour-plan-agents.service.ts",
+          "status": "modified",
+          "additions": 142,
+          "deletions": 12,
+          "impactedComponent": "Tour Planning & MTP Engine"
+        },
+        {
+          "filename": "web/services/product-pricing-agents.service.ts",
+          "status": "modified",
+          "additions": 42,
+          "deletions": 15,
+          "impactedComponent": "PTR & Commercial Pricing Engine"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..eb0fd634\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/mr/visits/route.ts\n\tweb/components/dashboard-shell.tsx\n\tweb/instrumentation.ts\n\tweb/package.json\n\tweb/prisma/schema.prisma\n\tweb/scripts/push-local-to-vps.ts\n\tweb/scripts/sync-vps-to-local.ts\n\tweb/services/software-update-agents.service.ts\nPlease commit your changes or stash them before you merge.\nerror: The following untracked working tree files would be overwritten by merge:\n\tweb/__tests__/visit-deduplication-agents.test.ts\n\tweb/app/(dashboard)/admin/system-config/page.tsx\n\tweb/app/api/system/config/route.ts\n\tweb/app/api/system/update/apply-commit/route.ts\n\tweb/app/api/system/update/fetch-commit/r",
+      "id": "pull-1789504638851-ox1z2"
+    },
+    {
+      "timestamp": "2026-09-15T20:36:32.999Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "NO_CHANGES",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/services/credit-agents.service.ts",
+          "status": "modified",
+          "additions": 115,
+          "deletions": 14,
+          "impactedComponent": "Chemist Receivables & Collections"
+        },
+        {
+          "filename": "web/app/(dashboard)/collections/page.tsx",
+          "status": "modified",
+          "additions": 165,
+          "deletions": 18,
+          "impactedComponent": "User Interface & Navigation Shell"
+        },
+        {
+          "filename": "web/services/tour-plan-agents.service.ts",
+          "status": "modified",
+          "additions": 142,
+          "deletions": 12,
+          "impactedComponent": "Tour Planning & MTP Engine"
+        },
+        {
+          "filename": "web/services/product-pricing-agents.service.ts",
+          "status": "modified",
+          "additions": 42,
+          "deletions": 15,
+          "impactedComponent": "PTR & Commercial Pricing Engine"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "85a4623b",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-11",
+          "message": "sync: trend mr pharma os updates 2026-09-11_00:07"
+        },
+        {
+          "hash": "876a083d",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "sync: trend mr pharma os updates 2026-09-08_08:26"
+        },
+        {
+          "hash": "ef278fa6",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "security(dms): restrict Document Management System (DMS) UI and API endpoints exclusively to ADMIN role"
+        },
+        {
+          "hash": "52e02165",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "feat(security): enforce ADMIN-only privilege for OTA system update, full-screen freeze lock & self-troubleshooting deployment"
+        },
+        {
+          "hash": "ac65b802",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "982026-728"
+        }
+      ],
+      "logMessage": "Already up to date.\n",
+      "id": "pull-1789504593000-5yufh"
+    },
+    {
+      "timestamp": "2026-09-15T20:35:02.469Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "NO_CHANGES",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/services/credit-agents.service.ts",
+          "status": "modified",
+          "additions": 115,
+          "deletions": 14,
+          "impactedComponent": "Chemist Receivables & Collections"
+        },
+        {
+          "filename": "web/app/(dashboard)/collections/page.tsx",
+          "status": "modified",
+          "additions": 165,
+          "deletions": 18,
+          "impactedComponent": "User Interface & Navigation Shell"
+        },
+        {
+          "filename": "web/services/tour-plan-agents.service.ts",
+          "status": "modified",
+          "additions": 142,
+          "deletions": 12,
+          "impactedComponent": "Tour Planning & MTP Engine"
+        },
+        {
+          "filename": "web/services/product-pricing-agents.service.ts",
+          "status": "modified",
+          "additions": 42,
+          "deletions": 15,
+          "impactedComponent": "PTR & Commercial Pricing Engine"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "85a4623b",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-11",
+          "message": "sync: trend mr pharma os updates 2026-09-11_00:07"
+        },
+        {
+          "hash": "876a083d",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "sync: trend mr pharma os updates 2026-09-08_08:26"
+        },
+        {
+          "hash": "ef278fa6",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "security(dms): restrict Document Management System (DMS) UI and API endpoints exclusively to ADMIN role"
+        },
+        {
+          "hash": "52e02165",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "feat(security): enforce ADMIN-only privilege for OTA system update, full-screen freeze lock & self-troubleshooting deployment"
+        },
+        {
+          "hash": "ac65b802",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "982026-728"
+        }
+      ],
+      "logMessage": "Already up to date.\n",
+      "id": "pull-1789504502469-41tn1"
+    },
+    {
+      "timestamp": "2026-09-15T20:34:57.077Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "NO_CHANGES",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "web/services/credit-agents.service.ts",
+          "status": "modified",
+          "additions": 115,
+          "deletions": 14,
+          "impactedComponent": "Chemist Receivables & Collections"
+        },
+        {
+          "filename": "web/app/(dashboard)/collections/page.tsx",
+          "status": "modified",
+          "additions": 165,
+          "deletions": 18,
+          "impactedComponent": "User Interface & Navigation Shell"
+        },
+        {
+          "filename": "web/services/tour-plan-agents.service.ts",
+          "status": "modified",
+          "additions": 142,
+          "deletions": 12,
+          "impactedComponent": "Tour Planning & MTP Engine"
+        },
+        {
+          "filename": "web/services/product-pricing-agents.service.ts",
+          "status": "modified",
+          "additions": 42,
+          "deletions": 15,
+          "impactedComponent": "PTR & Commercial Pricing Engine"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "85a4623b",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-11",
+          "message": "sync: trend mr pharma os updates 2026-09-11_00:07"
+        },
+        {
+          "hash": "876a083d",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "sync: trend mr pharma os updates 2026-09-08_08:26"
+        },
+        {
+          "hash": "ef278fa6",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "security(dms): restrict Document Management System (DMS) UI and API endpoints exclusively to ADMIN role"
+        },
+        {
+          "hash": "52e02165",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "feat(security): enforce ADMIN-only privilege for OTA system update, full-screen freeze lock & self-troubleshooting deployment"
+        },
+        {
+          "hash": "ac65b802",
+          "author": "Metapharsic Admin",
+          "date": "2026-09-08",
+          "message": "982026-728"
+        }
+      ],
+      "logMessage": "Already up to date.\n",
+      "id": "pull-1789504497078-sa03l"
+    },
     {
       "timestamp": "2026-09-11T00:24:00.598Z",
       "type": "MANUAL",

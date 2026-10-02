@@ -49,6 +49,9 @@ export interface GranularCallRow {
   orderConverted: boolean;
   orderValuePtr: number;
   orderItemsCount: number;
+  comments?: string | null;
+  feedback?: string | null;
+  receptiveness?: string | null;
 }
 
 export interface DayGroup {
@@ -515,6 +518,8 @@ export class MrDailyCallsAgentsService {
         durationMinutes: true,
         boxesPlaced: true,
         cqsScore: true,
+        feedback: true,
+        receptiveness: true,
         createdAt: true,
         doctor: { select: { fullName: true, primarySpecialty: true } },
         chemist: { select: { name: true } },
@@ -697,6 +702,9 @@ export class MrDailyCallsAgentsService {
         orderConverted,
         orderValuePtr,
         orderItemsCount,
+        comments: v.feedback || null,
+        feedback: v.feedback || null,
+        receptiveness: v.receptiveness || null,
       };
 
       if (!byMr.has(mrKey)) {

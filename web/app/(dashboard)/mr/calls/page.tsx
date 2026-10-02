@@ -27,8 +27,8 @@ interface Visit {
   startLatitude: number | null;
   startLongitude: number | null;
   endedAt: string | null;
-  doctor: { id: string; fullName: string; clinicAddress: string | null; territory?: Territory } | null;
-  chemist: { id: string; name: string; address: string | null; territory?: Territory } | null;
+  doctor: { id: string; fullName: string; clinicAddress: string | null; mobile?: string | null; whatsApp?: string | null; territory?: Territory } | null;
+  chemist: { id: string; name: string; address: string | null; mobile?: string | null; territory?: Territory } | null;
   lead: { id: string; status: "NEW" | "IN_PROGRESS" | "CONVERTED" | "LOST"; details: string | null } | null;
   samples: { id: string; quantity: number; product: { id: string; name: string } }[];
 }
@@ -66,6 +66,8 @@ export default function CallHistoryPage() {
 
   const [editing, setEditing] = useState<Visit | null>(null);
   const [editPurpose, setEditPurpose] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [backgroundGps, setBackgroundGps] = useState<{ lat: number; lon: number } | null>(null);
   const [editFeedback, setEditFeedback] = useState("");
   const [editDuration, setEditDuration] = useState("");
   const [editBoxesPlaced, setEditBoxesPlaced] = useState("");
@@ -123,12 +125,27 @@ export default function CallHistoryPage() {
 
   const openEdit = (v: Visit) => {
     setEditing(v);
+    const existingPhone = v.doctor?.mobile || v.doctor?.whatsApp || v.chemist?.mobile || "";
+    setEditPhone(existingPhone);
     setEditPurpose(v.purpose);
     setEditFeedback(v.feedback ?? "");
     setEditDuration(v.durationMinutes !== null ? String(v.durationMinutes) : "");
     setEditBoxesPlaced(v.boxesPlaced !== null ? String(v.boxesPlaced) : "");
     setEditError(null);
     setConfirmDelete(false);
+
+    // Silent background GPS capture (hidden from MR, captures checkout location for admin)
+    if (typeof navigator !== "undefined" && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setBackgroundGps({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        },
+        () => {
+          setBackgroundGps(null);
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
   };
 
   const closeEdit = () => {
@@ -158,15 +175,31 @@ export default function CallHistoryPage() {
   const saveEdit = async () => {
     if (!editing) return;
     if (!editPurpose.trim()) return setEditError("Purpose is required.");
+
+    // Mandatory phone number validation even on updates
+    const cleanDigits = editPhone.replace(/\D/g, "");
+    if (!editPhone.trim() || cleanDigits.length < 10) {
+      return setEditError("Doctor/Chemist contact phone number is mandatory (minimum 10 digits).");
+    }
+
     setSaving(true);
     setEditError(null);
     try {
-      await apiClient.put(`/api/mr/visits/${editing.id}`, {
+      const payload: any = {
         purpose: editPurpose.trim(),
+        phone: cleanDigits,
         feedback: editFeedback.trim() || undefined,
         durationMinutes: editDuration ? Number(editDuration) : undefined,
         boxesPlaced: editBoxesPlaced ? Number(editBoxesPlaced) : undefined,
-      });
+      };
+
+      // Silently pass background GPS coordinates if open (not shown to MR)
+      if (backgroundGps && (backgroundGps.lat !== 0 || backgroundGps.lon !== 0)) {
+        payload.latitude = backgroundGps.lat;
+        payload.longitude = backgroundGps.lon;
+      }
+
+      await apiClient.put(`/api/mr/visits/${editing.id}`, payload);
       setVisits((prev) =>
         prev.map((v) =>
           v.id === editing.id
@@ -176,6 +209,8 @@ export default function CallHistoryPage() {
                 feedback: editFeedback.trim() || null,
                 durationMinutes: editDuration ? Number(editDuration) : null,
                 boxesPlaced: editBoxesPlaced ? Number(editBoxesPlaced) : null,
+                doctor: v.doctor ? { ...v.doctor, mobile: cleanDigits } : null,
+                chemist: v.chemist ? { ...v.chemist, mobile: cleanDigits } : null,
               }
             : v
         )
@@ -526,6 +561,21 @@ export default function CallHistoryPage() {
             </div>
 
             <div className="px-5 pb-5 pt-1 space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span>Contact Phone Number *</span>
+                  <span className="text-[10px] text-rose-600 font-bold bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">MANDATORY</span>
+                </label>
+                <input
+                  type="tel"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="Enter 10-digit mobile number *"
+                  maxLength={15}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+                />
+                <p className="text-[10px] text-slate-400 mt-0.5">Mandatory for all doctor and chemist visits.</p>
+              </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Purpose *</label>
                 <input

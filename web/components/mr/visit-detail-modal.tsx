@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { X, MapPin, Stethoscope, Store, Clock, Camera, FileText } from "lucide-react";
+import { X, MapPin, Stethoscope, Store, Clock, Camera, FileText, Phone } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 
 interface VisitDetail {
@@ -19,8 +19,8 @@ interface VisitDetail {
   durationMinutes: number | null;
   boxesPlaced: number | null;
   photoUrl: string | null;
-  doctor: { id: string; fullName: string; clinicAddress: string | null } | null;
-  chemist: { id: string; name: string; address: string | null } | null;
+  doctor: { id: string; fullName: string; clinicAddress: string | null; mobile?: string | null; whatsApp?: string | null } | null;
+  chemist: { id: string; name: string; address: string | null; mobile?: string | null } | null;
   lead: unknown | null;
 }
 
@@ -72,6 +72,12 @@ export function VisitDetailModal({ visitId, onClose }: { visitId: string; onClos
                 <div>
                   <p className="font-bold text-slate-900 text-sm">{visit.doctor?.fullName ?? visit.chemist?.name ?? "Unknown"}</p>
                   <p className="text-xs text-slate-500 mt-0.5">{visit.doctor?.clinicAddress ?? visit.chemist?.address ?? "—"}</p>
+                  {(visit.doctor?.mobile || visit.doctor?.whatsApp || visit.chemist?.mobile) && (
+                    <p className="text-xs text-emerald-700 font-semibold mt-1 flex items-center gap-1">
+                      <Phone size={11} className="text-emerald-600" />
+                      <span>{visit.doctor?.mobile || visit.doctor?.whatsApp || visit.chemist?.mobile}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 

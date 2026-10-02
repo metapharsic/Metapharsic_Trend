@@ -66,6 +66,9 @@ async function handler(req: AuthedRequest) {
             clinicAddress: true,
             territoryId: true,
             primarySpecialty: true,
+            mobile: true,
+            whatsApp: true,
+            assistantContact: true,
             territory: { select: { id: true, name: true } },
           },
         }),
@@ -79,6 +82,7 @@ async function handler(req: AuthedRequest) {
         territoryId: d.territoryId,
         territoryName: d.territory?.name ?? null,
         primarySpecialty: d.primarySpecialty,
+        phone: d.mobile || d.whatsApp || d.assistantContact || "",
       }));
       total = count;
     } else if (type === "CHEMIST") {
@@ -94,6 +98,7 @@ async function handler(req: AuthedRequest) {
             address: true,
             territoryId: true,
             contactPerson: true,
+            mobile: true,
             territory: { select: { id: true, name: true } },
           },
         }),
@@ -107,6 +112,7 @@ async function handler(req: AuthedRequest) {
         territoryId: c.territoryId,
         territoryName: c.territory?.name ?? null,
         contactPerson: c.contactPerson,
+        phone: c.mobile || "",
       }));
       total = count;
     } else {
@@ -121,6 +127,9 @@ async function handler(req: AuthedRequest) {
             clinicAddress: true,
             territoryId: true,
             primarySpecialty: true,
+            mobile: true,
+            whatsApp: true,
+            assistantContact: true,
             territory: { select: { id: true, name: true } },
           },
         }),
@@ -133,6 +142,7 @@ async function handler(req: AuthedRequest) {
             address: true,
             territoryId: true,
             contactPerson: true,
+            mobile: true,
             territory: { select: { id: true, name: true } },
           },
         }),
@@ -146,6 +156,7 @@ async function handler(req: AuthedRequest) {
           territoryId: d.territoryId,
           territoryName: d.territory?.name ?? null,
           primarySpecialty: d.primarySpecialty,
+          phone: d.mobile || d.whatsApp || d.assistantContact || "",
         })),
         ...chemists.map((c) => ({
           id: c.id,
@@ -155,6 +166,7 @@ async function handler(req: AuthedRequest) {
           territoryId: c.territoryId,
           territoryName: c.territory?.name ?? null,
           contactPerson: c.contactPerson,
+          phone: c.mobile || "",
         })),
       ];
       total = combined.length;

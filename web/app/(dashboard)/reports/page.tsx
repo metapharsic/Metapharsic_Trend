@@ -156,7 +156,7 @@ export default function ReportsDashboard() {
   const [reports, setReports] = useState<ReportMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>("product-wise-sales");
-  const [timeframe, setTimeframe] = useState<string>("this_month");
+  const [timeframe, setTimeframe] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"table" | "chart">("table");
 
   // Selected report data state

@@ -3,6 +3,7 @@ import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, forbidden, notFound, apiError, badRequest } from "@/lib/api-response";
 import { photoUrl } from "@/lib/upload";
 import { UpdateVisitSchema } from "@/lib/validators";
+import { CallComplianceAgentsService } from "@/services/call-compliance-agents.service";
 
 
 async function handler(
@@ -15,8 +16,8 @@ async function handler(
       where: { id },
       include: {
         employee: { select: { id: true, userId: true } },
-        doctor: { select: { id: true, fullName: true, clinicAddress: true } },
-        chemist: { select: { id: true, name: true, address: true } },
+        doctor: { select: { id: true, fullName: true, clinicAddress: true, mobile: true, whatsApp: true } },
+        chemist: { select: { id: true, name: true, address: true, mobile: true } },
         lead: true,
       },
     });
@@ -44,7 +45,14 @@ async function updateHandler(
 ) {
   try {
     const id = String(params.id ?? "");
-    const visit = await db.visit.findUnique({ where: { id }, include: { employee: { select: { userId: true } } } });
+    const visit = await db.visit.findUnique({
+      where: { id },
+      include: {
+        employee: { select: { userId: true } },
+        doctor: { select: { id: true, mobile: true } },
+        chemist: { select: { id: true, mobile: true } },
+      },
+    });
     if (!visit) return notFound("Visit not found");
     if (visit.employee?.userId !== req.user.sub) return forbidden();
 
@@ -52,7 +60,37 @@ async function updateHandler(
     const parsed = UpdateVisitSchema.safeParse(body);
     if (!parsed.success) return badRequest("Validation error", parsed.error.flatten());
 
-    const updated = await db.visit.update({ where: { id }, data: parsed.data });
+    const { phone, latitude, longitude, ...visitFields } = parsed.data;
+
+    // Handle Phone verification & sync if provided during update
+    if (phone) {
+      const phoneValidation = CallComplianceAgentsService.verifyMandatoryPhone(phone);
+      if (phoneValidation.isValid) {
+        CallComplianceAgentsService.syncEntityContactNumber({
+          doctorId: visit.doctorId,
+          chemistId: visit.chemistId,
+          phone: phoneValidation.cleanPhone,
+        }).catch((e) => console.error("[CallCompliance] Update phone sync error:", e));
+      }
+    }
+
+    // Handle Silent Background GPS Telemetry
+    const gpsTelemetry = CallComplianceAgentsService.processSilentGpsTelemetry({
+      latitude,
+      longitude,
+    });
+
+    const updateData: any = {
+      ...visitFields,
+    };
+
+    if (gpsTelemetry.hasGps) {
+      updateData.latitude = gpsTelemetry.latitude;
+      updateData.longitude = gpsTelemetry.longitude;
+      updateData.locationUnavailable = false;
+    }
+
+    const updated = await db.visit.update({ where: { id }, data: updateData });
     return ok({ visit: updated });
   } catch (err) {
     console.error("[PUT /api/mr/visits/[id]]", err);

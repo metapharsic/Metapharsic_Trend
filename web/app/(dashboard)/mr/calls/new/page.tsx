@@ -2,7 +2,7 @@
 
 import React, { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MapPin, Search, X, Camera, Plus, AlertTriangle } from "lucide-react";
+import { MapPin, Search, X, Camera, Plus, AlertTriangle, Phone } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 
 interface Entity {
@@ -10,6 +10,7 @@ interface Entity {
   name: string;
   type: "DOCTOR" | "CHEMIST";
   address: string | null;
+  phone?: string | null;
 }
 
 interface Territory {
@@ -54,6 +55,7 @@ function NewCallForm() {
   const [selected, setSelected] = useState<Entity | null>(
     presetDoctorId ? { id: presetDoctorId, name: presetName ?? "Planned doctor", type: "DOCTOR", address: null } : null
   );
+  const [contactPhone, setContactPhone] = useState("");
 
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [showAddEntity, setShowAddEntity] = useState(false);
@@ -152,6 +154,15 @@ function NewCallForm() {
   useEffect(() => {
     captureGps();
   }, []);
+
+  // Pre-fill phone if selected entity already has one on file
+  useEffect(() => {
+    if (selected && selected.phone) {
+      setContactPhone(selected.phone);
+    } else if (!selected) {
+      setContactPhone("");
+    }
+  }, [selected]);
 
   // Call "start" is the moment an entity is selected — auto-capture GPS + timestamp.
   useEffect(() => {
@@ -260,20 +271,29 @@ function NewCallForm() {
     setError(null);
 
     if (!selected) return setError("Select a doctor or chemist to log this call against.");
+    if (!contactPhone.trim()) {
+      return setError("Doctor/Chemist contact phone number is mandatory to log this call.");
+    }
+    const cleanDigits = contactPhone.replace(/\D/g, "");
+    if (cleanDigits.length < 10) {
+      return setError("Please enter a valid contact phone number with at least 10 digits.");
+    }
     if (!purpose.trim()) return setError("Purpose is required.");
     if (requirePhoto && !photo) return setError("A visit verification photo is required.");
 
     const formData = new FormData();
     if (selected.type === "DOCTOR") formData.append("doctorId", selected.id);
     else formData.append("chemistId", selected.id);
+    formData.append("phone", cleanDigits);
     formData.append("purpose", purpose);
     if (feedback) formData.append("feedback", feedback);
-    formData.append("latitude", "0");
-    formData.append("longitude", "0");
+    formData.append("latitude", String(gps.lat ?? 0));
+    formData.append("longitude", String(gps.lon ?? 0));
+    if (gps.accuracy) formData.append("accuracy", String(gps.accuracy));
     if (callStart) {
       formData.append("startedAt", callStart.startedAt);
-      formData.append("startLatitude", "0");
-      formData.append("startLongitude", "0");
+      formData.append("startLatitude", String(callStart.lat || 0));
+      formData.append("startLongitude", String(callStart.lon || 0));
     }
     if (durationMinutes) formData.append("durationMinutes", durationMinutes);
     if (boxesPlaced) formData.append("boxesPlaced", boxesPlaced);
@@ -324,14 +344,43 @@ function NewCallForm() {
         <div>
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Consulting *</label>
           {selected ? (
-            <div className="flex items-center justify-between border border-emerald-200 bg-emerald-50 rounded-xl px-4 py-3">
-              <div>
-                <p className="font-bold text-slate-900 text-sm">{selected.name}</p>
-                <p className="text-xs text-slate-500">{selected.type === "DOCTOR" ? "Doctor" : "Chemist"}{selected.address ? ` · ${selected.address}` : ""}</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border border-emerald-200 bg-emerald-50 rounded-xl px-4 py-3">
+                <div>
+                  <p className="font-bold text-slate-900 text-sm">{selected.name}</p>
+                  <p className="text-xs text-slate-500">{selected.type === "DOCTOR" ? "Doctor" : "Chemist"}{selected.address ? ` · ${selected.address}` : ""}</p>
+                </div>
+                <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-red-500 p-2 -m-2">
+                  <X size={18} />
+                </button>
               </div>
-              <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-red-500 p-2 -m-2">
-                <X size={18} />
-              </button>
+
+              {/* ── MANDATORY PHONE NUMBER INPUT (EVEN FOR EXISTING DOCTOR/CHEMIST) ── */}
+              <div className="space-y-1 pt-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Phone size={13} className="text-emerald-600" />
+                    <span>Contact Phone Number *</span>
+                    <span className="text-[10px] font-black text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">MANDATORY</span>
+                  </span>
+                  {selected.phone ? (
+                    <span className="text-[10px] text-emerald-600 font-semibold">Verified on master file</span>
+                  ) : (
+                    <span className="text-[10px] text-amber-600 font-semibold">Required for audit</span>
+                  )}
+                </label>
+                <input
+                  type="tel"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  placeholder="Enter 10-digit mobile number *"
+                  maxLength={15}
+                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-base sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none shadow-xs"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Entering a valid mobile number is mandatory even for existing doctors/chemists. This automatically updates their master file.
+                </p>
+              </div>
             </div>
           ) : showAddEntity ? (
             <div className="space-y-3 border border-emerald-200 rounded-xl p-4 bg-emerald-50/40">

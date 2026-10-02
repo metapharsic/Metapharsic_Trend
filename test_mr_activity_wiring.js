@@ -26,7 +26,7 @@ async function runMrActivityWiringVerification() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: "abdulmannan@mrtracker.com",
-        password: "Password@123",
+        password: "mr1234",
         role: "MR",
         deviceUuid: "test-device-1",
       }),

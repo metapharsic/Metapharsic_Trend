@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, unauthorized, apiError, badRequest, forbidden, notFound } from "@/lib/api-response";
 import { startOfUtcDay, addUtcDays } from "@/lib/date";
+import { DealClosureAgentsService } from "@/services/deal-closure-agents.service";
 
 type Period = "daily" | "weekly" | "monthly" | "custom" | "all";
 
@@ -66,8 +67,13 @@ async function handler(req: AuthedRequest) {
     let scopeEmployeeId: string | undefined;
     let employeeLabel = "All MRs Fleet Combined";
     if (requestedEmployeeId) {
-      const employee = await db.employee.findUnique({
-        where: { id: requestedEmployeeId },
+      const employee = await db.employee.findFirst({
+        where: {
+          OR: [
+            { id: requestedEmployeeId },
+            { userId: requestedEmployeeId },
+          ],
+        },
         include: { territories: { select: { name: true } } },
       });
       if (!employee) return notFound("Employee not found");
@@ -130,6 +136,7 @@ async function handler(req: AuthedRequest) {
             product: { select: { name: true } },
           },
         },
+        lead: true,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -379,12 +386,37 @@ async function handler(req: AuthedRequest) {
       })
       .sort((a, b) => b.totalCalls - a.totalCalls);
 
+    const dealClosureSummary = await DealClosureAgentsService.analyzeDealClosures({
+      startDate: start,
+      endDate: end,
+      employeeId: scopeEmployeeId,
+      targetType: targetTypeFilter ?? undefined,
+      limit: 50,
+    });
+
     return ok({
       period,
       range: { start: start.toISOString(), end: end.toISOString() },
       employee: { id: scopeEmployeeId ?? null, name: employeeLabel },
       totals: {
         totalCalls: visits.length,
+        doctorCalls,
+        chemistCalls,
+        hospitalCalls,
+        totalBoxesPlaced,
+        totalSamplesDistributed,
+        avgDurationMinutes: avgDuration,
+        avgCqsScore: avgCqs,
+        anomalyCount,
+        totalPobValue,
+      },
+      meta: {
+        employeeLabel,
+        scopeEmployeeId: scopeEmployeeId ?? null,
+        period,
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+        totalVisits: visits.length,
         doctorCalls,
         chemistCalls,
         hospitalCalls,
@@ -411,6 +443,7 @@ async function handler(req: AuthedRequest) {
       },
       mrBreakdown,
       byDay,
+      dealClosureSummary,
       calls: visits.map((v) => {
         const targetType = v.doctorId ? "DOCTOR" : v.chemistId ? "CHEMIST" : v.hospitalId ? "HOSPITAL" : "OTHER";
         const targetName = v.doctor?.fullName ?? v.chemist?.name ?? v.hospital?.name ?? "Unknown Entity";
@@ -437,6 +470,12 @@ async function handler(req: AuthedRequest) {
           anomalyFlag: v.anomalyFlag,
           anomalyDetails: v.anomalyDetails,
           receptiveness: v.receptiveness,
+          comments: v.feedback || v.lead?.details || null,
+          feedback: v.feedback || null,
+          followUpDate: v.followUpDate ? v.followUpDate.toISOString() : (v.lead?.followUpDate ? v.lead.followUpDate.toISOString() : null),
+          followUpAction: v.lead?.followUpAction || null,
+          leadDetails: v.lead?.details || null,
+          leadStatus: v.lead?.status || null,
           samplesCount: v.samples.reduce((acc, s) => acc + (s.quantity || 0), 0),
           samplesSummary: sampleNames || null,
           employeeId: v.employee.id,

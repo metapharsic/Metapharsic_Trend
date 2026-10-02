@@ -73,6 +73,9 @@ export interface GranularCallRow {
   entityType: "DOCTOR" | "CHEMIST" | "HOSPITAL" | "OTHER";
   specialty?: string | null;
   purpose: string;
+  comments?: string | null;
+  feedback?: string | null;
+  receptiveness?: string | null;
   startedAt: string;
   endedAt: string | null;
   durationMinutes: number | null;
@@ -176,12 +179,13 @@ function startOfMonthStr() {
 
 function exportCSV(mrs: MrGroup[], startDate: string, endDate: string) {
   const rows: string[] = [
-    "MR Name,Date,Time (HH:MM:SS),Entity Name,Entity Type,Specialty,Purpose,Duration,Duration Sec,Boxes Placed,CQS Score,CQS Rating,Order Converted,Order Value (PTR)",
+    "MR Name,Date,Time (HH:MM:SS),Entity Name,Entity Type,Specialty,Purpose,MR Comments & Feedback,Receptiveness,Duration,Duration Sec,Boxes Placed,CQS Score,CQS Rating,Order Converted,Order Value (PTR)",
   ];
   for (const mr of mrs) {
     for (const day of mr.days) {
       for (const c of day.calls) {
         const { date, time } = formatDateTime(c.startedAt);
+        const comment = (c.comments || c.feedback || "").replace(/"/g, '""');
         rows.push(
           [
             `"${mr.mrName}"`,
@@ -191,6 +195,8 @@ function exportCSV(mrs: MrGroup[], startDate: string, endDate: string) {
             c.entityType,
             `"${c.specialty ?? ""}"`,
             `"${c.purpose}"`,
+            `"${comment}"`,
+            `"${c.receptiveness ?? ""}"`,
             c.formattedDuration,
             c.durationSeconds ?? "",
             c.boxesPlaced ?? 0,
@@ -831,6 +837,9 @@ export default function MrDailyCallsReportPage() {
                                       Purpose
                                     </th>
                                     <th className="px-4 py-2.5 font-semibold uppercase tracking-wider text-[10px]">
+                                      MR Comments &amp; Feedback
+                                    </th>
+                                    <th className="px-4 py-2.5 font-semibold uppercase tracking-wider text-[10px]">
                                       Time (HH:MM:SS)
                                     </th>
                                     <th className="px-4 py-2.5 font-semibold uppercase tracking-wider text-[10px] text-right">
@@ -875,8 +884,28 @@ export default function MrDailyCallsReportPage() {
                                             {TypeCfg.label}
                                           </span>
                                         </td>
-                                        <td className="px-4 py-3 text-slate-600 max-w-[200px] truncate">
+                                        <td className="px-4 py-3 text-slate-600 max-w-[160px] truncate">
                                           {c.purpose}
+                                        </td>
+                                        <td className="px-4 py-3 max-w-[280px]">
+                                          {c.comments || c.feedback ? (
+                                            <div className="bg-amber-50/90 border border-amber-200/90 rounded-lg p-2 text-xs shadow-xs">
+                                              <div className="flex items-center gap-1 text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">
+                                                <MessageCircle size={10} className="text-amber-600" />
+                                                <span>MR Feedback</span>
+                                                {c.receptiveness && (
+                                                  <span className="ml-auto font-mono text-[9px] px-1.5 py-0.5 rounded bg-amber-100/80 text-amber-900 border border-amber-300">
+                                                    {c.receptiveness}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <p className="text-slate-800 italic leading-snug line-clamp-3">
+                                                &ldquo;{c.comments || c.feedback}&rdquo;
+                                              </p>
+                                            </div>
+                                          ) : (
+                                            <span className="text-slate-400 text-xs italic">No comments</span>
+                                          )}
                                         </td>
                                         <td className="px-4 py-3">
                                           <span className="font-mono text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md text-[11px] font-bold border border-indigo-100">
@@ -923,7 +952,7 @@ export default function MrDailyCallsReportPage() {
                                 </tbody>
                                 <tfoot>
                                   <tr className="bg-slate-50 border-t border-slate-200">
-                                    <td colSpan={3} className="px-5 py-2.5 text-xs font-bold text-slate-700">
+                                    <td colSpan={4} className="px-5 py-2.5 text-xs font-bold text-slate-700">
                                       Day Total Summary
                                     </td>
                                     <td colSpan={5} className="px-4 py-2.5 text-right text-xs font-bold text-slate-700">

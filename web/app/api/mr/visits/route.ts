@@ -11,6 +11,7 @@ import { ok, badRequest, unauthorized, forbidden, notFound, apiError } from "@/l
 import { getWorkflowSettings } from "@/lib/workflow-settings";
 import { startOfUtcDay, addUtcDays } from "@/lib/date";
 import { VisitDeduplicationAgentsService } from "@/services/visit-deduplication-agents.service";
+import { CallComplianceAgentsService } from "@/services/call-compliance-agents.service";
 
 
 async function getVisits(req: AuthedRequest) {
@@ -73,8 +74,8 @@ async function getVisits(req: AuthedRequest) {
         take: limit,
         orderBy: { createdAt: "desc" },
         include: {
-          doctor: { select: { id: true, fullName: true, clinicAddress: true, territory: { select: { id: true, name: true } } } },
-          chemist: { select: { id: true, name: true, address: true, territory: { select: { id: true, name: true } } } },
+          doctor: { select: { id: true, fullName: true, clinicAddress: true, mobile: true, whatsApp: true, territory: { select: { id: true, name: true } } } },
+          chemist: { select: { id: true, name: true, address: true, mobile: true, territory: { select: { id: true, name: true } } } },
           lead: true,
           samples: { include: { product: { select: { id: true, name: true } } } },
           employee: { select: { firstName: true, lastName: true } },
@@ -132,11 +133,13 @@ async function createVisit(req: AuthedRequest) {
     if (!employee) return unauthorized("Employee record not found");
 
     const formData = await req.formData();
+    const phoneInput = formData.get("phone") || formData.get("contactPhone") || formData.get("mobile");
     const raw = {
       doctorId: formData.get("doctorId") || undefined,
       chemistId: formData.get("chemistId") || undefined,
       hospitalId: formData.get("hospitalId") || undefined,
       purpose: formData.get("purpose"),
+      phone: phoneInput ? String(phoneInput) : undefined,
       feedback: formData.get("feedback") || undefined,
       latitude: formData.get("latitude"),
       longitude: formData.get("longitude"),
@@ -152,7 +155,7 @@ async function createVisit(req: AuthedRequest) {
       return badRequest("Validation error", parsed.error.flatten());
     }
 
-    const { doctorId, chemistId, hospitalId, purpose, feedback, latitude, longitude, startedAt, startLatitude, startLongitude, durationMinutes, boxesPlaced } =
+    const { doctorId, chemistId, hospitalId, purpose, phone, feedback, latitude, longitude, startedAt, startLatitude, startLongitude, durationMinutes, boxesPlaced } =
       parsed.data;
 
     const leadJson = formData.get("lead");
@@ -210,7 +213,43 @@ async function createVisit(req: AuthedRequest) {
       targetLon = hospital.longitude;
     }
 
-    // Geofencing and GPS checks are completely disabled.
+    // Mandatory Phone Verification Agent: Enforce phone validation even for existing doctors/chemists
+    const phoneValidation = CallComplianceAgentsService.verifyMandatoryPhone(phone);
+    let verifiedPhone = phoneValidation.cleanPhone;
+
+    if (!phoneValidation.isValid) {
+      // Check if existing entity already has a valid phone on file
+      let existingPhone: string | null = null;
+      if (doctorId) {
+        const d = await db.doctor.findUnique({ where: { id: doctorId }, select: { mobile: true, whatsApp: true } });
+        existingPhone = d?.mobile || d?.whatsApp || null;
+      } else if (chemistId) {
+        const c = await db.chemist.findUnique({ where: { id: chemistId }, select: { mobile: true } });
+        existingPhone = c?.mobile || null;
+      }
+
+      if (!existingPhone || existingPhone.replace(/\D/g, "").length < 10) {
+        return badRequest(phoneValidation.error || "Doctor/Chemist contact phone number is mandatory for all calls.");
+      }
+      verifiedPhone = existingPhone.replace(/\D/g, "").slice(-10);
+    }
+
+    // Background Entity Contact Sync Agent: Keep doctor/chemist contact cards up to date
+    if (verifiedPhone) {
+      CallComplianceAgentsService.syncEntityContactNumber({
+        doctorId,
+        chemistId,
+        phone: verifiedPhone,
+      }).catch((e) => console.error("[CallCompliance] Contact sync error:", e));
+    }
+
+    // Silent GPS Telemetry Agent: Background capture for admin compliance
+    const gpsTelemetry = CallComplianceAgentsService.processSilentGpsTelemetry({
+      latitude,
+      longitude,
+      accuracy: formData.get("accuracy") || formData.get("gpsAccuracy"),
+    });
+
     const distanceMeters = 0;
     const geofenceViolation = false;
     const anomalyResult = { isAnomalous: false, reason: null, calculatedSpeed: 0 };
@@ -300,8 +339,9 @@ async function createVisit(req: AuthedRequest) {
           hospitalId,
           purpose,
           feedback,
-          latitude,
-          longitude,
+          latitude: gpsTelemetry.latitude,
+          longitude: gpsTelemetry.longitude,
+          locationUnavailable: gpsTelemetry.locationUnavailable,
           startedAt,
           startLatitude,
           startLongitude,
