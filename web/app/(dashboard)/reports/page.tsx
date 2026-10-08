@@ -32,6 +32,7 @@ import {
   Cpu,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { downloadExcelReportWithDashboard } from "@/lib/excel-export";
 
 interface ReportMeta {
   id: string;
@@ -310,28 +311,121 @@ export default function ReportsDashboard() {
     };
   }, [displayRows]);
 
-  // Export to CSV
-  const handleExportCSV = () => {
+  // Export to Professional Excel (.xlsx) with Executive Dashboard & Potential Customer Highlights
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const handleExportExcel = async () => {
     if (!displayRows.length) return;
-    const keys = Object.keys(displayRows[0]);
-    const headers = keys.map((k) => `"${KEY_LABELS[k] || k}"`).join(",");
-    const csvRows = displayRows.map((r) =>
-      keys.map((k) => {
-        const val = r[k];
-        if (val === null || val === undefined) return '""';
-        return `"${String(val).replace(/"/g, '""')}"`;
-      }).join(",")
-    );
+    setExportingExcel(true);
+    try {
+      const keys = Object.keys(displayRows[0]);
+      const detailHeaders = keys.map((k) => KEY_LABELS[k] || k);
+      const detailRows = displayRows.map((r) =>
+        keys.map((k) => {
+          const val = r[k];
+          return val === null || val === undefined ? "" : val;
+        })
+      );
 
-    const csvContent = "\uFEFF" + [headers, ...csvRows].join("\r\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `${selected}_${timeframe}_report.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const activeMeta = reports.find((r) => r.id === selected);
+      const activeTitle = activeMeta?.title || (selected ? selected.replace(/-/g, " ").toUpperCase() : "Pharmaceutical Report");
+      const activeDesc = activeMeta?.description || "Executive Multi-Dimensional Business Intelligence";
+
+      const kpis = [
+        { label: "Report Category", value: activeTitle, note: "Selected Analytical Domain" },
+        { label: "Total Rows Audited", value: displayRows.length, note: "Reconciled from Database" },
+        { label: "Active Timeframe", value: timeframe.toUpperCase(), note: "Reporting Cycle" },
+      ];
+
+      // Add numeric aggregates if any exist in the rows
+      for (const k of keys) {
+        if (typeof displayRows[0][k] === "number" && !k.toLowerCase().includes("id")) {
+          const sum = displayRows.reduce((acc, row) => acc + (Number(row[k]) || 0), 0);
+          const isCurrency = k.toLowerCase().includes("amount") || k.toLowerCase().includes("value") || k.toLowerCase().includes("revenue") || k.toLowerCase().includes("price");
+          kpis.push({
+            label: `Total ${KEY_LABELS[k] || k}`,
+            value: isCurrency ? `₹${sum.toLocaleString("en-IN")}` : sum.toLocaleString("en-IN"),
+            note: "Computed aggregate sum",
+          });
+          if (kpis.length >= 6) break;
+        }
+      }
+
+      // Fetch live Potential Customer Intelligence concurrently
+      let potentialTable: { headers: string[]; rows: (string | number)[][] } | undefined = undefined;
+      let potSummary: any = undefined;
+
+      try {
+        const res = await fetch("/api/reports/potential-customers?limit=40");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.topOpportunities) {
+            potSummary = {
+              vipKolCount: data.vipKolCount,
+              coreTierCount: data.coreTierCount,
+              growthTierCount: data.growthTierCount,
+              retainTierCount: data.retainTierCount,
+              totalEstimatedMonthlyPotentialInr: data.totalEstimatedMonthlyPotentialInr,
+              urgentFollowupsCount: data.urgentFollowupsCount,
+            };
+
+            potentialTable = {
+              headers: [
+                "Customer / Account Name",
+                "Entity Type",
+                "Specialty / Category",
+                "Territory",
+                "Assigned MR",
+                "Potential Tier",
+                "Score",
+                "Daily Footfall",
+                "Est. Monthly Value",
+                "Current Stage",
+                "Urgency Window",
+                "Conversion Highlights & Strategic Value Points",
+                "Recommended Tactical Next Action",
+              ],
+              rows: data.topOpportunities.map((item: any) => [
+                item.name,
+                item.customerType,
+                item.specialty,
+                item.territory,
+                item.assignedMr,
+                item.potentialTier,
+                item.potentialScore,
+                item.dailyPatientFootfall,
+                `₹${(item.estimatedMonthlyValueInr || 0).toLocaleString("en-IN")}`,
+                item.currentStage,
+                item.urgencyLevel,
+                (item.keyHighlightPoints || []).join(" | "),
+                item.recommendedTacticalAction,
+              ]),
+            };
+          }
+        }
+      } catch (err) {
+        console.warn("Potential customer fetch fallback:", err);
+      }
+
+      const filename = `Metapharsic_${selected}_${timeframe}_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      await downloadExcelReportWithDashboard(
+        {
+          reportTitle: activeTitle,
+          reportSubtitle: activeDesc,
+          period: timeframe.toUpperCase(),
+          kpis,
+          potentialCustomersTable: potentialTable,
+          potentialCustomerSummary: potSummary,
+          detailHeaders,
+          detailRows,
+        },
+        filename
+      );
+    } catch (e) {
+      console.error("Excel export error:", e);
+    } finally {
+      setExportingExcel(false);
+    }
   };
 
   // Print Executive View
@@ -374,12 +468,13 @@ export default function ReportsDashboard() {
             Sync
           </button>
           <button
-            onClick={handleExportCSV}
-            disabled={!displayRows.length}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-700/80 hover:bg-emerald-600 text-white rounded-lg border border-emerald-600 transition shadow-sm disabled:opacity-50"
+            onClick={handleExportExcel}
+            disabled={!displayRows.length || exportingExcel}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg border border-emerald-500 transition shadow-sm disabled:opacity-50"
+            title="Download formatted Excel (.xlsx) report with Executive Dashboard and Potential Customer Highlights"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            Export CSV
+            <FileSpreadsheet className={`w-3.5 h-3.5 ${exportingExcel ? "animate-bounce" : ""}`} />
+            {exportingExcel ? "Exporting XLSX..." : "Export Excel & Dashboard"}
           </button>
           <button
             onClick={handlePrint}

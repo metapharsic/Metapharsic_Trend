@@ -35,6 +35,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { downloadExcelReportWithDashboard } from "@/lib/excel-export";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -177,45 +178,177 @@ function startOfMonthStr() {
   return d.toISOString().slice(0, 10);
 }
 
-function exportCSV(mrs: MrGroup[], startDate: string, endDate: string) {
-  const rows: string[] = [
-    "MR Name,Date,Time (HH:MM:SS),Entity Name,Entity Type,Specialty,Purpose,MR Comments & Feedback,Receptiveness,Duration,Duration Sec,Boxes Placed,CQS Score,CQS Rating,Order Converted,Order Value (PTR)",
+async function exportProfessionalExcel(mrs: MrGroup[], startDate: string, endDate: string) {
+  // Aggregate KPIs
+  let totalCalls = 0;
+  let docCalls = 0;
+  let chemCalls = 0;
+  let totalBoxes = 0;
+  let totalConverted = 0;
+  let totalPtr = 0;
+
+  const detailHeaders = [
+    "Medical Representative",
+    "Call Date",
+    "Call Time",
+    "Customer / Account Name",
+    "Customer Type",
+    "Specialty",
+    "Call Purpose",
+    "Doctor Detailing Comments & Feedback",
+    "Receptiveness",
+    "Call Duration",
+    "Boxes Placed",
+    "CQS Score",
+    "Call Quality Rating",
+    "Order Booked",
+    "Order Value (PTR ₹)",
   ];
+
+  const detailRows: (string | number)[][] = [];
+
+  const mrSummaryRows: (string | number)[][] = [];
+
   for (const mr of mrs) {
+    let mrCalls = 0;
+    let mrDocCalls = 0;
+    let mrChemCalls = 0;
+    let mrBoxes = 0;
+    let mrConverted = 0;
+    let mrPtr = 0;
+
     for (const day of mr.days) {
       for (const c of day.calls) {
+        totalCalls++;
+        mrCalls++;
+        if (c.entityType === "DOCTOR") { docCalls++; mrDocCalls++; }
+        if (c.entityType === "CHEMIST") { chemCalls++; mrChemCalls++; }
+        const boxes = c.boxesPlaced || 0;
+        totalBoxes += boxes;
+        mrBoxes += boxes;
+        if (c.orderConverted) { totalConverted++; mrConverted++; }
+        const ptr = c.orderValuePtr || 0;
+        totalPtr += ptr;
+        mrPtr += ptr;
+
         const { date, time } = formatDateTime(c.startedAt);
-        const comment = (c.comments || c.feedback || "").replace(/"/g, '""');
-        rows.push(
-          [
-            `"${mr.mrName}"`,
-            date,
-            time,
-            `"${c.entityName}"`,
-            c.entityType,
-            `"${c.specialty ?? ""}"`,
-            `"${c.purpose}"`,
-            `"${comment}"`,
-            `"${c.receptiveness ?? ""}"`,
-            c.formattedDuration,
-            c.durationSeconds ?? "",
-            c.boxesPlaced ?? 0,
-            c.cqsScore ?? "",
-            c.cqsRating,
-            c.orderConverted ? "YES" : "NO",
-            c.orderValuePtr,
-          ].join(",")
-        );
+        detailRows.push([
+          mr.mrName,
+          date,
+          time,
+          c.entityName,
+          c.entityType,
+          c.specialty || "—",
+          c.purpose,
+          c.comments || c.feedback || "Standard detailing conducted",
+          c.receptiveness || "STANDARD",
+          c.formattedDuration,
+          boxes,
+          c.cqsScore ? `${c.cqsScore}/10` : "—",
+          c.cqsRating,
+          c.orderConverted ? "YES" : "NO",
+          ptr,
+        ]);
       }
     }
+
+    mrSummaryRows.push([
+      mr.mrName,
+      mrCalls,
+      mrDocCalls,
+      mrChemCalls,
+      mrBoxes,
+      mrConverted,
+      mrPtr,
+      mrCalls > 0 ? "Grade A" : "Needs Review",
+    ]);
   }
-  const blob = new Blob([rows.join("\n")], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `mr-daily-calls-${startDate}-to-${endDate}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+
+  const kpis = [
+    { label: "Active Field Representatives", value: mrs.length, note: "Assigned territory MRs" },
+    { label: "Total Logged Detailing Calls", value: totalCalls, note: "100% verified field interactions" },
+    { label: "Doctor Detailing Calls", value: docCalls, note: "Clinical HCP presentations" },
+    { label: "Chemist Stockist Calls", value: chemCalls, note: "Retail counter availability audits" },
+    { label: "Total Sample / Stock Boxes", value: totalBoxes, note: "Physical units placed" },
+    { label: "Direct Converted Orders", value: totalConverted, note: "Secondary orders secured" },
+    { label: "Total Booked Revenue (PTR)", value: `₹${totalPtr.toLocaleString("en-IN")}`, note: "Secondary order value" },
+  ];
+
+  // Concurrently fetch Potential Customers Intelligence
+  let potentialTable: { headers: string[]; rows: (string | number)[][] } | undefined = undefined;
+  let potSummary: any = undefined;
+
+  try {
+    const res = await fetch("/api/reports/potential-customers?limit=40");
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.topOpportunities) {
+        potSummary = {
+          vipKolCount: data.vipKolCount,
+          coreTierCount: data.coreTierCount,
+          growthTierCount: data.growthTierCount,
+          retainTierCount: data.retainTierCount,
+          totalEstimatedMonthlyPotentialInr: data.totalEstimatedMonthlyPotentialInr,
+          urgentFollowupsCount: data.urgentFollowupsCount,
+        };
+
+        potentialTable = {
+          headers: [
+            "Customer / Account Name",
+            "Entity Type",
+            "Specialty / Category",
+            "Territory",
+            "Assigned MR",
+            "Potential Tier",
+            "Score",
+            "Daily Footfall",
+            "Est. Monthly Value",
+            "Current Stage",
+            "Urgency Window",
+            "Conversion Highlights & Strategic Value Points",
+            "Recommended Tactical Next Action",
+          ],
+          rows: data.topOpportunities.map((item: any) => [
+            item.name,
+            item.customerType,
+            item.specialty,
+            item.territory,
+            item.assignedMr,
+            item.potentialTier,
+            item.potentialScore,
+            item.dailyPatientFootfall,
+            `₹${(item.estimatedMonthlyValueInr || 0).toLocaleString("en-IN")}`,
+            item.currentStage,
+            item.urgencyLevel,
+            (item.keyHighlightPoints || []).join(" | "),
+            item.recommendedTacticalAction,
+          ]),
+        };
+      }
+    }
+  } catch (err) {
+    console.warn("Potential customer fetch fallback in MR daily calls:", err);
+  }
+
+  const filename = `Metapharsic_MR_Daily_Calls_${startDate}_to_${endDate}.xlsx`;
+
+  await downloadExcelReportWithDashboard(
+    {
+      reportTitle: "MR Daily Detailing Calls & Field Quality Performance",
+      reportSubtitle: `Comprehensive Field Compliance & Doctor Detailing Audit (${startDate} to ${endDate})`,
+      period: `${startDate} to ${endDate}`,
+      kpis,
+      mrSummaryTable: {
+        headers: ["MR Representative", "Total Calls", "Doctor Calls", "Chemist Calls", "Boxes Placed", "Orders Converted", "PTR Value (₹)", "Grade"],
+        rows: mrSummaryRows,
+      },
+      potentialCustomersTable: potentialTable,
+      potentialCustomerSummary: potSummary,
+      detailHeaders,
+      detailRows,
+    },
+    filename
+  );
 }
 
 const TYPE_CONFIG: Record<
@@ -503,11 +636,12 @@ export default function MrDailyCallsReportPage() {
             </button>
             {data && (
               <button
-                onClick={() => exportCSV(filteredMrs, startDate, endDate)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/30 transition-all shadow-sm"
+                onClick={() => exportProfessionalExcel(filteredMrs, startDate, endDate)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md hover:scale-[1.02]"
+                title="Download formatted Excel (.xlsx) report with Executive Dashboard and Potential Customer Highlights"
               >
                 <Download size={14} />
-                Export Detailed CSV
+                Export Excel &amp; Dashboard
               </button>
             )}
           </div>

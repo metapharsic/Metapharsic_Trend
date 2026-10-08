@@ -484,6 +484,46 @@ export default function MrReportsPage() {
       c.followUpAction || (c.followUpDate ? `Follow-up on ${c.followUpDate}` : "Routine follow-up"),
     ]);
 
+    const potentialCustomersHeaders = [
+      "Customer / Account Name",
+      "Entity Type",
+      "Specialty / Category",
+      "Territory",
+      "Assigned MR",
+      "Potential Tier",
+      "Score",
+      "Est. Monthly Value",
+      "Current Stage",
+      "Urgency Window",
+      "Conversion Highlights & Strategic Value Points",
+      "Recommended Tactical Next Action",
+    ];
+
+    const potentialCustomersRows = (report.dealClosureSummary?.topPriorityQueue || []).map((opp: any) => {
+      const highlights: string[] = [];
+      if (opp.closingSignals?.length) highlights.push(`🎯 ${opp.closingSignals.join("; ")}`);
+      if (opp.productInterests?.length) highlights.push(`💊 Focus SKUs: ${opp.productInterests.join(", ")}`);
+      if (opp.canCloseThisWeek) highlights.push(`🔥 HOT LEAD: ${opp.closeThisWeekReason}`);
+      if (opp.commercialCategory) highlights.push(`💼 Commercial: ${opp.commercialCategory.replace(/_/g, " ")}`);
+
+      const tier = opp.closureProbability >= 80 ? "A+ (KOL / VIP)" : opp.closureProbability >= 60 ? "A (Core Prescriber)" : "B (Growth Opportunity)";
+
+      return [
+        opp.targetName,
+        opp.targetType,
+        opp.specialtyOrType,
+        opp.territory,
+        opp.mrName,
+        tier,
+        opp.closureProbability,
+        `₹${(opp.estimatedDealValue || 0).toLocaleString("en-IN")}`,
+        opp.dealStage,
+        opp.recommendedFollowupWindow,
+        highlights.join(" | ") || "Standard Detailing Active",
+        opp.actionableGuidance,
+      ];
+    });
+
     const filename = `Metapharsic_Executive_Deal_Closure_Dashboard_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
     downloadExcelReportWithDashboard(
@@ -495,6 +535,10 @@ export default function MrReportsPage() {
         kpis,
         mrSummaryTable,
         stageSummaryTable,
+        potentialCustomersTable: {
+          headers: potentialCustomersHeaders,
+          rows: potentialCustomersRows,
+        },
         detailHeaders,
         detailRows,
         callLogsHeaders,

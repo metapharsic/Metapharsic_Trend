@@ -45,6 +45,7 @@ accounts_module_export_unzipped/
 _to_delete/
 web/reports-output/
 brain/
+scratch/
 .claude/
 
 

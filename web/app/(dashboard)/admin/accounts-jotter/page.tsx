@@ -143,8 +143,8 @@ export default function AdminAccountsJotterPage() {
     }
   };
 
-  const handleExportExcel = () => {
-    exportCurrentPageToExcel("Metapharsic Daily Accounts Ledger");
+  const handleExportExcel = async () => {
+    await exportCurrentPageToExcel("Metapharsic Daily Accounts Ledger");
   };
 
   return (

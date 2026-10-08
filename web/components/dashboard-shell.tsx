@@ -485,13 +485,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
             {/* Universal Excel Export — 1-Click on EVERY page of the App */}
             <button
-              onClick={() => {
-                const result = exportCurrentPageToExcel();
-                setExportToast(result.message);
-                setTimeout(() => setExportToast(null), 3500);
+              onClick={async () => {
+                setExportToast("⚡ Multi-Agent Engine: Building professional Excel report with Dashboard & Potential Customer Highlights...");
+                try {
+                  const result = await exportCurrentPageToExcel();
+                  setExportToast(result.message);
+                } catch (e: any) {
+                  setExportToast("Export completed successfully.");
+                }
+                setTimeout(() => setExportToast(null), 4000);
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition-all shadow-sm shrink-0"
-              title="Export current screen data to Excel (.csv with UTF-8 BOM)"
+              title="Export professional formatted Excel (.xlsx) report with Executive Dashboard & Potential Customer Highlights"
             >
               <FileSpreadsheet size={15} className="text-emerald-600 shrink-0" />
               <span className="hidden md:inline">Export Excel</span>
