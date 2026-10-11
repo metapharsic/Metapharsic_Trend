@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trend MR Pharma OS — The Autonomous AI Enterprise Commercial (60s)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #030712;
+      --card-bg: rgba(15, 23, 42, 0.85);
+      --card-border: rgba(255, 255, 255, 0.12);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.4);
+      --cyan: #06b6d4;
+      --cyan-glow: rgba(6, 182, 212, 0.4);
+      --rose: #f43f5e;
+      --rose-glow: rgba(244, 63, 94, 0.4);
+      --amber: #f59e0b;
+      --purple: #a855f7;
+      --whatsapp: #25d366;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background: var(--bg);
+      color: #f8fafc;
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      perspective: 1200px;
+    }
+
+    /* Ambient Background Canvas */
+    #bgCanvas {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* 16:9 Cinema Viewport */
+    .video-viewport {
+      width: 95vw;
+      max-width: 1280px;
+      aspect-ratio: 16 / 9;
+      background: rgba(4, 9, 24, 0.95);
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 30px 80px -10px rgba(0, 0, 0, 0.9), 0 0 60px rgba(6, 182, 212, 0.2);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+      backdrop-filter: blur(20px);
+    }
+
+    /* Ambient Light Aura */
+    .ambient-glow {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      transition: background 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* HUD Top Header */
+    .hud-header {
+      position: absolute;
+      top: 20px;
+      left: 28px;
+      right: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    .brand-cluster {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(16px);
+      padding: 8px 18px;
+      border-radius: 40px;
+      border: 1px solid var(--card-border);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .brand-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 15px var(--emerald);
+      animation: pulseIndicator 1.4s infinite;
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      background: linear-gradient(135deg, #fff 30%, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hud-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .live-tag {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--rose);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--rose);
+      border-radius: 50%;
+      animation: blink 0.9s infinite;
+    }
+
+    /* Main Video Stage */
+    .stage {
+      flex: 1;
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 70px 48px 100px 48px;
+    }
+
+    .scene {
+      position: absolute;
+      inset: 0;
+      padding: 70px 48px 110px 48px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.95) translateY(20px);
+      transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .scene.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1) translateY(0);
+    }
+
+    /* Typography & Badges */
+    .scene-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      padding: 6px 16px;
+      border-radius: 30px;
+      margin-bottom: 14px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    .scene-h1 {
+      font-size: 44px;
+      font-weight: 900;
+      text-align: center;
+      line-height: 1.15;
+      margin-bottom: 12px;
+      letter-spacing: -1px;
+      max-width: 950px;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+    }
+
+    .scene-p {
+      font-size: 19px;
+      color: #94a3b8;
+      text-align: center;
+      max-width: 780px;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    /* Visual Showcase Mockup Containers */
+    .showcase-row {
+      display: flex;
+      gap: 24px;
+      width: 100%;
+      max-width: 980px;
+      align-items: stretch;
+      justify-content: center;
+    }
+
+    .glass-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(20px);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .glass-panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    }
+
+    /* Scene 1: Lost Revenue Radar Graphic */
+    .radar-scanner {
+      width: 130px;
+      height: 130px;
+      border-radius: 50%;
+      border: 2px dashed rgba(244, 63, 94, 0.6);
+      position: relative;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: spin 8s linear infinite;
+    }
+
+    .radar-sweep {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, transparent 70%, rgba(244, 63, 94, 0.5) 100%);
+    }
+
+    .loss-counter {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 38px;
+      font-weight: 900;
+      color: var(--rose);
+      text-shadow: 0 0 25px var(--rose-glow);
+      margin: 8px 0;
+    }
+
+    /* Scene 2: 8-Agent Neural Grid */
+    .neural-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .agent-chip {
+      background: rgba(6, 182, 212, 0.08);
+      border: 1px solid rgba(6, 182, 212, 0.25);
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .agent-chip.active-ping {
+      border-color: var(--cyan);
+      box-shadow: 0 0 20px var(--cyan-glow);
+      background: rgba(6, 182, 212, 0.18);
+    }
+
+    .agent-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    .agent-task {
+      font-size: 13px;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+
+    .agent-status {
+      font-size: 11px;
+      color: var(--emerald);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 700;
+    }
+
+    /* Scene 3: Mobile Detailing & Geofence UI */
+    .mobile-frame {
+      width: 280px;
+      background: #090e17;
+      border: 3px solid #334155;
+      border-radius: 28px;
+      padding: 16px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 30px rgba(16, 185, 129, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .geofence-radar-pin {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--emerald);
+      border-radius: 14px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    /* Scene 4: Invoice Terminal */
+    .invoice-card {
+      background: rgba(2, 6, 23, 0.9);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 16px;
+      padding: 18px;
+      width: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Scene 5: Drug License OCR Scanner */
+    .license-scanner-frame {
+      width: 380px;
+      height: 180px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 2px solid var(--purple);
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      box-shadow: 0 0 30px rgba(168, 85, 247, 0.25);
+    }
+
+    .scanner-laser {
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, transparent, #a855f7, #c084fc, transparent);
+      box-shadow: 0 0 15px #a855f7;
+      animation: scanLaser 2s ease-in-out infinite alternate;
+    }
+
+    /* Scene 6: WhatsApp Mockup */
+    .whatsapp-card {
+      width: 440px;
+      background: #0b141a;
+      border: 1px solid #202c33;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(37, 211, 102, 0.2);
+    }
+
+    .whatsapp-header {
+      background: #1f2c34;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .whatsapp-chat {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .wa-bubble {
+      background: #005c4b;
+      color: #e9edef;
+      border-radius: 12px 0 12px 12px;
+      padding: 12px 16px;
+      align-self: flex-end;
+      max-width: 90%;
+      font-size: 13px;
+      line-height: 1.5;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    /* Scene 7: CTA Glow */
+    .cta-grand-btn {
+      background: linear-gradient(135deg, #10b981, #06b6d4);
+      color: #030712;
+      font-size: 22px;
+      font-weight: 900;
+      padding: 18px 48px;
+      border-radius: 50px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 0 45px rgba(16, 185, 129, 0.6);
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-top: 16px;
+      cursor: pointer;
+      animation: pulseBtn 2s infinite;
+    }
+
+    .cta-grand-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 60px rgba(6, 182, 212, 0.8);
+    }
+
+    /* Bottom Subtitle / Voice Bar */
+    .voice-dock {
+      position: absolute;
+      bottom: 58px;
+      left: 28px;
+      right: 28px;
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 18px;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      z-index: 25;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    }
+
+    .voice-avatar-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--cyan), var(--emerald));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+    }
+
+    .voice-text-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .voice-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .voice-speech-quote {
+      font-size: 15px;
+      font-weight: 600;
+      color: #f1f5f9;
+      line-height: 1.4;
+    }
+
+    /* Audio Waveform Canvas */
+    #waveCanvas {
+      width: 140px;
+      height: 34px;
+      flex-shrink: 0;
+    }
+
+    .time-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--emerald);
+      flex-shrink: 0;
+    }
+
+    /* Video Controller Bar */
+    .video-controls {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 52px;
+      background: rgba(2, 6, 23, 0.98);
+      border-top: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 16px;
+      z-index: 30;
+    }
+
+    .progress-bar-wrap {
+      flex: 1;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan), var(--emerald));
+      border-radius: 6px;
+      width: 0%;
+      box-shadow: 0 0 12px var(--cyan);
+    }
+
+    .btn-pill {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
+      color: #fff;
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-pill:hover {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: rgba(255, 255, 255, 0.35);
+    }
+
+    .btn-pill.primary {
+      background: var(--emerald);
+      color: #030712;
+      border-color: var(--emerald);
+      box-shadow: 0 0 15px var(--emerald-glow);
+    }
+
+    /* Start Screen Overlay */
+    .start-modal {
+      position: absolute;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.92);
+      backdrop-filter: blur(25px);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      text-align: center;
+      transition: opacity 0.5s ease;
+    }
+
+    .start-cta {
+      background: linear-gradient(135deg, var(--emerald), var(--cyan));
+      color: #030712;
+      border: none;
+      font-size: 20px;
+      font-weight: 900;
+      padding: 18px 46px;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 15px 40px rgba(16, 185, 129, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-top: 24px;
+    }
+
+    .start-cta:hover {
+      transform: scale(1.06);
+      box-shadow: 0 20px 50px rgba(6, 182, 212, 0.7);
+    }
+
+    /* Keyframe Animations */
+    @keyframes pulseIndicator {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(1.3); }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes scanLaser {
+      0% { top: 10px; }
+      100% { top: 160px; }
+    }
+    @keyframes pulseBtn {
+      0%, 100% { box-shadow: 0 0 35px rgba(16, 185, 129, 0.6); }
+      50% { box-shadow: 0 0 60px rgba(6, 182, 212, 0.8); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background Canvas Animation -->
+  <canvas id="bgCanvas"></canvas>
+
+  <!-- Video Player Viewport -->
+  <div class="video-viewport" id="viewport">
+    <div class="ambient-glow" id="ambientGlow"></div>
+
+    <!-- Top HUD Bar -->
+    <div class="hud-header">
+      <div class="brand-cluster">
+        <div class="brand-indicator"></div>
+        <span class="brand-title">TREND MR PHARMA OS • ENTERPRISE COMMERCIAL 2026</span>
+      </div>
+      <div class="hud-meta">
+        <div class="live-tag">
+          <div class="live-dot"></div>
+          <span>AUTONOMOUS ENGINE • LIVE 60S</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Stage for 7 Scenes -->
+    <div class="stage">
+
+      <!-- SCENE 1 (0:00 - 0:08) -->
+      <div class="scene active" id="scene1" data-ambient="rgba(244, 63, 94, 0.2)">
+        <div class="radar-scanner">
+          <div class="radar-sweep"></div>
+          <span style="font-size: 42px; z-index: 2;">⚠️</span>
+        </div>
+        <div class="scene-pill" style="background: rgba(244, 63, 94, 0.15); color: var(--rose); border: 1px solid rgba(244, 63, 94, 0.3);">
+          PHARMA REVENUE LEAKAGE ALERT
+        </div>
+        <h1 class="scene-h1">
+          IS YOUR FIELD FORCE LEAKING <span style="color: var(--rose);">30% OF ITS REVENUE?</span>
+        </h1>
+        <p class="scene-p">
+          Fake doctor calls. Delayed paper reporting. Ghost stock. Every single morning, your pharmaceutical company loses millions to operational blind spots.
+        </p>
+        <div class="showcase-row">
+          <div class="glass-panel" style="flex: 1; align-items: center; border-color: rgba(244, 63, 94, 0.4);">
+            <span style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Estimated Monthly Leakage</span>
+            <div class="loss-counter" id="lossCounter">₹24,80,000</div>
+            <span style="font-size: 13px; color: var(--rose); font-weight: 700;">✖ 38.4% Unverified Calls Detected</span>
+          </div>
+          <div class="glass-panel" style="flex: 1; align-items: center;">
+            <span style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Reporting Latency</span>
+            <div style="font-size: 38px; font-weight: 900; color: var(--amber); margin: 8px 0; font-family: 'JetBrains Mono', monospace;">48 HOURS</div>
+            <span style="font-size: 13px; color: var(--amber); font-weight: 700;">⚠ Manual DCR Administrative Lag</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 2 (0:08 - 0:16) -->
+      <div class="scene" id="scene2" data-ambient="rgba(6, 182, 212, 0.22)">
+        <div class="scene-pill" style="background: rgba(6, 182, 212, 0.15); color: var(--cyan); border: 1px solid rgba(6, 182, 212, 0.3);">
+          THE AUTONOMOUS REVOLUTION
+        </div>
+        <h1 class="scene-h1">
+          MEET <span style="background: linear-gradient(135deg, var(--cyan), var(--emerald)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">TREND MR PHARMA OS</span>
+        </h1>
+        <p class="scene-p">
+          The world's first autonomous pharmaceutical engine powered by an 8-Agent Council auditing every call, every rupee, and every kilometer in real time.
+        </p>
+        <div class="neural-grid">
+          <div class="agent-chip active-ping">
+            <span class="agent-name">AGENT 01</span>
+            <span class="agent-task">FIELD_DCR_AGENT</span>
+            <span class="agent-status">● AUDITED</span>
+          </div>
+          <div class="agent-chip active-ping">
+            <span class="agent-name">AGENT 02</span>
+            <span class="agent-task">ROUTING_COMPLIANCE</span>
+            <span class="agent-status">● VERIFIED</span>
+          </div>
+          <div class="agent-chip active-ping">
+            <span class="agent-name">AGENT 03</span>
+            <span class="agent-task">COMMERCIAL_AGENT</span>
+            <span class="agent-status">● ONLINE</span>
+          </div>
+          <div class="agent-chip active-ping">
+            <span class="agent-name">AGENT 04</span>
+            <span class="agent-task">DATA_INTEGRITY</span>
+            <span class="agent-status">● 100% PARITY</span>
+          </div>
+          <div class="agent-chip active-ping">
+            <span class="agent-name">AGENT 05</span>
+            <span class="agent-task">FINANCE_ACCOUNTS</span>
+            <span class="agent-status">● SYNCED</span>
+          </div>
+          <div class="agent-chip active-ping">
+            <span class="agent-name">AGENT 06</span>
+            <span class="agent-task">ROLE_AUTH_AGENT</span>
+            <span class="agent-status">● ENFORCED</span>
+          </div>
+          <div class="agent-chip active-ping">
+            <span class="agent-name">AGENT 07</span>
+            <span class="agent-task">INVOICE_RECONCILER</span>
+            <span class="agent-status">● AUDITED</span>
+          </div>
+          <div class="agent-chip active-ping">
+            <span class="agent-name">AGENT 08</span>
+            <span class="agent-task">INVENTORY_VALUATION</span>
+            <span class="agent-status">● LIVE</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 3 (0:16 - 0:25) -->
+      <div class="scene" id="scene3" data-ambient="rgba(16, 185, 129, 0.22)">
+        <div class="scene-pill" style="background: rgba(16, 185, 129, 0.15); color: var(--emerald); border: 1px solid rgba(16, 185, 129, 0.3);">
+          SMART FIELD FORCE AUTOMATION
+        </div>
+        <h1 class="scene-h1">
+          ZERO FAKE CALLS. <span style="color: var(--emerald);">100% GEOFENCED PRECISION.</span>
+        </h1>
+        <p class="scene-p">
+          Anti-spoof GPS telemetry, real-time doctor detailing with visual aids, automated sample distribution logs, and Call Quality Scoring (CQS).
+        </p>
+        <div class="showcase-row">
+          <div class="mobile-frame">
+            <div style="font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">GPS Telemetry Active</div>
+            <div class="geofence-radar-pin">
+              <span style="font-size: 14px; font-weight: 800; color: #fff;">📍 Dr. Anand Rao</span><br>
+              <span style="font-size: 11px; color: var(--emerald);">Geofence Matched (±3m)</span>
+            </div>
+            <div style="background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 8px; font-size: 12px;">
+              💊 E-Detailing: CardioGuard 50mg<br>
+              📦 Samples Given: 2 Strips (Batch #982)
+            </div>
+            <div style="background: var(--emerald); color: #030712; font-weight: 900; padding: 6px; border-radius: 6px; text-align: center; font-size: 12px;">
+              CQS SCORE: A+ (98/100)
+            </div>
+          </div>
+          <div class="glass-panel" style="flex: 1; justify-content: space-around;">
+            <div>
+              <span style="font-size: 12px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Fleet Calls Verified</span>
+              <div style="font-size: 40px; font-weight: 900; color: var(--emerald); font-family: 'JetBrains Mono', monospace;">784 VISITS</div>
+              <span style="font-size: 13px; color: var(--emerald);">✔ 100% In-Clinic Attendance</span>
+            </div>
+            <div>
+              <span style="font-size: 12px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Batch Traceability</span>
+              <div style="font-size: 26px; font-weight: 800; color: var(--cyan); font-family: 'JetBrains Mono', monospace;">33 ACTIVE SKUs</div>
+              <span style="font-size: 13px; color: #94a3b8;">Zero Sample Leakage across Fleet</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 4 (0:25 - 0:34) -->
+      <div class="scene" id="scene4" data-ambient="rgba(245, 158, 11, 0.22)">
+        <div class="scene-pill" style="background: rgba(245, 158, 11, 0.15); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.3);">
+          COMMERCIAL SECONDARY SALES ENGINE
+        </div>
+        <h1 class="scene-h1">
+          MAXIMIZE MARGINS. <span style="color: var(--amber);">LOCK IN 61.6% PROFIT.</span>
+        </h1>
+        <p class="scene-p">
+          Secondary POB order booking, live PTR/PTS unit calculations, real-time scheme simulators, and instant GST-compliant invoicing with zero leak.
+        </p>
+        <div class="showcase-row">
+          <div class="invoice-card">
+            <div style="color: var(--amber); font-size: 13px; font-weight: 700; border-bottom: 1px dashed rgba(245,158,11,0.4); padding-bottom: 6px;">
+              TAX INVOICE #INV-2026-0057
+            </div>
+            <div style="font-size: 12px; color: #cbd5e1; line-height: 1.6;">
+              Party: Apollo Pharmacy (West)<br>
+              Billed Units: 1,027 Billed<br>
+              Free Scheme: 515 Units (10+2)<br>
+              Base Value: ₹1,06,577.64<br>
+              GST (12%): Included
+            </div>
+            <div style="background: rgba(16,185,129,0.15); color: var(--emerald); padding: 8px; border-radius: 8px; font-weight: 800; text-align: center; font-size: 13px;">
+              STATUS: SETTLED & DELIVERED
+            </div>
+          </div>
+          <div class="glass-panel" style="flex: 1; justify-content: space-around;">
+            <div>
+              <span style="font-size: 12px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Blended Gross Margin</span>
+              <div style="font-size: 42px; font-weight: 900; color: var(--amber); font-family: 'JetBrains Mono', monospace;">61.6% MARGIN</div>
+              <span style="font-size: 13px; color: var(--emerald);">✔ ₹65,609 Net Profit Captured</span>
+            </div>
+            <div>
+              <span style="font-size: 12px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Scheme Simulator</span>
+              <div style="font-size: 22px; font-weight: 800; color: #fff;">Zero Margin Erosion</div>
+              <span style="font-size: 13px; color: var(--cyan);">Pre-Validated against Live PTS Floor</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 5 (0:34 - 0:42) -->
+      <div class="scene" id="scene5" data-ambient="rgba(168, 85, 247, 0.22)">
+        <div class="scene-pill" style="background: rgba(168, 85, 247, 0.15); color: var(--purple); border: 1px solid rgba(168, 85, 247, 0.3);">
+          360° MASTER DIRECTORY & AI OCR
+        </div>
+        <h1 class="scene-h1">
+          3-SECOND ONBOARDING. <span style="color: var(--purple);">DOCTOR DPS INTELLIGENCE.</span>
+        </h1>
+        <p class="scene-p">
+          Instant Drug License OCR (20B/21B extraction), Chemist ledgers, and Doctor Prescribing Potential (DPS Tier A/B) for pinpoint medical detailing.
+        </p>
+        <div class="showcase-row">
+          <div class="license-scanner-frame">
+            <div class="scanner-laser"></div>
+            <div style="font-size: 12px; font-weight: 700; color: var(--purple); margin-bottom: 6px;">
+              📷 AI OPTICAL LICENSE SCANNER
+            </div>
+            <div style="font-size: 13px; color: #e2e8f0; font-family: 'JetBrains Mono', monospace; line-height: 1.6;">
+              License No: 20B/MH/2026/8941<br>
+              Entity: MedPlus Retail Chemist<br>
+              GSTIN: 27AABCT3521Q1ZN<br>
+              Status: <span style="color: var(--emerald); font-weight: 700;">VALIDATED IN 0.4s</span>
+            </div>
+          </div>
+          <div class="glass-panel" style="flex: 1; justify-content: space-around;">
+            <div>
+              <span style="font-size: 12px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Clinical Directory</span>
+              <div style="font-size: 38px; font-weight: 900; color: var(--purple); font-family: 'JetBrains Mono', monospace;">346 DOCTORS</div>
+              <span style="font-size: 13px; color: var(--emerald);">✔ 287 Active DPS Prescribing Profiles</span>
+            </div>
+            <div>
+              <span style="font-size: 12px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Wholesale Distribution</span>
+              <div style="font-size: 22px; font-weight: 800; color: #fff;">6 Live Distributors</div>
+              <span style="font-size: 13px; color: var(--cyan);">Full Territory Ledger Alignment</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 6 (0:42 - 0:50) -->
+      <div class="scene" id="scene6" data-ambient="rgba(37, 211, 102, 0.22)">
+        <div class="scene-pill" style="background: rgba(37, 211, 102, 0.15); color: #25d366; border: 1px solid rgba(37, 211, 102, 0.3);">
+          1-CLICK WHATSAPP EXECUTIVE DISPATCH
+        </div>
+        <h1 class="scene-h1">
+          ZERO APPS TO OPEN. <span style="color: #25d366;">COMMAND ON WHATSAPP.</span>
+        </h1>
+        <p class="scene-p">
+          Automated multi-agent daily scorecards delivered directly to C-Suite & Managers on WhatsApp. Dispatch field directives to 500 reps in 1-click.
+        </p>
+        <div class="showcase-row">
+          <div class="whatsapp-card">
+            <div class="whatsapp-header">
+              <span style="font-size: 24px;">🤖</span>
+              <div>
+                <div style="font-size: 14px; font-weight: 800; color: #fff;">Trend MR Council Hub</div>
+                <div style="font-size: 11px; color: #25d366;">Cloud API Verified Official</div>
+              </div>
+            </div>
+            <div class="whatsapp-chat">
+              <div class="wa-bubble">
+                📊 <b>DAILY FLEET AUDIT SUMMARY</b><br>
+                • Total Calls: 784 (Detailing 96%)<br>
+                • Invoiced Secondary Sales: ₹1,06,577<br>
+                • Council Verdict: <b>PASS (Grade A+)</b><br>
+                • Anomaly Breaches: <b>0 Detected</b>
+              </div>
+              <div style="background: rgba(37,211,102,0.1); border: 1px dashed #25d366; padding: 8px 12px; border-radius: 8px; font-size: 12px; color: #25d366; text-align: center;">
+                💬 1-Click Field Directive Dispatched to 13 MRs
+              </div>
+            </div>
+          </div>
+          <div class="glass-panel" style="flex: 1; justify-content: space-around;">
+            <div>
+              <span style="font-size: 12px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Executive Adoption</span>
+              <div style="font-size: 38px; font-weight: 900; color: #25d366; font-family: 'JetBrains Mono', monospace;">100% ADOPTION</div>
+              <span style="font-size: 13px; color: #fff;">Zero login friction for CEOs and MDs</span>
+            </div>
+            <div>
+              <span style="font-size: 12px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Directives Response Time</span>
+              <div style="font-size: 24px; font-weight: 800; color: var(--cyan);">Under 30 Seconds</div>
+              <span style="font-size: 13px; color: #94a3b8;">Instant rep notification on field phones</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 7 (0:50 - 1:00) -->
+      <div class="scene" id="scene7" data-ambient="rgba(16, 185, 129, 0.3)">
+        <div class="scene-pill" style="background: rgba(16, 185, 129, 0.2); color: var(--emerald); border: 1px solid rgba(16, 185, 129, 0.4);">
+          SCALE YOUR PHARMA EMPIRE TODAY
+        </div>
+        <h1 class="scene-h1" style="font-size: 48px;">
+          DEPLOY <span style="color: var(--emerald);">TREND MR PHARMA OS</span> NOW
+        </h1>
+        <p class="scene-p" style="font-size: 21px;">
+          Double field productivity. Eliminate compliance fraud. Gain 100% commercial transparency in under 24 hours.
+        </p>
+        <a href="https://metapharsic.cloud" target="_blank" class="cta-grand-btn">
+          ⚡ SCHEDULE LIVE ENTERPRISE DEMO & DEPLOY
+        </a>
+        <div style="margin-top: 20px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #94a3b8; display: flex; gap: 24px;">
+          <span>✔ GUARANTEED ROI IN 30 DAYS</span>
+          <span>✔ ZERO-DOWNTIME 24-HOUR SETUP</span>
+          <span>✔ UNLIMITED SCALE</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom Audio & Voice Dock -->
+    <div class="voice-dock">
+      <div class="voice-avatar-box">🎙️</div>
+      <div class="voice-text-body">
+        <div class="voice-badge">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); display: inline-block;"></span>
+          <span id="voiceStatus">AI VOICE NARRATOR ACTIVE</span>
+        </div>
+        <div class="voice-speech-quote" id="voiceSubtitle">
+          "Every single morning, your pharmaceutical company loses millions to fake doctor visits and untracked field operations..."
+        </div>
+      </div>
+
+      <!-- Animated Audio Waveform -->
+      <canvas id="waveCanvas"></canvas>
+
+      <div class="time-badge" id="timeCounter">00:00 / 01:00</div>
+    </div>
+
+    <!-- Bottom Controls -->
+    <div class="video-controls">
+      <button class="btn-pill primary" id="playPauseBtn">▶ Play</button>
+      <button class="btn-pill" id="replayBtn">↺ Restart</button>
+      <button class="btn-pill" id="muteAudioBtn">🔊 Sound ON</button>
+      <button class="btn-pill" id="muteVoiceBtn">🗣️ Voice ON</button>
+
+      <div class="progress-bar-wrap" id="progressBar">
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+
+      <div style="display: flex; gap: 5px;">
+        <button class="btn-pill" style="padding: 4px 8px; font-size: 11px;" onclick="jumpTo(0)">0s</button>
+        <button class="btn-pill" style="padding: 4px 8px; font-size: 11px;" onclick="jumpTo(8)">8s</button>
+        <button class="btn-pill" style="padding: 4px 8px; font-size: 11px;" onclick="jumpTo(16)">16s</button>
+        <button class="btn-pill" style="padding: 4px 8px; font-size: 11px;" onclick="jumpTo(25)">25s</button>
+        <button class="btn-pill" style="padding: 4px 8px; font-size: 11px;" onclick="jumpTo(34)">34s</button>
+        <button class="btn-pill" style="padding: 4px 8px; font-size: 11px;" onclick="jumpTo(42)">42s</button>
+        <button class="btn-pill" style="padding: 4px 8px; font-size: 11px;" onclick="jumpTo(50)">50s</button>
+      </div>
+    </div>
+
+    <!-- Start Modal Overlay -->
+    <div class="start-modal" id="startModal">
+      <div style="font-size: 54px; margin-bottom: 12px;">🚀</div>
+      <h2 style="font-size: 36px; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 10px;">
+        TREND MR PHARMA OS
+      </h2>
+      <p style="color: #94a3b8; font-size: 17px; max-width: 580px; line-height: 1.6;">
+        Watch the 60-second high-energy commercial explaining the 8-Agent Council, GPS Geofencing, Commercial Secondary Sales, AI OCR, and WhatsApp C-Suite Intelligence with full cinematic voice narration.
+      </p>
+      <button class="start-cta" id="startCommercialBtn">
+        <span>▶</span> START 60S COMMERCIAL WITH VOICE
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    // -------------------------------------------------------------------------
+    // 1. SCENE DEFINITIONS & SCRIPT (60s Exact Timeline)
+    // -------------------------------------------------------------------------
+    const TIMELINE = [
+      {
+        id: "scene1",
+        start: 0,
+        end: 8,
+        ambient: "rgba(244, 63, 94, 0.25)",
+        script: "Every single morning, your pharmaceutical business loses millions to fake doctor visits, ghost orders, and delayed field reporting. What if your company could run itself with zero blind spots?"
+      },
+      {
+        id: "scene2",
+        start: 8,
+        end: 16,
+        ambient: "rgba(6, 182, 212, 0.25)",
+        script: "Meet Trend MR Pharma OS. Powered by an autonomous council of eight specialized AI agents auditing every call, every rupee, and every kilometer in real time."
+      },
+      {
+        id: "scene3",
+        start: 16,
+        end: 25,
+        ambient: "rgba(16, 185, 129, 0.25)",
+        script: "Say goodbye to fake calls. Our routing and compliance agents verify live GPS coordinates within meters, scoring every detailing call with precision CQS quality metrics."
+      },
+      {
+        id: "scene4",
+        start: 25,
+        end: 34,
+        ambient: "rgba(245, 158, 11, 0.25)",
+        script: "Turn field reps into profit centers. Capture secondary POB orders with automated GST invoices, real-time scheme simulators, and ironclad margin controls."
+      },
+      {
+        id: "scene5",
+        start: 34,
+        end: 42,
+        ambient: "rgba(168, 85, 247, 0.25)",
+        script: "Onboard chemists and distributors in under three seconds with native AI drug license scanning, while Doctor DPS intelligence guarantees you target high-yield prescribers."
+      },
+      {
+        id: "scene6",
+        start: 42,
+        end: 50,
+        ambient: "rgba(37, 211, 102, 0.25)",
+        script: "No bloated dashboards to sift through. Deliver daily audit scorecards directly to your leadership's WhatsApp with one click, and broadcast field directives in seconds."
+      },
+      {
+        id: "scene7",
+        start: 50,
+        end: 60,
+        ambient: "rgba(16, 185, 129, 0.35)",
+        script: "Pharma leaders are doubling their field revenue while slashing compliance risks. Stop losing money to outdated systems. Deploy Trend MR Pharma OS today and dominate your territories!"
+      }
+    ];
+
+    const TOTAL_SECONDS = 60;
+    let playhead = 0;
+    let isPlaying = false;
+    let ticker = null;
+    let activeSceneIndex = -1;
+    let soundEnabled = true;
+    let voiceEnabled = true;
+
+    // -------------------------------------------------------------------------
+    // 2. WEB AUDIO SYNTHESIZER (Cinematic Cyber Pulse & SFX)
+    // -------------------------------------------------------------------------
+    let actx = null;
+    let bgOsc = null;
+    let bgGain = null;
+
+    function ensureAudioContext() {
+      if (!actx) {
+        actx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (actx.state === 'suspended') {
+        actx.resume();
+      }
+    }
+
+    function playCinematicSFX(type) {
+      if (!soundEnabled || !actx) return;
+      try {
+        const now = actx.currentTime;
+        if (type === 'alarm') {
+          // Tension bass sweep
+          const osc = actx.createOscillator();
+          const g = actx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(110, now);
+          osc.frequency.exponentialRampToValueAtTime(55, now + 0.6);
+          g.gain.setValueAtTime(0.2, now);
+          g.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+          osc.connect(g);
+          g.connect(actx.destination);
+          osc.start();
+          osc.stop(now + 0.6);
+        } else if (type === 'chime') {
+          // Futuristic two-tone chime
+          [440, 880].forEach((freq, idx) => {
+            const osc = actx.createOscillator();
+            const g = actx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+            g.gain.setValueAtTime(0.18, now + idx * 0.08);
+            g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.3);
+            osc.connect(g);
+            g.connect(actx.destination);
+            osc.start(now + idx * 0.08);
+            osc.stop(now + idx * 0.08 + 0.3);
+          });
+        } else if (type === 'cash') {
+          // Commercial harmonic chime
+          [523.25, 659.25, 783.99].forEach((freq, idx) => {
+            const osc = actx.createOscillator();
+            const g = actx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.07);
+            g.gain.setValueAtTime(0.15, now + idx * 0.07);
+            g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.07 + 0.35);
+            osc.connect(g);
+            g.connect(actx.destination);
+            osc.start(now + idx * 0.07);
+            osc.stop(now + idx * 0.07 + 0.35);
+          });
+        } else if (type === 'whatsapp') {
+          // Signature pop
+          const osc = actx.createOscillator();
+          const g = actx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(950, now);
+          osc.frequency.exponentialRampToValueAtTime(1400, now + 0.12);
+          g.gain.setValueAtTime(0.25, now);
+          g.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+          osc.connect(g);
+          g.connect(actx.destination);
+          osc.start();
+          osc.stop(now + 0.12);
+        } else if (type === 'grand') {
+          // Massive crescendo drop
+          const osc = actx.createOscillator();
+          const g = actx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(80, now);
+          osc.frequency.exponentialRampToValueAtTime(220, now + 0.8);
+          g.gain.setValueAtTime(0.25, now);
+          g.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+          osc.connect(g);
+          g.connect(actx.destination);
+          osc.start();
+          osc.stop(now + 0.9);
+        }
+      } catch (err) {}
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. AI SPEECH SYNTHESIS ENGINE (Natural Enterprise Voice)
+    // -------------------------------------------------------------------------
+    let availableVoices = [];
+
+    function populateVoices() {
+      if ('speechSynthesis' in window) {
+        availableVoices = window.speechSynthesis.getVoices();
+      }
+    }
+    populateVoices();
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = populateVoices;
+    }
+
+    function getBestEnglishVoice() {
+      if (!availableVoices.length) populateVoices();
+      // Look for natural English voices (Google, Microsoft, Natural, Guy, etc.)
+      const preferred = [
+        "Google US English",
+        "Microsoft David",
+        "Microsoft Guy",
+        "Microsoft Christopher",
+        "Google UK English Male",
+        "English"
+      ];
+      for (const p of preferred) {
+        const found = availableVoices.find(v => v.name.includes(p) || (v.lang.startsWith("en") && v.name.toLowerCase().includes("male")));
+        if (found) return found;
+      }
+      return availableVoices.find(v => v.lang.startsWith("en")) || availableVoices[0] || null;
+    }
+
+    function narrateSceneScript(text) {
+      if (!voiceEnabled || !('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel(); // Stop any pending utterance
+      const utterance = new SpeechSynthesisUtterance(text);
+      const chosenVoice = getBestEnglishVoice();
+      if (chosenVoice) utterance.voice = chosenVoice;
+      utterance.rate = 1.15; // brisk commercial cadence
+      utterance.pitch = 0.95; // authoritative confident tone
+      utterance.volume = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. ANIMATED WAVEFORM VISUALIZER
+    // -------------------------------------------------------------------------
+    const waveCanvas = document.getElementById('waveCanvas');
+    const wCtx = waveCanvas.getContext('2d');
+    waveCanvas.width = 140;
+    waveCanvas.height = 34;
+
+    function drawWaveform() {
+      wCtx.clearRect(0, 0, waveCanvas.width, waveCanvas.height);
+      const bars = 18;
+      const step = waveCanvas.width / bars;
+      for (let i = 0; i < bars; i++) {
+        let height = 4;
+        if (isPlaying) {
+          const t = Date.now() / 150 + i * 0.4;
+          height = 6 + Math.abs(Math.sin(t)) * 20;
+        }
+        wCtx.fillStyle = isPlaying ? '#10b981' : 'rgba(255,255,255,0.2)';
+        wCtx.fillRect(i * step + 2, (waveCanvas.height - height) / 2, step - 4, height);
+      }
+      requestAnimationFrame(drawWaveform);
+    }
+    drawWaveform();
+
+    // -------------------------------------------------------------------------
+    // 5. BACKGROUND PARTICLES CANVAS
+    // -------------------------------------------------------------------------
+    const bgCanvas = document.getElementById('bgCanvas');
+    const bCtx = bgCanvas.getContext('2d');
+    let particles = [];
+
+    function resizeBg() {
+      bgCanvas.width = window.innerWidth;
+      bgCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeBg);
+    resizeBg();
+
+    for (let i = 0; i < 40; i++) {
+      particles.push({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        vx: (Math.random() - 0.5) * 0.6,
+        vy: (Math.random() - 0.5) * 0.6,
+        r: Math.random() * 2 + 1,
+        alpha: Math.random() * 0.4 + 0.1
+      });
+    }
+
+    function animateBg() {
+      bCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+      for (const p of particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0) p.x = bgCanvas.width;
+        if (p.x > bgCanvas.width) p.x = 0;
+        if (p.y < 0) p.y = bgCanvas.height;
+        if (p.y > bgCanvas.height) p.y = 0;
+        bCtx.beginPath();
+        bCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        bCtx.fillStyle = `rgba(6, 182, 212, ${p.alpha})`;
+        bCtx.fill();
+      }
+      requestAnimationFrame(animateBg);
+    }
+    animateBg();
+
+    // -------------------------------------------------------------------------
+    // 6. SCENE CONTROLLER & TIMELINE ENGINE
+    // -------------------------------------------------------------------------
+    const ambientGlow = document.getElementById('ambientGlow');
+    const voiceSubtitle = document.getElementById('voiceSubtitle');
+    const timeCounter = document.getElementById('timeCounter');
+    const progressFill = document.getElementById('progressFill');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const replayBtn = document.getElementById('replayBtn');
+    const startModal = document.getElementById('startModal');
+    const startCommercialBtn = document.getElementById('startCommercialBtn');
+    const muteAudioBtn = document.getElementById('muteAudioBtn');
+    const muteVoiceBtn = document.getElementById('muteVoiceBtn');
+
+    function renderFrame() {
+      let idx = TIMELINE.findIndex(s => playhead >= s.start && playhead < s.end);
+      if (idx === -1 && playhead >= TOTAL_SECONDS) idx = TIMELINE.length - 1;
+
+      if (idx !== -1 && idx !== activeSceneIndex) {
+        activeSceneIndex = idx;
+        const current = TIMELINE[idx];
+
+        // Swap DOM scene visibility
+        TIMELINE.forEach((s, i) => {
+          const el = document.getElementById(s.id);
+          if (i === activeSceneIndex) el.classList.add('active');
+          else el.classList.remove('active');
+        });
+
+        // Ambient lighting transition
+        ambientGlow.style.background = `radial-gradient(circle at 50% 50%, ${current.ambient} 0%, transparent 70%)`;
+
+        // Subtitles & Narration
+        voiceSubtitle.textContent = `"${current.script}"`;
+        narrateSceneScript(current.script);
+
+        // Scene SFX trigger
+        if (idx === 0) playCinematicSFX('alarm');
+        else if (idx === 1 || idx === 2) playCinematicSFX('chime');
+        else if (idx === 3) playCinematicSFX('cash');
+        else if (idx === 4) playCinematicSFX('chime');
+        else if (idx === 5) playCinematicSFX('whatsapp');
+        else if (idx === 6) playCinematicSFX('grand');
+      }
+
+      // Update Timer & Progress
+      const pct = (playhead / TOTAL_SECONDS) * 100;
+      progressFill.style.width = `${Math.min(pct, 100)}%`;
+
+      const sec = Math.floor(playhead);
+      const secStr = sec < 10 ? `0${sec}` : `${sec}`;
+      timeCounter.textContent = `00:${secStr} / 01:00`;
+
+      if (playhead >= TOTAL_SECONDS) {
+        pauseCommercial();
+        playhead = TOTAL_SECONDS;
+      }
+    }
+
+    function tick() {
+      playhead += 0.1;
+      renderFrame();
+    }
+
+    function startCommercial() {
+      ensureAudioContext();
+      if (playhead >= TOTAL_SECONDS) {
+        playhead = 0;
+        activeSceneIndex = -1;
+      }
+      isPlaying = true;
+      playPauseBtn.textContent = '⏸ Pause';
+      playPauseBtn.classList.remove('primary');
+      ticker = setInterval(tick, 100);
+      startModal.style.opacity = '0';
+      setTimeout(() => startModal.style.display = 'none', 500);
+      renderFrame();
+    }
+
+    function pauseCommercial() {
+      isPlaying = false;
+      playPauseBtn.textContent = '▶ Play';
+      playPauseBtn.classList.add('primary');
+      if (ticker) clearInterval(ticker);
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    }
+
+    function jumpTo(seconds) {
+      playhead = seconds;
+      activeSceneIndex = -1;
+      renderFrame();
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. EVENT LISTENERS
+    // -------------------------------------------------------------------------
+    startCommercialBtn.addEventListener('click', startCommercial);
+
+    playPauseBtn.addEventListener('click', () => {
+      if (isPlaying) pauseCommercial();
+      else startCommercial();
+    });
+
+    replayBtn.addEventListener('click', () => {
+      pauseCommercial();
+      jumpTo(0);
+      startCommercial();
+    });
+
+    muteAudioBtn.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      muteAudioBtn.textContent = soundEnabled ? '🔊 Sound ON' : '🔇 Sound OFF';
+    });
+
+    muteVoiceBtn.addEventListener('click', () => {
+      voiceEnabled = !voiceEnabled;
+      muteVoiceBtn.textContent = voiceEnabled ? '🗣️ Voice ON' : '🤐 Voice OFF';
+      if (!voiceEnabled && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      } else if (voiceEnabled && isPlaying && activeSceneIndex !== -1) {
+        narrateSceneScript(TIMELINE[activeSceneIndex].script);
+      }
+    });
+
+    document.getElementById('progressBar').addEventListener('click', (e) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickRatio = (e.clientX - rect.left) / rect.width;
+      jumpTo(clickRatio * TOTAL_SECONDS);
+    });
+
+    // Auto-prepare initial frame
+    renderFrame();
+  </script>
+</body>
+</html>

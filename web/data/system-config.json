@@ -7,8 +7,8 @@
   "autoPullSchedule": "TWICE_WEEKLY",
   "autoSyncOnPull": false,
   "lastCheckedAt": "2026-10-02T14:45:42.704Z",
-  "lastPulledAt": "2026-10-10T04:59:20.064Z",
-  "lastPullStatus": "SUCCESS",
+  "lastPulledAt": "2026-10-11T16:00:01.161Z",
+  "lastPullStatus": "NO_CHANGES",
   "lastPulledFiles": [
     {
       "filename": ".gitignore",
@@ -90,13 +90,159 @@
   ],
   "lastFetchedCommits": [
     {
-      "hash": "ee1aab5f",
+      "hash": "3182dcd",
+      "author": "Metapharsic Admin",
+      "date": "2026-10-11",
+      "message": "feat: entity license parser agent, profile management updates, and synchronized system config"
+    },
+    {
+      "hash": "83cb414",
+      "author": "Metapharsic Admin",
+      "date": "2026-10-11",
+      "message": "feat(navigation): multi-threaded database provisioning for sidebar modules & system artifacts with zero hardcoding"
+    },
+    {
+      "hash": "ee1aab5",
       "author": "Metapharsic Admin",
       "date": "2026-10-08",
       "message": "feat: multi-agent potential customer intelligence & professional native xlsx export engine"
+    },
+    {
+      "hash": "d2a43bc",
+      "author": "Metapharsic Admin",
+      "date": "2026-10-02",
+      "message": "fix(vps): restore exceljs backward compat export, formData typing, and auto-npm-install hook"
+    },
+    {
+      "hash": "0b359b7",
+      "author": "Metapharsic Admin",
+      "date": "2026-10-02",
+      "message": "feat: multi-agent deal closure intelligence, professional xlsx export & call compliance"
     }
   ],
   "pullHistory": [
+    {
+      "timestamp": "2026-10-11T16:00:01.161Z",
+      "type": "AUTO",
+      "branch": "main",
+      "beforeHash": "3182dcd",
+      "afterHash": "3182dcd",
+      "status": "NO_CHANGES",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": ".gitignore",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/admin/accounts-jotter/page.tsx",
+          "status": "modified",
+          "additions": 2,
+          "deletions": 2,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/mr/reports/page.tsx",
+          "status": "modified",
+          "additions": 44,
+          "deletions": 0,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/(dashboard)/reports/mr-daily-calls/page.tsx",
+          "status": "modified",
+          "additions": 168,
+          "deletions": 34,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/(dashboard)/reports/page.tsx",
+          "status": "modified",
+          "additions": 121,
+          "deletions": 26,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/reports/potential-customers/route.ts",
+          "status": "added",
+          "additions": 110,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/components/dashboard-shell.tsx",
+          "status": "modified",
+          "additions": 10,
+          "deletions": 5,
+          "impactedComponent": "User Interface & Navigation Shell"
+        },
+        {
+          "filename": "web/data/system-config.json",
+          "status": "modified",
+          "additions": 750,
+          "deletions": 81,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/excel-export.ts",
+          "status": "modified",
+          "additions": 448,
+          "deletions": 193,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/scripts/test_potential_customer_excel.ts",
+          "status": "added",
+          "additions": 144,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/potential-customers-agents.service.ts",
+          "status": "added",
+          "additions": 624,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "3182dcd",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-11",
+          "message": "feat: entity license parser agent, profile management updates, and synchronized system config"
+        },
+        {
+          "hash": "83cb414",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-11",
+          "message": "feat(navigation): multi-threaded database provisioning for sidebar modules & system artifacts with zero hardcoding"
+        },
+        {
+          "hash": "ee1aab5",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-08",
+          "message": "feat: multi-agent potential customer intelligence & professional native xlsx export engine"
+        },
+        {
+          "hash": "d2a43bc",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-02",
+          "message": "fix(vps): restore exceljs backward compat export, formData typing, and auto-npm-install hook"
+        },
+        {
+          "hash": "0b359b7",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-02",
+          "message": "feat: multi-agent deal closure intelligence, professional xlsx export & call compliance"
+        }
+      ],
+      "logMessage": "Already up to date.\n",
+      "id": "pull-1791734401163-u2f6e"
+    },
     {
       "timestamp": "2026-10-10T04:59:20.064Z",
       "type": "MANUAL",

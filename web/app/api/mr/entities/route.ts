@@ -54,7 +54,7 @@ async function handler(req: AuthedRequest) {
     let total = 0;
 
     if (type === "DOCTOR") {
-      const [doctors, count] = await Promise.all([
+      let [doctors, count] = await Promise.all([
         db.doctor.findMany({
           where: doctorWhere,
           skip: (page - 1) * limit,
@@ -74,6 +74,38 @@ async function handler(req: AuthedRequest) {
         }),
         db.doctor.count({ where: doctorWhere }),
       ]);
+
+      // If territory filter returned 0 results for a search, fallback to global search
+      if (doctors.length === 0 && search && territoryFilter) {
+        const fallbackWhere = {
+          fullName: { contains: search, mode: "insensitive" as const },
+        };
+        const [fallbackDocs, fallbackCount] = await Promise.all([
+          db.doctor.findMany({
+            where: fallbackWhere,
+            skip: (page - 1) * limit,
+            take: limit,
+            orderBy: { fullName: "asc" },
+            select: {
+              id: true,
+              fullName: true,
+              clinicAddress: true,
+              territoryId: true,
+              primarySpecialty: true,
+              mobile: true,
+              whatsApp: true,
+              assistantContact: true,
+              territory: { select: { id: true, name: true } },
+            },
+          }),
+          db.doctor.count({ where: fallbackWhere }),
+        ]);
+        if (fallbackDocs.length > 0) {
+          doctors = fallbackDocs;
+          count = fallbackCount;
+        }
+      }
+
       entities = doctors.map((d) => ({
         id: d.id,
         name: d.fullName,
@@ -86,7 +118,7 @@ async function handler(req: AuthedRequest) {
       }));
       total = count;
     } else if (type === "CHEMIST") {
-      const [chemists, count] = await Promise.all([
+      let [chemists, count] = await Promise.all([
         db.chemist.findMany({
           where: chemistWhere,
           skip: (page - 1) * limit,
@@ -104,6 +136,35 @@ async function handler(req: AuthedRequest) {
         }),
         db.chemist.count({ where: chemistWhere }),
       ]);
+
+      // If territory filter returned 0 results for a search, fallback to global search
+      if (chemists.length === 0 && search && territoryFilter) {
+        const fallbackWhere = {
+          name: { contains: search, mode: "insensitive" as const },
+        };
+        const [fallbackChems, fallbackCount] = await Promise.all([
+          db.chemist.findMany({
+            where: fallbackWhere,
+            skip: (page - 1) * limit,
+            take: limit,
+            orderBy: { name: "asc" },
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              territoryId: true,
+              contactPerson: true,
+              mobile: true,
+              territory: { select: { id: true, name: true } },
+            },
+          }),
+          db.chemist.count({ where: fallbackWhere }),
+        ]);
+        if (fallbackChems.length > 0) {
+          chemists = fallbackChems;
+          count = fallbackCount;
+        }
+      }
       entities = chemists.map((c) => ({
         id: c.id,
         name: c.name,
