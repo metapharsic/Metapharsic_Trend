@@ -1137,3 +1137,51 @@ model WhatsAppDispatchLog {
   @@map("whatsapp_dispatch_logs")
 }
 
+model AppModule {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  label         String
+  href          String
+  icon          String
+  category      String
+  categoryOrder Int      @default(0)
+  sortOrder     Int      @default(0)
+  roles         Role[]
+  labelByRole   Json?
+  isArtifact    Boolean  @default(false)
+  moduleType    String   @default("MODULE") // "MODULE" | "ARTIFACT"
+  badge         String?
+  isActive      Boolean  @default(true)
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([category])
+  @@index([categoryOrder, sortOrder])
+  @@index([isActive])
+  @@index([isArtifact])
+  @@map("app_modules")
+}
+
+model SystemArtifact {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  title        String
+  artifactType String   // "REPORT", "INTELLIGENCE_COUNCIL", "AUDIT_DOSSIER", "SUPPLY_CHAIN_ANALYSIS", "COMPLIANCE_RUN", "DOCUMENT"
+  category     String
+  fileFormat   String   @default("MARKDOWN") // "MARKDOWN", "JSON", "PDF", "EXCEL"
+  filePath     String?
+  content      String?  @db.Text
+  metadata     Json?
+  status       String   @default("ACTIVE")
+  generatedBy  String?  @default("SYSTEM_AGENT")
+  version      String   @default("1.0.0")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([artifactType])
+  @@index([category])
+  @@index([status])
+  @@map("system_artifacts")
+}
+

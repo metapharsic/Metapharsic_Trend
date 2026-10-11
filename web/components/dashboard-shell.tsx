@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  LucideIcon,
   LayoutGrid,
   MapPinned,
   Bell,
@@ -48,76 +49,76 @@ import { systemHealth, SystemErrorRecord } from "@/lib/system-health";
 import { SystemDiagnosticsModal } from "@/components/system-diagnostics-modal";
 import { SystemUpdateModal } from "@/components/system-update-modal";
 
-// Structured navigation categories
-const NAV_CATEGORY_ORDER = [
-  "Executive & Dashboards",
-  "Field Force & CRM",
-  "Commercial & Channels",
-  "Finance, HR & People",
-  "Analytics & Marketing",
-  "Administration & Profile",
-] as const;
+// Dynamic icon map linking Lucide icon names from PostgreSQL database to icon components
+const ICON_MAP: Record<string, LucideIcon> = {
+  LayoutGrid,
+  MapPinned,
+  Bell,
+  Search,
+  LogOut,
+  ShieldCheck,
+  CalendarDays,
+  Package,
+  Receipt,
+  Stethoscope,
+  BarChart3,
+  Users2,
+  Calculator,
+  Building2,
+  GraduationCap,
+  Contact,
+  UserCog,
+  UserCircle2,
+  ClipboardCheck,
+  Menu,
+  X,
+  Wallet,
+  Target,
+  IndianRupee,
+  Clock,
+  Settings2,
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  Sparkles,
+  BookOpen,
+  FileSpreadsheet,
+  Download,
+  ShieldAlert,
+  Activity,
+  Folder,
+};
 
-const NAV_ITEMS = [
-  // ── Executive & Dashboards ───────────────────────────────────
-  { href: "/md", label: "MD Executive Dashboard", icon: LayoutGrid, roles: ["MD", "ADMIN"], category: "Executive & Dashboards" },
-  { href: "/asm", label: "ASM Area Dashboard", icon: LayoutGrid, roles: ["ASM", "ADMIN"], category: "Executive & Dashboards" },
-  { href: "/mr", label: "MR Field Dashboard", icon: LayoutGrid, roles: ["MR", "ADMIN"], category: "Executive & Dashboards" },
-  { href: "/mr/reports/council", label: "Multi-Agent AI Council", icon: Sparkles, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "MR"], category: "Executive & Dashboards" },
-  { href: "/admin", label: "Admin Control Center", icon: ShieldCheck, roles: ["ADMIN"], category: "Executive & Dashboards" },
+function getNavIcon(iconName: any): LucideIcon {
+  if (typeof iconName === "function") return iconName as LucideIcon;
+  if (typeof iconName === "string" && ICON_MAP[iconName]) return ICON_MAP[iconName];
+  return LayoutGrid;
+}
 
-  // ── Field Force & CRM ────────────────────────────────────────
-  { href: "/mr/calls", label: "My Calls & DCR", icon: ClipboardCheck, roles: ["MR", "ADMIN"], category: "Field Force & CRM" },
-  { href: "/mr/reports", label: "My Call Reports", icon: BarChart3, roles: ["MR", "ADMIN"], category: "Field Force & CRM" },
-  { href: "/mr/reports/council", label: "Multi-Agent Audit & WhatsApp", icon: Sparkles, roles: ["MR", "ADMIN", "ASM", "RM", "ZSM", "NSM", "MD"], category: "Field Force & CRM" },
-  { href: "/tour-plans", label: "Tour Plans (MTP/TP)", icon: CalendarDays, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "MR"], category: "Field Force & CRM" },
-  { href: "/territories", label: "Territory Tree", icon: MapPinned, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"], category: "Field Force & CRM" },
-  { href: "/doctors", label: "Doctor CRM & Potential", icon: Stethoscope, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"], category: "Field Force & CRM" },
-  { href: "/hospitals", label: "Hospital & Institutional", icon: Building2, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"], category: "Field Force & CRM" },
-  { href: "/entities", label: "Master Entity Profiles", icon: Contact, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"], category: "Field Force & CRM" },
-  { href: "/mr/leads", label: "Lead Pipeline", icon: Target, roles: ["MR", "ADMIN", "ASM"], category: "Field Force & CRM" },
-  { href: "/admin/mr-activity", label: "Field Activity Monitor", icon: ClipboardCheck, roles: ["ADMIN", "ASM", "RM", "ZSM", "NSM"], category: "Field Force & CRM" },
-  { href: "/mr/claims", label: "Expiry & Damage Claims", icon: AlertTriangle, roles: ["MR", "ADMIN", "ASM"], labelByRole: { ADMIN: "Claims Review", ASM: "Claims Review" }, category: "Field Force & CRM" },
-  { href: "/mr/attendance", label: "Field Attendance", icon: Clock, roles: ["MR", "ADMIN", "ASM"], category: "Field Force & CRM" },
+export interface NavModuleItem {
+  id: string;
+  code: string;
+  label: string;
+  href: string;
+  icon: string;
+  category: string;
+  categoryOrder?: number;
+  sortOrder?: number;
+  roles: string[];
+  labelByRole?: Record<string, string> | null;
+  isArtifact?: boolean;
+  moduleType?: string;
+  badge?: string | null;
+  isActive?: boolean;
+  description?: string | null;
+}
 
-  // ── Commercial & Channels ────────────────────────────────────
-  { href: "/orders", label: "Secondary Orders", icon: Package, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "MR", "DISTRIBUTOR"], labelByRole: { MR: "My Orders", DISTRIBUTOR: "Orders & Invoices" }, category: "Commercial & Channels" },
-  { href: "/collections", label: "Credit & Collections", icon: Wallet, roles: ["MR", "ASM", "ADMIN", "FINANCE"], category: "Commercial & Channels" },
-  { href: "/inventory", label: "Stock Inventory", icon: Package, roles: ["ADMIN", "WAREHOUSE", "ASM", "MR"], category: "Commercial & Channels" },
-  { href: "/admin/financials", label: "Entity Credit & Balances", icon: IndianRupee, roles: ["ADMIN", "ASM", "FINANCE"], category: "Commercial & Channels" },
-  { href: "/warehouse", label: "Warehouse Operations", icon: Package, roles: ["WAREHOUSE", "ADMIN"], category: "Commercial & Channels" },
-  { href: "/distributor", label: "Distributor Portal", icon: Package, roles: ["DISTRIBUTOR", "ADMIN", "MD"], category: "Commercial & Channels" },
-  { href: "/doctor", label: "Doctor Portal", icon: Stethoscope, roles: ["DOCTOR", "ADMIN"], category: "Commercial & Channels" },
+export interface NavCategoryGroup {
+  category: string;
+  categoryOrder?: number;
+  items: NavModuleItem[];
+}
 
-  // ── Finance, HR & People ─────────────────────────────────────
-  { href: "/admin/accounts-jotter", label: "Admin Accounts Jotter", icon: BookOpen, roles: ["ADMIN", "FINANCE", "MD"], category: "Finance, HR & People" },
-  { href: "/finance", label: "Finance & General Ledger", icon: Calculator, roles: ["FINANCE", "ADMIN"], category: "Finance, HR & People" },
-  { href: "/finance/accounts", label: "Chart of Accounts", icon: IndianRupee, roles: ["FINANCE", "ADMIN", "MD"], category: "Finance, HR & People" },
-  { href: "/finance/journal", label: "Journal Entries", icon: IndianRupee, roles: ["FINANCE", "ADMIN"], category: "Finance, HR & People" },
-  { href: "/finance/reports", label: "Financial Statements", icon: IndianRupee, roles: ["FINANCE", "ADMIN", "MD"], category: "Finance, HR & People" },
-  { href: "/expenses", label: "Expense Claims & DA", icon: Receipt, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "MR", "FINANCE"], category: "Finance, HR & People" },
-  { href: "/users", label: "User Management & Roles", icon: UserCog, roles: ["ADMIN", "HR", "MD"], category: "Finance, HR & People" },
-  { href: "/hr", label: "HR Dashboard", icon: Users2, roles: ["HR", "ADMIN"], category: "Finance, HR & People" },
-  { href: "/hrms", label: "HRMS & Payroll", icon: Users2, roles: ["ADMIN", "HR"], category: "Finance, HR & People" },
-  { href: "/lms", label: "Training & Certifications", icon: GraduationCap, roles: ["ADMIN", "HR", "ASM", "RM", "ZSM", "NSM", "MD", "MR"], category: "Finance, HR & People" },
-
-  // ── Analytics & Marketing ────────────────────────────────────
-  { href: "/reports", label: "Executive BI Reports", icon: BarChart3, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"], category: "Analytics & Marketing" },
-  { href: "/reports/mr-daily-calls", label: "MR Daily Calls Report", icon: BarChart3, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "MR"], category: "Analytics & Marketing" },
-  { href: "/simulator", label: "Scheme Margin Simulator", icon: Calculator, roles: ["ADMIN", "MD", "NSM", "FINANCE", "MARKETING"], category: "Analytics & Marketing" },
-  { href: "/marketing", label: "Marketing & Campaign Intelligence", icon: BarChart3, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "MARKETING"], category: "Analytics & Marketing" },
-
-  // ── Administration & Profile ─────────────────────────────────
-  { href: "/dms", label: "Document Management (DMS)", icon: Folder, roles: ["ADMIN"], category: "Administration & Profile" },
-  { href: "/admin/ptr-calculator", label: "PTR & Scheme Simulator", icon: Calculator, roles: ["ADMIN", "MD"], category: "Administration & Profile" },
-
-  { href: "/admin/accounts-jotter", label: "Quick Accounts Jotter", icon: BookOpen, roles: ["ADMIN", "FINANCE"], category: "Administration & Profile" },
-  { href: "/admin/diagnostics", label: "System Health & Diagnostics", icon: ShieldAlert, roles: ["ADMIN", "MD"], category: "Administration & Profile" },
-  { href: "/admin/company-settings", label: "Company Settings", icon: Building2, roles: ["ADMIN"], category: "Administration & Profile" },
-  { href: "/admin/workflow-settings", label: "Workflow Settings", icon: Settings2, roles: ["ADMIN"], category: "Administration & Profile" },
-  { href: "/admin/system-config", label: "System Configuration", icon: Settings2, roles: ["ADMIN"], category: "Administration & Profile" },
-  { href: "/profile", label: "My Profile", icon: UserCircle2, roles: ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM", "HR", "FINANCE", "WAREHOUSE", "MARKETING", "MR", "DISTRIBUTOR", "DOCTOR"], category: "Administration & Profile" },
-];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -201,26 +202,46 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const filteredNavItems = NAV_ITEMS.filter((item) => !userRole || item.roles.includes(userRole)).map((item) => {
-    const override = userRole && "labelByRole" in item ? (item.labelByRole as unknown as Record<string, string>)[userRole] : undefined;
-    return override ? { ...item, label: override } : item;
-  });
+  // Navigation categories & items strictly fetched from PostgreSQL database
+  const [groupedNavItems, setGroupedNavItems] = useState<NavCategoryGroup[]>([]);
+  const [navLoading, setNavLoading] = useState(true);
 
-  const groupedNavItems = NAV_CATEGORY_ORDER.map((cat) => ({
-    category: cat,
-    items: filteredNavItems.filter((i) => i.category === cat),
-  })).filter((g) => g.items.length > 0);
+  useEffect(() => {
+    let isMounted = true;
+    const query = userRole ? `?role=${userRole}` : "";
+    apiClient
+      .get(`/api/system/modules${query}`)
+      .then((res) => {
+        if (isMounted && res.data?.success && res.data.data?.sidebar) {
+          setGroupedNavItems(res.data.data.sidebar);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load navigation modules from database:", err);
+      })
+      .finally(() => {
+        if (isMounted) setNavLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userRole]);
+
+  const filteredNavItems = groupedNavItems.flatMap((g) => g.items);
 
   // Auto-expand the category that holds the currently active route
   useEffect(() => {
-    const activeGroup = groupedNavItems.find((g) => g.items.some((item) => pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))));
+    const activeGroup = groupedNavItems.find((g) =>
+      g.items.some((item) => pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)))
+    );
     if (activeGroup) {
       setExpandedCategories((prev) => ({
         ...prev,
         [activeGroup.category]: true,
       }));
     }
-  }, [pathname, userRole]);
+  }, [pathname, groupedNavItems]);
 
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) => ({
@@ -295,11 +316,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
                 {isExpanded && (
                   <div className="p-1.5 space-y-1 bg-white">
-                    {group.items.map(({ href, label, icon: Icon }) => {
+                    {group.items.map((item) => {
+                      const { href, label, isArtifact } = item;
+                      const Icon = getNavIcon(item.icon);
                       const active = pathname === href;
                       return (
                         <Link
-                          key={href}
+                          key={href + label}
                           href={href}
                           onClick={() => setSidebarOpen(false)}
                           className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
@@ -308,8 +331,17 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                               : "text-gray-600 hover:bg-primary-50 hover:text-primary-700"
                           }`}
                         >
-                          <Icon size={16} className="shrink-0" />
-                          <span className="truncate">{label}</span>
+                          <Icon size={16} className={`shrink-0 ${active ? "text-white" : isArtifact ? "text-primary-600" : "text-gray-500"}`} />
+                          <span className="truncate flex-1">{label}</span>
+                          {isArtifact && (
+                            <span
+                              className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
+                                active ? "bg-white/20 text-white" : "bg-primary-50 text-primary-700 border border-primary-200/60"
+                              }`}
+                            >
+                              AI
+                            </span>
+                          )}
                         </Link>
                       );
                     })}
@@ -374,11 +406,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
                 {/* Desktop Accordion Body */}
                 <div className={`space-y-0.5 xl:p-1 xl:bg-white ${isExpanded ? "block" : "hidden xl:hidden"}`}>
-                  {group.items.map(({ href, label, icon: Icon }) => {
+                  {group.items.map((item) => {
+                    const { href, label, isArtifact } = item;
+                    const Icon = getNavIcon(item.icon);
                     const active = pathname === href;
                     return (
                       <Link
-                        key={href}
+                        key={href + label}
                         href={href}
                         title={label}
                         className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all justify-center xl:justify-start ${
@@ -387,8 +421,17 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                             : "text-gray-600 hover:bg-primary-50 hover:text-primary-700"
                         }`}
                       >
-                        <Icon size={16} className={`shrink-0 ${active ? "text-white" : "text-gray-500"}`} />
-                        <span className="hidden xl:inline truncate">{label}</span>
+                        <Icon size={16} className={`shrink-0 ${active ? "text-white" : isArtifact ? "text-primary-600" : "text-gray-500"}`} />
+                        <span className="hidden xl:inline truncate flex-1">{label}</span>
+                        {isArtifact && (
+                          <span
+                            className={`hidden xl:inline text-[8px] font-bold px-1.5 py-0.2 rounded ml-auto ${
+                              active ? "bg-white/20 text-white" : "bg-primary-50 text-primary-700 border border-primary-200/60"
+                            }`}
+                          >
+                            AI
+                          </span>
+                        )}
                       </Link>
                     );
                   })}
@@ -451,19 +494,22 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 {navSearchResults.length === 0 ? (
                   <p className="px-4 py-3 text-xs text-gray-400">No pages match &ldquo;{navSearch}&rdquo;.</p>
                 ) : (
-                  navSearchResults.map(({ href, label, icon: Icon, category }) => (
-                    <button
-                      key={href}
-                      onMouseDown={() => goToSearchResult(href)}
-                      className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs text-gray-700 hover:bg-primary-50 hover:text-primary-700 text-left transition-colors"
-                    >
-                      <span className="flex items-center gap-2.5">
-                        <Icon size={15} className="shrink-0 text-gray-400" />
-                        <span className="font-medium">{label}</span>
-                      </span>
-                      <span className="text-[10px] text-gray-400 uppercase tracking-wider">{category}</span>
-                    </button>
-                  ))
+                  navSearchResults.map(({ href, label, icon: iconName, category }) => {
+                    const Icon = getNavIcon(iconName);
+                    return (
+                      <button
+                        key={href}
+                        onMouseDown={() => goToSearchResult(href)}
+                        className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs text-gray-700 hover:bg-primary-50 hover:text-primary-700 text-left transition-colors"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <Icon size={15} className="shrink-0 text-gray-400" />
+                          <span className="font-medium">{label}</span>
+                        </span>
+                        <span className="text-[10px] text-gray-400 uppercase tracking-wider">{category}</span>
+                      </button>
+                    );
+                  })
                 )}
               </div>
             )}
