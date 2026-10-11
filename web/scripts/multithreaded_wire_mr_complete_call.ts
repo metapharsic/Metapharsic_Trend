@@ -1,5 +1,7 @@
 import { Worker, isMainThread, parentPort, workerData } from "worker_threads";
 import { PrismaClient, Role } from "@prisma/client";
+import * as path from "path";
+import * as fs from "fs";
 
 // Canonical Sample Quantities matching Abdul Malik
 export const CANONICAL_MR_SAMPLES: Record<string, number> = {
@@ -243,9 +245,14 @@ if (!isMainThread) {
 
       const spawnWorker = (threadId: number, workerTask: string): Promise<any> => {
         return new Promise((resolve, reject) => {
+          const tsxLoaderPath = path.resolve(__dirname, "../node_modules/tsx/dist/loader.mjs");
+          const execArgv = fs.existsSync(tsxLoaderPath)
+            ? ["--import", tsxLoaderPath]
+            : ["--import", "tsx"];
+
           const worker = new Worker(__filename, {
             workerData: { threadId, dbUrl: target.url, workerTask },
-            execArgv: ["--import", "tsx"],
+            execArgv,
           });
 
           worker.on("message", (msg) => {
