@@ -114,6 +114,7 @@ export default function ProfilePage() {
   const [form, setForm] = useState({ firstName: "", lastName: "", phone: "", password: "" });
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     // Get the current user's ID from the JWT and fetch their profile
@@ -142,15 +143,55 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
     if (!profile) return;
+    setErrorMsg(null);
+
+    const firstName = form.firstName.trim();
+    const lastName = form.lastName.trim();
+    const phone = form.phone.trim();
+    const password = form.password.trim();
+
+    if (!firstName) {
+      setErrorMsg("First name is required");
+      return;
+    }
+    if (!lastName) {
+      setErrorMsg("Last name is required");
+      return;
+    }
+    if (password.length > 0 && password.length < 6) {
+      setErrorMsg("Password must be at least 6 characters");
+      return;
+    }
+
     setSaving(true);
     try {
-      await apiClient.put(`/api/users/${profile.id}`, form);
+      const payload: { firstName: string; lastName: string; phone: string; password?: string } = {
+        firstName,
+        lastName,
+        phone,
+      };
+
+      if (password.length >= 6) {
+        payload.password = password;
+      }
+
+      await apiClient.put(`/api/users/${profile.id}`, payload);
       setSavedOk(true);
       setEditing(false);
+      setForm((prev) => ({ ...prev, password: "" }));
       setTimeout(() => setSavedOk(false), 3000);
+
       // Refresh
       const res = await apiClient.get(`/api/users/${profile.id}`);
       setProfile(res.data.data.user);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.error?.message ||
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to update profile";
+      setErrorMsg(msg);
+      setTimeout(() => setErrorMsg(null), 5000);
     } finally {
       setSaving(false);
     }
@@ -186,6 +227,13 @@ export default function ProfilePage() {
         </div>
       )}
 
+      {/* Error Toast */}
+      {errorMsg && (
+        <div className="fixed top-6 right-6 z-50 bg-rose-600 text-white px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2">
+          <X size={18} /> {errorMsg}
+        </div>
+      )}
+
       {/* Profile Hero */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 rounded-2xl p-8 text-white shadow-lg">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
@@ -212,7 +260,20 @@ export default function ProfilePage() {
             <p className="text-slate-400 text-sm mt-2">{meta.description}</p>
           </div>
           <button
-            onClick={() => setEditing(!editing)}
+            onClick={() => {
+              if (editing) {
+                setErrorMsg(null);
+                setForm({
+                  firstName: profile.employee?.firstName ?? "",
+                  lastName: profile.employee?.lastName ?? "",
+                  phone: profile.employee?.phone ?? "",
+                  password: "",
+                });
+                setEditing(false);
+              } else {
+                setEditing(true);
+              }
+            }}
             className="flex-shrink-0 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-colors backdrop-blur border border-white/20"
           >
             <Edit3 size={15} /> {editing ? "Cancel" : "Edit Profile"}
@@ -231,6 +292,12 @@ export default function ProfilePage() {
             <div className="p-5 space-y-4">
               {editing ? (
                 <div className="space-y-3">
+                  {errorMsg && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                      <X size={14} className="flex-shrink-0" />
+                      <span>{errorMsg}</span>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">First Name</label>

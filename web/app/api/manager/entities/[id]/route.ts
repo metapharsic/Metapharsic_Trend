@@ -280,8 +280,12 @@ async function updateEntity(
     const parsed = UpdateEntityBodySchema.safeParse(body);
     if (!parsed.success) return badRequest("Validation error", parsed.error.flatten());
 
+    const { type } = parsed.data;
+    if (req.user.role === Role.MR && type === "EMPLOYEE") {
+      return badRequest("Medical Representatives cannot modify employee internal records");
+    }
+
     const {
-      type,
       name,
       address,
       latitude,
@@ -589,5 +593,6 @@ async function deactivateEntity(
 const ALL_MANAGERS = [Role.ADMIN, Role.MD, Role.NSM, Role.ZSM, Role.RM, Role.ASM];
 
 export const GET = withAuth(getEntityDetails, [...ALL_MANAGERS, Role.MR]);
-export const PUT = withAuth(updateEntity, ALL_MANAGERS);
+export const PUT = withAuth(updateEntity, [...ALL_MANAGERS, Role.MR]);
 export const DELETE = withAuth(deactivateEntity, ALL_MANAGERS);
+

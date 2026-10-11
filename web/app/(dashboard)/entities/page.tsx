@@ -32,6 +32,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { LicenseAutoFill } from "@/components/entities/license-autofill";
 
 type EntityType = "DOCTOR" | "CHEMIST" | "DISTRIBUTOR" | "HOSPITAL" | "EMPLOYEE";
 
@@ -179,6 +180,7 @@ export default function MasterProfiles() {
 
   const canManage = !role || ["ADMIN", "MD", "NSM", "ZSM", "RM", "ASM"].includes(role.toUpperCase());
   const canCreate = canManage || (role === "MR" && (activeTab === "DOCTOR" || activeTab === "CHEMIST"));
+  const canEdit = canManage || (role === "MR" && (activeTab === "DOCTOR" || activeTab === "CHEMIST" || activeTab === "DISTRIBUTOR" || activeTab === "HOSPITAL"));
 
   // Fetch entity records
   const loadEntities = () => {
@@ -516,7 +518,7 @@ export default function MasterProfiles() {
                   <th className="px-6 py-3 font-semibold">Contact & Channel</th>
                   <th className="px-6 py-3 font-semibold">Territory & Address</th>
                   {activeTab === "DOCTOR" && <th className="px-6 py-3 font-semibold">DPS Score / Tier</th>}
-                  {activeTab === "CHEMIST" && <th className="px-6 py-3 font-semibold">GSTIN / Credit</th>}
+                  {activeTab === "CHEMIST" && <th className="px-6 py-3 font-semibold">License / GSTIN</th>}
                   {activeTab === "DISTRIBUTOR" && <th className="px-6 py-3 font-semibold">GSTIN / License</th>}
                   {activeTab === "HOSPITAL" && <th className="px-6 py-3 font-semibold">Beds / Depts</th>}
                   {activeTab === "EMPLOYEE" && <th className="px-6 py-3 font-semibold">Role / Status</th>}
@@ -601,12 +603,8 @@ export default function MasterProfiles() {
 
                     {activeTab === "CHEMIST" && (
                       <td className="px-6 py-3.5">
-                        <p className="text-xs font-mono text-slate-600">{row.gstNo || "No GSTIN"}</p>
-                        <p className="text-xs font-semibold text-emerald-700 mt-0.5">
-                          {row.creditLimit !== null && row.creditLimit !== undefined
-                            ? currency(row.creditLimit)
-                            : "No limit"}
-                        </p>
+                        <p className="text-xs font-mono text-slate-800 font-semibold">{row.licenseNo || "No DL"}</p>
+                        <p className="text-[11px] font-mono text-slate-400 mt-0.5">{row.gstNo || "No GSTIN"}</p>
                       </td>
                     )}
 
@@ -655,7 +653,7 @@ export default function MasterProfiles() {
                         </button>
 
                         {/* Edit Record */}
-                        {canManage && (
+                        {canEdit && (
                           <button
                             onClick={() => setEditRow(row)}
                             title="Edit Master Profile"
@@ -719,7 +717,7 @@ export default function MasterProfiles() {
             setViewDetails(null);
             setEditRow(target);
           }}
-          canManage={canManage}
+          canManage={canEdit}
         />
       )}
 
@@ -956,6 +954,10 @@ function ViewDossierModal({
 
                     {row.type === "CHEMIST" && (
                       <>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Drug License (DL):</span>
+                          <span className="font-mono text-slate-800 font-semibold">{data.licenseNo || "No DL recorded"}</span>
+                        </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400">Contact Person:</span>
                           <span className="font-semibold text-slate-800">{data.contactPerson || "Owner"}</span>
@@ -1381,6 +1383,23 @@ function AppendEntityModal({
           ) : (
             /* Doctor, Chemist, Distributor, Hospital Form */
             <>
+              <LicenseAutoFill
+                customerType={type}
+                onExtracted={(data) => {
+                  if (data.entityName) setName(data.entityName);
+                  if (data.address) setAddress(data.address);
+                  if (data.licenseNo) {
+                    setLicenseNo(data.licenseNo);
+                    if (type === "DOCTOR") setRegistrationNo(data.licenseNo);
+                  }
+                  if (data.gstNo) setGstNo(data.gstNo);
+                  if (data.contactPerson) setContactPerson(data.contactPerson);
+                  if (data.phone) setWhatsApp(data.phone);
+                  if (data.qualification && type === "DOCTOR") setQualification(data.qualification);
+                  if (data.entityName && type === "CHEMIST") setBillingName(data.entityName);
+                }}
+              />
+
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                   Entity Name *
@@ -1478,13 +1497,13 @@ function AppendEntityModal({
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                        Registration No
+                        Registration No / Medical License
                       </label>
                       <input
                         value={registrationNo}
                         onChange={(e) => setRegistrationNo(e.target.value)}
                         placeholder="e.g. DMC/R/12345"
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono"
                       />
                     </div>
                   </div>
@@ -1521,6 +1540,17 @@ function AppendEntityModal({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Drug License No (Form 20/21)
+                      </label>
+                      <input
+                        value={licenseNo}
+                        onChange={(e) => setLicenseNo(e.target.value)}
+                        placeholder="e.g. TS/HYD/2024/9912 or 20B/21B"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                         GSTIN
                       </label>
                       <input
@@ -1530,19 +1560,20 @@ function AppendEntityModal({
                         className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                        Credit Limit (₹)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={creditLimit}
-                        onChange={(e) => setCreditLimit(e.target.value)}
-                        placeholder="e.g. 100000"
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                      />
-                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                      Credit Limit (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={creditLimit}
+                      onChange={(e) => setCreditLimit(e.target.value)}
+                      placeholder="e.g. 100000"
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                    />
                   </div>
                 </>
               )}
@@ -1784,6 +1815,23 @@ function EditEntityModal({
             </div>
           )}
 
+          <LicenseAutoFill
+            customerType={type}
+            onExtracted={(data) => {
+              if (data.entityName) setName(data.entityName);
+              if (data.address) setAddress(data.address);
+              if (data.licenseNo) {
+                setLicenseNo(data.licenseNo);
+                if (type === "DOCTOR") setRegistrationNo(data.licenseNo);
+              }
+              if (data.gstNo) setGstNo(data.gstNo);
+              if (data.contactPerson) setContactPerson(data.contactPerson);
+              if (data.phone) setWhatsApp(data.phone);
+              if (data.qualification && type === "DOCTOR") setQualification(data.qualification);
+              if (data.entityName && type === "CHEMIST") setBillingName(data.entityName);
+            }}
+          />
+
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
               Full Name *
@@ -1903,27 +1951,40 @@ function EditEntityModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                    GSTIN
+                    Drug License No (Form 20/21)
                   </label>
                   <input
-                    value={gstNo}
-                    onChange={(e) => setGstNo(e.target.value)}
+                    value={licenseNo}
+                    onChange={(e) => setLicenseNo(e.target.value)}
+                    placeholder="e.g. TS/HYD/2024/9912 or 20B/21B"
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                    Credit Limit (₹)
+                    GSTIN
                   </label>
                   <input
-                    type="number"
-                    min="0"
-                    value={creditLimit}
-                    onChange={(e) => setCreditLimit(e.target.value)}
-                    placeholder="Leave blank for none"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                    value={gstNo}
+                    onChange={(e) => setGstNo(e.target.value)}
+                    placeholder="07AAAAA0000A1Z5"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Credit Limit (₹)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={creditLimit}
+                  onChange={(e) => setCreditLimit(e.target.value)}
+                  placeholder="Leave blank for none"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                />
               </div>
             </>
           )}

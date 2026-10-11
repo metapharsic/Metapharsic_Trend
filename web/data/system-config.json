@@ -7,187 +7,376 @@
   "autoPullSchedule": "TWICE_WEEKLY",
   "autoSyncOnPull": false,
   "lastCheckedAt": "2026-10-02T14:45:42.704Z",
-  "lastPulledAt": "2026-10-07T21:30:01.200Z",
-  "lastPullStatus": "FAILED",
+  "lastPulledAt": "2026-10-10T04:59:20.064Z",
+  "lastPullStatus": "SUCCESS",
   "lastPulledFiles": [
     {
-      "filename": "test_mr_activity_wiring.js",
+      "filename": ".gitignore",
       "status": "modified",
       "additions": 1,
-      "deletions": 1,
-      "impactedComponent": "Field Force & DCR CRM"
+      "deletions": 0,
+      "impactedComponent": "Core Application Platform"
     },
     {
-      "filename": "web/app/(dashboard)/mr/calls/new/page.tsx",
+      "filename": "web/app/(dashboard)/admin/accounts-jotter/page.tsx",
       "status": "modified",
-      "additions": 61,
-      "deletions": 12,
-      "impactedComponent": "Field Force & DCR CRM"
-    },
-    {
-      "filename": "web/app/(dashboard)/mr/calls/page.tsx",
-      "status": "modified",
-      "additions": 54,
-      "deletions": 4,
-      "impactedComponent": "Field Force & DCR CRM"
+      "additions": 2,
+      "deletions": 2,
+      "impactedComponent": "Core Application Platform"
     },
     {
       "filename": "web/app/(dashboard)/mr/reports/page.tsx",
       "status": "modified",
-      "additions": 1358,
-      "deletions": 479,
+      "additions": 44,
+      "deletions": 0,
       "impactedComponent": "Field Force & DCR CRM"
     },
     {
       "filename": "web/app/(dashboard)/reports/mr-daily-calls/page.tsx",
       "status": "modified",
-      "additions": 32,
-      "deletions": 3,
+      "additions": 168,
+      "deletions": 34,
       "impactedComponent": "Field Force & DCR CRM"
     },
     {
       "filename": "web/app/(dashboard)/reports/page.tsx",
       "status": "modified",
-      "additions": 1,
-      "deletions": 1,
+      "additions": 121,
+      "deletions": 26,
       "impactedComponent": "Core Application Platform"
     },
     {
-      "filename": "web/app/api/mr/entities/route.ts",
-      "status": "modified",
-      "additions": 12,
-      "deletions": 0,
-      "impactedComponent": "Field Force & DCR CRM"
-    },
-    {
-      "filename": "web/app/api/mr/reports/calls/route.ts",
-      "status": "modified",
-      "additions": 41,
-      "deletions": 2,
-      "impactedComponent": "Field Force & DCR CRM"
-    },
-    {
-      "filename": "web/app/api/mr/reports/deal-closure/route.ts",
+      "filename": "web/app/api/reports/potential-customers/route.ts",
       "status": "added",
-      "additions": 71,
+      "additions": 110,
       "deletions": 0,
-      "impactedComponent": "Field Force & DCR CRM"
+      "impactedComponent": "Core Application Platform"
     },
     {
-      "filename": "web/app/api/mr/visits/[id]/route.ts",
+      "filename": "web/components/dashboard-shell.tsx",
       "status": "modified",
-      "additions": 42,
-      "deletions": 4,
-      "impactedComponent": "Field Force & DCR CRM"
-    },
-    {
-      "filename": "web/app/api/mr/visits/route.ts",
-      "status": "modified",
-      "additions": 46,
-      "deletions": 6,
-      "impactedComponent": "Field Force & DCR CRM"
-    },
-    {
-      "filename": "web/components/mr/visit-detail-modal.tsx",
-      "status": "modified",
-      "additions": 9,
-      "deletions": 3,
-      "impactedComponent": "Field Force & DCR CRM"
+      "additions": 10,
+      "deletions": 5,
+      "impactedComponent": "User Interface & Navigation Shell"
     },
     {
       "filename": "web/data/system-config.json",
       "status": "modified",
-      "additions": 1681,
-      "deletions": 55,
+      "additions": 750,
+      "deletions": 81,
       "impactedComponent": "Core Application Platform"
     },
     {
       "filename": "web/lib/excel-export.ts",
       "status": "modified",
-      "additions": 732,
-      "deletions": 165,
+      "additions": 448,
+      "deletions": 193,
       "impactedComponent": "Core Application Platform"
     },
     {
-      "filename": "web/lib/validators.ts",
-      "status": "modified",
-      "additions": 5,
-      "deletions": 0,
-      "impactedComponent": "Core Application Platform"
-    },
-    {
-      "filename": "web/package-lock.json",
-      "status": "modified",
-      "additions": 687,
-      "deletions": 14,
-      "impactedComponent": "Core Application Platform"
-    },
-    {
-      "filename": "web/package.json",
-      "status": "modified",
-      "additions": 1,
-      "deletions": 0,
-      "impactedComponent": "Core Application Platform"
-    },
-    {
-      "filename": "web/scripts/sync-vps-to-local.ts",
-      "status": "modified",
-      "additions": 398,
-      "deletions": 109,
-      "impactedComponent": "Core Application Platform"
-    },
-    {
-      "filename": "web/scripts/test_call_compliance.ts",
+      "filename": "web/scripts/test_potential_customer_excel.ts",
       "status": "added",
-      "additions": 85,
+      "additions": 144,
       "deletions": 0,
       "impactedComponent": "Core Application Platform"
     },
     {
-      "filename": "web/scripts/test_exceljs.ts",
+      "filename": "web/services/potential-customers-agents.service.ts",
       "status": "added",
-      "additions": 12,
-      "deletions": 0,
-      "impactedComponent": "Core Application Platform"
-    },
-    {
-      "filename": "web/services/call-compliance-agents.service.ts",
-      "status": "added",
-      "additions": 179,
-      "deletions": 0,
-      "impactedComponent": "Core Application Platform"
-    },
-    {
-      "filename": "web/services/deal-closure-agents.service.ts",
-      "status": "added",
-      "additions": 742,
-      "deletions": 0,
-      "impactedComponent": "Core Application Platform"
-    },
-    {
-      "filename": "web/services/mr-daily-calls-agents.service.ts",
-      "status": "modified",
-      "additions": 8,
-      "deletions": 0,
-      "impactedComponent": "Field Force & DCR CRM"
-    },
-    {
-      "filename": "web/test_deal_closure_verification.ts",
-      "status": "added",
-      "additions": 169,
+      "additions": 624,
       "deletions": 0,
       "impactedComponent": "Core Application Platform"
     }
   ],
   "lastFetchedCommits": [
     {
-      "hash": "0b359b7c",
+      "hash": "ee1aab5f",
       "author": "Metapharsic Admin",
-      "date": "2026-10-02",
-      "message": "feat: multi-agent deal closure intelligence, professional xlsx export & call compliance"
+      "date": "2026-10-08",
+      "message": "feat: multi-agent potential customer intelligence & professional native xlsx export engine"
     }
   ],
   "pullHistory": [
+    {
+      "timestamp": "2026-10-10T04:59:20.064Z",
+      "type": "MANUAL",
+      "branch": "ee1aab5f",
+      "beforeHash": "85a4623b",
+      "afterHash": "ee1aab5f",
+      "status": "SUCCESS",
+      "filesCount": 11,
+      "files": [
+        {
+          "filename": ".gitignore",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/admin/accounts-jotter/page.tsx",
+          "status": "modified",
+          "additions": 2,
+          "deletions": 2,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/mr/reports/page.tsx",
+          "status": "modified",
+          "additions": 44,
+          "deletions": 0,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/(dashboard)/reports/mr-daily-calls/page.tsx",
+          "status": "modified",
+          "additions": 168,
+          "deletions": 34,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/(dashboard)/reports/page.tsx",
+          "status": "modified",
+          "additions": 121,
+          "deletions": 26,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/reports/potential-customers/route.ts",
+          "status": "added",
+          "additions": 110,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/components/dashboard-shell.tsx",
+          "status": "modified",
+          "additions": 10,
+          "deletions": 5,
+          "impactedComponent": "User Interface & Navigation Shell"
+        },
+        {
+          "filename": "web/data/system-config.json",
+          "status": "modified",
+          "additions": 750,
+          "deletions": 81,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/excel-export.ts",
+          "status": "modified",
+          "additions": 448,
+          "deletions": 193,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/scripts/test_potential_customer_excel.ts",
+          "status": "added",
+          "additions": 144,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/potential-customers-agents.service.ts",
+          "status": "added",
+          "additions": 624,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "ee1aab5f",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-08",
+          "message": "feat: multi-agent potential customer intelligence & professional native xlsx export engine"
+        }
+      ],
+      "logMessage": "🎉 Successful Note: Commit #ee1aab5f is fully applied and verified live on PM2 with zero downtime!\n\n✔ The commit #ee1aab5f is applied with the below changes:\n  • [MODIFIED] .gitignore (+1/-0) — Core Application Platform\n  • [MODIFIED] web/app/(dashboard)/admin/accounts-jotter/page.tsx (+2/-2) — Core Application Platform\n  • [MODIFIED] web/app/(dashboard)/mr/reports/page.tsx (+44/-0) — Field Force & DCR CRM\n  • [MODIFIED] web/app/(dashboard)/reports/mr-daily-calls/page.tsx (+168/-34) — Field Force & DCR CRM\n  • [MODIFIED] web/app/(dashboard)/reports/page.tsx (+121/-26) — Core Application Platform\n  • [ADDED] web/app/api/reports/potential-customers/route.ts (+110/-0) — Core Application Platform\n  • [MODIFIED] web/components/dashboard-shell.tsx (+10/-5) — User Interface & Navigation Shell\n  • [MODIFIED] web/data/system-config.json (+750/-81) — Core Application Platform\n  • [MODIFIED] web/lib/excel-export.ts (+448/-193) — Core Application Platform\n  • [ADDED] web/scripts/test_potential_customer_excel.ts (+144/-0) — Core Application Platform\n  • [ADDED] web/services/potential-customers-agents.service.ts (+624/-0) — Core Application Platform",
+      "id": "pull-1791608360064-01xti"
+    },
+    {
+      "timestamp": "2026-10-10T04:58:46.188Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623b",
+      "afterHash": "85a4623b",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": "test_mr_activity_wiring.js",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/(dashboard)/mr/calls/new/page.tsx",
+          "status": "modified",
+          "additions": 61,
+          "deletions": 12,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/(dashboard)/mr/calls/page.tsx",
+          "status": "modified",
+          "additions": 54,
+          "deletions": 4,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/(dashboard)/mr/reports/page.tsx",
+          "status": "modified",
+          "additions": 1358,
+          "deletions": 479,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/(dashboard)/reports/mr-daily-calls/page.tsx",
+          "status": "modified",
+          "additions": 32,
+          "deletions": 3,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/(dashboard)/reports/page.tsx",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/mr/entities/route.ts",
+          "status": "modified",
+          "additions": 12,
+          "deletions": 0,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/api/mr/reports/calls/route.ts",
+          "status": "modified",
+          "additions": 41,
+          "deletions": 2,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/api/mr/reports/deal-closure/route.ts",
+          "status": "added",
+          "additions": 71,
+          "deletions": 0,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/api/mr/visits/[id]/route.ts",
+          "status": "modified",
+          "additions": 42,
+          "deletions": 4,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/api/mr/visits/route.ts",
+          "status": "modified",
+          "additions": 46,
+          "deletions": 6,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/components/mr/visit-detail-modal.tsx",
+          "status": "modified",
+          "additions": 9,
+          "deletions": 3,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/data/system-config.json",
+          "status": "modified",
+          "additions": 1681,
+          "deletions": 55,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/excel-export.ts",
+          "status": "modified",
+          "additions": 732,
+          "deletions": 165,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/validators.ts",
+          "status": "modified",
+          "additions": 5,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/package-lock.json",
+          "status": "modified",
+          "additions": 687,
+          "deletions": 14,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/package.json",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/scripts/sync-vps-to-local.ts",
+          "status": "modified",
+          "additions": 398,
+          "deletions": 109,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/scripts/test_call_compliance.ts",
+          "status": "added",
+          "additions": 85,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/scripts/test_exceljs.ts",
+          "status": "added",
+          "additions": 12,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/call-compliance-agents.service.ts",
+          "status": "added",
+          "additions": 179,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/deal-closure-agents.service.ts",
+          "status": "added",
+          "additions": 742,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/mr-daily-calls-agents.service.ts",
+          "status": "modified",
+          "additions": 8,
+          "deletions": 0,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/test_deal_closure_verification.ts",
+          "status": "added",
+          "additions": 169,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 85a4623b..ee1aab5f\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/contracts/pricing-consistency.test.ts\n\tweb/__tests__/software-update-agents.test.ts\n\tweb/app/(dashboard)/admin/accounts-jotter/page.tsx\n\tweb/app/(dashboard)/admin/page.tsx\n\tweb/app/(dashboard)/entities/page.tsx\n\tweb/app/(dashboard)/marketing/page.tsx\n\tweb/app/(dashboard)/mr/calls/new/page.tsx\n\tweb/app/(dashboard)/mr/calls/page.tsx\n\tweb/app/(dashboard)/mr/claims/page.tsx\n\tweb/app/(dashboard)/mr/reports/council/page.tsx\n\tweb/app/(dashboard)/mr/reports/page.tsx\n\tweb/app/(dashboard)/reports/mr-daily-calls/page.tsx\n\tweb/app/(dashboard)/reports/page.tsx\n\tweb/app/(dashboard)/simulator/page.tsx\n\tweb/app/(dashboard)/users/page.tsx\n\tweb/app/api/auth/login/mr/route.ts\n\tweb/app/api/invoices/route.ts\n\tweb/app/api/manager/entities/[id]/route.ts\n\tweb/app/api/manager/entities/rou",
+      "id": "pull-1791608326189-q7p57"
+    },
     {
       "timestamp": "2026-10-07T21:30:01.200Z",
       "type": "AUTO",

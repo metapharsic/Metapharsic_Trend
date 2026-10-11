@@ -103,6 +103,8 @@ export async function resetFixture(): Promise<TestFixture> {
       territoryId: territory.id,
       patientFootfallDaily: 35,
       avgPrescriptionsDaily: 15,
+      mobile: "+919876543210",
+      whatsApp: "+919876543210",
     },
   });
 
@@ -114,6 +116,7 @@ export async function resetFixture(): Promise<TestFixture> {
       latitude: 28.69,
       longitude: 77.095,
       territoryId: territory.id,
+      mobile: "+919876543211",
     },
   });
 

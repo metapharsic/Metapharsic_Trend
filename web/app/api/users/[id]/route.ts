@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { Role } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
-import { ok, badRequest, notFound, conflict, apiError } from "@/lib/api-response";
+import { ok, badRequest, notFound, forbidden, conflict, apiError } from "@/lib/api-response";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 
@@ -15,14 +15,19 @@ const UpdateUserSchema = z.object({
   role: z.nativeEnum(Role).optional(),
   isActive: z.boolean().optional(),
   resetDeviceUuid: z.boolean().optional(),
-  password: z.string().min(6).optional(),
+  password: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((val) => (val && val.trim().length > 0 ? val.trim() : undefined))
+    .pipe(z.string().min(6).optional()),
   managerId: z.string().uuid().nullable().optional(),
   territoryIds: z.array(z.string().uuid()).optional(),
 });
 
 async function getUser(req: AuthedRequest, context: { params: Record<string, string | string[] | undefined> }) {
   try {
-    const id = context.params.id as string;
+    const id = String(context?.params?.id ?? "");
     const user = await db.user.findUnique({
       where: { id },
       include: {
@@ -63,19 +68,29 @@ async function getUser(req: AuthedRequest, context: { params: Record<string, str
 
 async function updateUser(req: AuthedRequest, context: { params: Record<string, string | string[] | undefined> }) {
   try {
-    const id = context.params.id as string;
+    const id = String(context?.params?.id ?? "");
 
     // Allow users to update their own profile; only ADMIN/HR can update others
-    const isSelf = req.user.sub === id;
-    if (!isSelf && req.user.role !== Role.ADMIN && req.user.role !== Role.HR) {
-      return badRequest("Insufficient permissions");
+    const isSelf = Boolean(req.user?.sub && id && req.user.sub.trim().toLowerCase() === id.trim().toLowerCase());
+    const canManageOthers = req.user?.role === Role.ADMIN || req.user?.role === Role.HR;
+    if (!isSelf && !canManageOthers) {
+      return forbidden("You do not have permission to update other users' profiles");
     }
 
     const body = await req.json();
     const parsed = UpdateUserSchema.safeParse(body);
     if (!parsed.success) return badRequest("Validation error", parsed.error.flatten());
 
-    const user = await UserProvisioningAgentsService.updateUserDetails(id, parsed.data);
+    const updateData = { ...parsed.data };
+    // Non-admin/HR users editing their own profile cannot elevate role or change org hierarchy
+    if (!canManageOthers) {
+      delete updateData.role;
+      delete updateData.isActive;
+      delete updateData.managerId;
+      delete updateData.territoryIds;
+    }
+
+    const user = await UserProvisioningAgentsService.updateUserDetails(id, updateData);
 
     return ok({ user });
   } catch (err: any) {
@@ -151,8 +166,6 @@ async function deleteUser(req: AuthedRequest, context: { params: Record<string, 
   }
 }
 
-const ALL_ROLES = Object.values(Role);
-
-export const GET = withAuth(getUser, ALL_ROLES);
-export const PUT = withAuth(updateUser, ALL_ROLES);
+export const GET = withAuth(getUser);
+export const PUT = withAuth(updateUser);
 export const DELETE = withAuth(deleteUser, [Role.ADMIN]);
