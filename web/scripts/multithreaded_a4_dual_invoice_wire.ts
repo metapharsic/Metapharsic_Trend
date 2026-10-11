@@ -140,6 +140,37 @@ if (!isMainThread) {
         } finally {
           await prisma.$disconnect();
         }
+      } else if (workerTask === "WATERMARK_AND_LABEL_CLEANLINESS_AUDITOR") {
+        // THREAD 5: Watermark Visibility & Label Cleanliness Auditor
+        const content = fs.readFileSync(invoiceFilePath, "utf-8");
+
+        const hasWatermark = /invoice-watermark/i.test(content);
+        const hasWatermarkCompany = /company\?\.name/i.test(content);
+        const hasWatermarkLogo = /company\?\.logoUrl/i.test(content);
+        const hasVisibleOpacity = /opacity-\[0\.(?:0[89]|1[0-5])\]/i.test(content) && /opacity:\s*0\.1[0-5]\s*!important/i.test(content);
+
+        const noA5HalfA4 = !/A5\s*\(1\/2\s*A4\)/i.test(content);
+        const noA4LandscapeLong = !/A4\s*LANDSCAPE\s*\(DUAL\s*A5\s*COPIES/i.test(content);
+        const noA5Format = !/A5\s*FORMAT/i.test(content);
+
+        const allValid = hasWatermark && hasWatermarkCompany && hasWatermarkLogo && hasVisibleOpacity && noA5HalfA4 && noA4LandscapeLong && noA5Format;
+
+        parentPort?.postMessage({
+          threadId,
+          name: "Watermark & Label Cleanliness Auditor",
+          status: allValid ? "SUCCESS" : "FAILED",
+          durationMs: Date.now() - startTime,
+          data: {
+            hasWatermark,
+            hasWatermarkCompany,
+            hasWatermarkLogo,
+            hasVisibleOpacity,
+            noA5HalfA4,
+            noA4LandscapeLong,
+            noA5Format,
+            cleanAndWatermarked: allValid,
+          },
+        });
       }
     } catch (err: any) {
       parentPort?.postMessage({
@@ -165,6 +196,7 @@ if (!isMainThread) {
       { id: 2, name: "DUAL_PANEL_CONTENT_PARITY_ENGINE" },
       { id: 3, name: "PRINT_CSS_LANDSCAPE_AUDITOR" },
       { id: 4, name: "LIVE_DB_ORDER_DUAL_SIMULATOR" },
+      { id: 5, name: "WATERMARK_AND_LABEL_CLEANLINESS_AUDITOR" },
     ];
 
     const overallStart = Date.now();
