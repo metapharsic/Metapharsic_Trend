@@ -300,7 +300,7 @@ export default function InvoicePage() {
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-300 text-blue-900 px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-wide">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
-            A5 Printing Format Only (148 × 210 mm)
+            A5 Format Only (148 × 210 mm • Half of A4)
           </span>
 
           <div className="flex bg-white border border-slate-300 rounded-lg p-0.5 text-xs font-bold text-slate-700">
@@ -346,7 +346,7 @@ export default function InvoicePage() {
               {company?.name || "METAPHARSIC LIFESCIENCES"}
             </span>
             <span className="text-base font-bold tracking-widest mt-1 uppercase">
-              PHARMACEUTICAL COMMERCIAL TAX INVOICE • A5 FORMAT
+              PHARMACEUTICAL COMMERCIAL TAX INVOICE • A5 FORMAT (HALF A4)
             </span>
           </div>
         </div>
@@ -365,7 +365,7 @@ export default function InvoicePage() {
                   <ShieldCheck size={11} /> GST COMPLIANT
                 </span>
                 <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-300 text-blue-900 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider print:border-slate-800 print:text-slate-900">
-                  A5 PRINT ONLY
+                  A5 PRINT ONLY (HALF A4)
                 </span>
               </div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -680,7 +680,7 @@ export default function InvoicePage() {
 
           {/* Official A5 Standard Print Notice */}
           <div className="border-t border-slate-200 pt-1 text-center text-[9px] uppercase font-bold tracking-widest text-slate-400 print:text-slate-700">
-            METAPHARSIC COMMERCIAL TAX INVOICE • STRICTLY CONFIGURED FOR A5 PAPER PRINTING ONLY (148 mm × 210 mm)
+            METAPHARSIC COMMERCIAL TAX INVOICE • STRICTLY CONFIGURED FOR A5 PAPER PRINTING ONLY (148 mm × 210 mm • EXACT HALF OF A4)
           </div>
 
         </div>
