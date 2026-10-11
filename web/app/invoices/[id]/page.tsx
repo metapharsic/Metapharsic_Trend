@@ -227,17 +227,17 @@ export default function InvoicePage() {
 
   return (
     <div className="min-h-screen bg-slate-100 py-8 px-4 print:bg-white print:p-0">
-      {/* Print Layout Styling specifically optimized for A3 & Standard Paper */}
+      {/* Print Layout Styling specifically strictly enforced for A3 Printing Only */}
       <style>{`
         @media print {
           @page {
-            size: A3 portrait;
-            margin: 12mm 15mm;
+            size: A3 portrait !important;
+            margin: 12mm 15mm !important;
           }
           html, body {
-            width: 100% !important;
-            height: auto !important;
-            margin: 0 !important;
+            width: 297mm !important;
+            min-height: 420mm !important;
+            margin: 0 auto !important;
             padding: 0 !important;
             background: #ffffff !important;
             color: #0f172a !important;
@@ -249,14 +249,19 @@ export default function InvoicePage() {
             display: none !important;
           }
           .invoice-card {
-            border: 3pt double #0f172a !important;
+            border: 3.5pt double #0f172a !important;
             box-shadow: none !important;
-            width: 100% !important;
-            max-width: 100% !important;
+            width: 267mm !important;
+            max-width: 267mm !important;
+            min-height: 388mm !important;
+            margin: 0 auto !important;
             padding: 14mm 12mm !important;
             border-radius: 0 !important;
             font-size: 12pt !important;
             line-height: 1.4 !important;
+            box-sizing: border-box !important;
+            page-break-inside: avoid !important;
+            page-break-after: avoid !important;
           }
           .invoice-table th, .invoice-table td {
             font-size: 11pt !important;
@@ -273,7 +278,7 @@ export default function InvoicePage() {
           }
           .invoice-watermark {
             opacity: 0.07 !important;
-            font-size: 72pt !important;
+            font-size: 70pt !important;
           }
         }
       `}</style>
@@ -287,7 +292,12 @@ export default function InvoicePage() {
           <ArrowLeft size={16} /> Back to Dashboard
         </button>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-300 text-blue-900 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wide">
+            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+            A3 Printing Format Only (297 × 420 mm)
+          </span>
+
           <div className="flex bg-white border border-slate-300 rounded-xl p-1 text-xs font-bold text-slate-700">
             {(["ORIGINAL", "DUPLICATE", "TRIPLICATE"] as const).map((copy) => (
               <button
@@ -308,7 +318,7 @@ export default function InvoicePage() {
             onClick={() => window.print()}
             className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md transition"
           >
-            <Printer size={18} /> Print Invoice (A3 / Standard)
+            <Printer size={18} /> Print A3 Invoice Only
           </button>
         </div>
       </div>
@@ -331,7 +341,7 @@ export default function InvoicePage() {
               {company?.name || "METAPHARSIC LIFESCIENCES"}
             </span>
             <span className="text-2xl font-bold tracking-widest mt-2 uppercase">
-              PHARMACEUTICAL COMMERCIAL TAX INVOICE
+              PHARMACEUTICAL COMMERCIAL TAX INVOICE • A3 FORMAT
             </span>
           </div>
         </div>
@@ -348,6 +358,9 @@ export default function InvoicePage() {
                 </h1>
                 <span className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-md">
                   <ShieldCheck size={13} /> GST COMPLIANT
+                </span>
+                <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-300 text-blue-900 text-xs font-black px-2.5 py-0.5 rounded-md uppercase tracking-wider print:border-slate-800 print:text-slate-900">
+                  A3 PRINT ONLY
                 </span>
               </div>
               <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
@@ -661,6 +674,11 @@ export default function InvoicePage() {
             <div className="text-right text-[10px] text-slate-400 shrink-0">
               <span>Status: <b className="text-slate-600">{order.status}</b></span> · <span>Booked by {bookedBy}</span>
             </div>
+          </div>
+
+          {/* Official A3 Standard Print Notice */}
+          <div className="border-t border-slate-200 pt-2 text-center text-[10px] uppercase font-bold tracking-widest text-slate-400 print:text-slate-700">
+            METAPHARSIC COMMERCIAL TAX INVOICE • STRICTLY CONFIGURED FOR A3 PAPER PRINTING ONLY (297 mm × 420 mm)
           </div>
 
         </div>
