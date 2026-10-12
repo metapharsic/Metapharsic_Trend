@@ -533,8 +533,8 @@ function SingleInvoiceCard({
               {qrDataUrl && (
                 <div className="text-center shrink-0 border-l border-slate-300 pl-1">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={qrDataUrl} alt="UPI QR" className="w-7 h-7 mx-auto p-0.2" />
-                  <span className="text-[6px] text-slate-500 block truncate max-w-[50px]">{company?.upiId}</span>
+                  <img src={qrDataUrl} alt="UPI QR" className="w-16 h-16 mx-auto" />
+                  <span className="text-[7px] text-slate-500 block truncate max-w-[70px] mt-0.5">{company?.upiId}</span>
                 </div>
               )}
             </div>
@@ -679,7 +679,7 @@ export default function InvoicePage() {
       `Inv ${inv?.invoiceNo || order.id.slice(0, 8)}`
     )}`;
 
-    QRCode.toDataURL(upiUri, { width: 140, margin: 1 })
+    QRCode.toDataURL(upiUri, { width: 256, margin: 1 })
       .then(setQrDataUrl)
       .catch((err) => console.error("QR Code Error:", err));
   }, [order, company]);
