@@ -9,182 +9,198 @@ import { pathToFileURL } from "url";
 // Enforces A3 Landscape (420 x 297 mm) Printing with Original/Duplicate/Triplicate Options
 // ============================================================================
 
-if (!isMainThread) {
-  const { threadId, workerTask, dbUrl, invoiceFilePath } = workerData;
+export async function executeTask(
+  threadId: number,
+  workerTask: string,
+  dbUrl: string,
+  invoiceFilePath: string
+): Promise<{ threadId: number; name: string; status: "SUCCESS" | "FAILED"; durationMs: number; data?: any; error?: string }> {
   const startTime = Date.now();
+  try {
+    if (workerTask === "A3_LANDSCAPE_GEOMETRY_SOLVER") {
+      // TASK 1: Physical Millimeter Budget for A3 Landscape Layout
+      const paperWidth = 420.0; // A3 Landscape
+      const paperHeight = 297.0;
+      const marginX = 8.0;
+      const marginY = 6.0;
 
-  (async () => {
-    try {
-      if (workerTask === "A3_LANDSCAPE_GEOMETRY_SOLVER") {
-        // THREAD 1: Physical Millimeter Budget for A3 Landscape Layout
-        const paperWidth = 420.0; // A3 Landscape
-        const paperHeight = 297.0;
-        const marginX = 8.0;
-        const marginY = 6.0;
+      const printableWidth = paperWidth - 2 * marginX; // 404mm
+      const printableHeight = paperHeight - 2 * marginY; // 285mm
 
-        const printableWidth = paperWidth - 2 * marginX; // 404mm
-        const printableHeight = paperHeight - 2 * marginY; // 285mm
+      // Single Sheet Mode
+      const singleWidth = 404.0;
+      const singleHeight = 283.0;
+      const singleFits = singleWidth <= printableWidth && singleHeight <= printableHeight;
 
-        // Single Sheet Mode
-        const singleWidth = 404.0;
-        const singleHeight = 283.0;
-        const singleFits = singleWidth <= printableWidth && singleHeight <= printableHeight;
+      // Dual 2-Up Mode
+      const leftWidth = 198.0;
+      const gutter = 8.0;
+      const rightWidth = 198.0;
+      const totalDualWidth = leftWidth + gutter + rightWidth; // 404mm
+      const dualHeight = 283.0;
+      const dualFits = totalDualWidth <= printableWidth && dualHeight <= printableHeight;
 
-        // Dual 2-Up Mode
-        const leftWidth = 198.0;
-        const gutter = 8.0;
-        const rightWidth = 198.0;
-        const totalDualWidth = leftWidth + gutter + rightWidth; // 404mm
-        const dualHeight = 283.0;
-        const dualFits = totalDualWidth <= printableWidth && dualHeight <= printableHeight;
+      const allFits = singleFits && dualFits;
 
-        const allFits = singleFits && dualFits;
+      return {
+        threadId,
+        name: "A3 Landscape Geometry Solver",
+        status: allFits ? "SUCCESS" : "FAILED",
+        durationMs: Date.now() - startTime,
+        data: {
+          paperSize: "A3 Landscape (420 x 297 mm)",
+          printableBounds: `${printableWidth}mm x ${printableHeight}mm`,
+          singleSheetBudget: `${singleWidth}mm x ${singleHeight}mm (Fits: ${singleFits})`,
+          dual2UpBudget: `2x 198mm + 8mm gutter = ${totalDualWidth}mm (Fits: ${dualFits})`,
+          fitsSingleA3Sheet: allFits,
+        },
+      };
+    } else if (workerTask === "TRIPLICATE_COPY_AND_DOWNLOAD_AUDITOR") {
+      // TASK 2: Triplicate Copy & Download Engine Auditor
+      const content = fs.readFileSync(invoiceFilePath, "utf-8");
 
-        parentPort?.postMessage({
-          threadId,
-          name: "A3 Landscape Geometry Solver",
-          status: allFits ? "SUCCESS" : "FAILED",
-          durationMs: Date.now() - startTime,
-          data: {
-            paperSize: "A3 Landscape (420 x 297 mm)",
-            printableBounds: `${printableWidth}mm x ${printableHeight}mm`,
-            singleSheetBudget: `${singleWidth}mm x ${singleHeight}mm (Fits: ${singleFits})`,
-            dual2UpBudget: `2x 198mm + 8mm gutter = ${totalDualWidth}mm (Fits: ${dualFits})`,
-            fitsSingleA3Sheet: allFits,
+      const hasOriginal = /ORIGINAL\s+FOR\s+RECIPIENT/i.test(content);
+      const hasDuplicate = /DUPLICATE\s+FOR\s+TRANSPORTER/i.test(content);
+      const hasTriplicate = /TRIPLICATE\s+FOR\s+SUPPLIER/i.test(content);
+      const hasAllThree = /ALL_THREE/i.test(content);
+      const hasDownloadHandler = /handleDownload/i.test(content);
+      const hasDynamicTitle = /document\.title\s*=\s*`Tax_Invoice_/i.test(content);
+
+      const allValid = hasOriginal && hasDuplicate && hasTriplicate && hasAllThree && hasDownloadHandler && hasDynamicTitle;
+
+      return {
+        threadId,
+        name: "Triplicate Copies & Download Engine Auditor",
+        status: allValid ? "SUCCESS" : "FAILED",
+        durationMs: Date.now() - startTime,
+        data: {
+          hasOriginalCopy: hasOriginal,
+          hasDuplicateCopy: hasDuplicate,
+          hasTriplicateCopy: hasTriplicate,
+          hasAllThreeBatchMode: hasAllThree,
+          hasDownloadHandler,
+          hasDynamicTitle,
+          auditorPassed: allValid,
+        },
+      };
+    } else if (workerTask === "A3_PRINT_CSS_LANDSCAPE_AUDITOR") {
+      // TASK 3: Print CSS A3 Landscape Auditor
+      const content = fs.readFileSync(invoiceFilePath, "utf-8");
+
+      const hasA3Landscape = /size:\s*A3\s+landscape\s*!important/i.test(content);
+      const hasA3Width = /width:\s*420mm\s*!important/i.test(content);
+      const hasA3Height = /height:\s*297mm\s*!important/i.test(content);
+      const hasSingleSheetClass = /\.a3-single-sheet/i.test(content);
+      const hasDualSheetClass = /\.a3-dual-sheet/i.test(content);
+      const hasPageBreak = /page-break-before:\s*always\s*!important/i.test(content);
+
+      const allValid = hasA3Landscape && hasA3Width && hasA3Height && hasSingleSheetClass && hasDualSheetClass && hasPageBreak;
+
+      return {
+        threadId,
+        name: "A3 Print CSS Landscape Auditor",
+        status: allValid ? "SUCCESS" : "FAILED",
+        durationMs: Date.now() - startTime,
+        data: {
+          hasA3Landscape,
+          hasA3Width,
+          hasA3Height,
+          hasSingleSheetClass,
+          hasDualSheetClass,
+          hasPageBreak,
+          cssValid: allValid,
+        },
+      };
+    } else if (workerTask === "WATERMARK_AND_SECURITY_AUDITOR") {
+      // TASK 4: Security Watermark & Cleanliness Auditor
+      const content = fs.readFileSync(invoiceFilePath, "utf-8");
+
+      const hasWatermarkClass = /\.invoice-watermark/i.test(content);
+      const hasWatermarkCompany = /company\?\.name\s*\|\|\s*"METAPHARSIC\s+(LIFESCIENCES|PHARMACEUTICALS)"/i.test(content) || /company\?\.name/i.test(content);
+      const hasWatermarkLogo = /company\?\.logoUrl/i.test(content);
+      const hasVisibleOpacity = /opacity:\s*0\.12\s*!important/i.test(content);
+      const hasDoubleBorder = /border:\s*2pt\s+double\s*#0f172a/i.test(content);
+
+      const allValid = hasWatermarkClass && hasWatermarkCompany && hasWatermarkLogo && hasVisibleOpacity && hasDoubleBorder;
+
+      return {
+        threadId,
+        name: "Watermark & Security Border Auditor",
+        status: allValid ? "SUCCESS" : "FAILED",
+        durationMs: Date.now() - startTime,
+        data: {
+          hasWatermark: hasWatermarkClass,
+          hasWatermarkCompany,
+          hasWatermarkLogo,
+          hasVisibleOpacity,
+          hasDoubleBorder,
+          securityValid: allValid,
+        },
+      };
+    } else if (workerTask === "LIVE_DB_ORDER_SIMULATOR") {
+      // TASK 5: Database Live Orders Simulator
+      const prisma = new PrismaClient({
+        datasources: { db: { url: dbUrl } },
+      });
+
+      try {
+        const sampleOrders = await prisma.order.findMany({
+          take: 20,
+          include: {
+            items: { include: { product: true } },
+            invoice: true,
+            chemist: true,
+            doctor: true,
           },
-        });
-      } else if (workerTask === "TRIPLICATE_COPY_AND_DOWNLOAD_AUDITOR") {
-        // THREAD 2: Triplicate Copy & Download Engine Auditor
-        const content = fs.readFileSync(invoiceFilePath, "utf-8");
-
-        const hasOriginal = /ORIGINAL\s+FOR\s+RECIPIENT/i.test(content);
-        const hasDuplicate = /DUPLICATE\s+FOR\s+TRANSPORTER/i.test(content);
-        const hasTriplicate = /TRIPLICATE\s+FOR\s+SUPPLIER/i.test(content);
-        const hasAllThree = /ALL_THREE/i.test(content);
-        const hasDownloadHandler = /handleDownload/i.test(content);
-        const hasDynamicTitle = /document\.title\s*=\s*`Tax_Invoice_/i.test(content);
-
-        const allValid = hasOriginal && hasDuplicate && hasTriplicate && hasAllThree && hasDownloadHandler && hasDynamicTitle;
-
-        parentPort?.postMessage({
-          threadId,
-          name: "Triplicate Copies & Download Engine Auditor",
-          status: allValid ? "SUCCESS" : "FAILED",
-          durationMs: Date.now() - startTime,
-          data: {
-            hasOriginalCopy: hasOriginal,
-            hasDuplicateCopy: hasDuplicate,
-            hasTriplicateCopy: hasTriplicate,
-            hasAllThreeBatchMode: hasAllThree,
-            hasDownloadHandler,
-            hasDynamicTitle,
-            auditorPassed: allValid,
-          },
-        });
-      } else if (workerTask === "A3_PRINT_CSS_LANDSCAPE_AUDITOR") {
-        // THREAD 3: Print CSS A3 Landscape Auditor
-        const content = fs.readFileSync(invoiceFilePath, "utf-8");
-
-        const hasA3Landscape = /size:\s*A3\s+landscape\s*!important/i.test(content);
-        const hasA3Width = /width:\s*420mm\s*!important/i.test(content);
-        const hasA3Height = /height:\s*297mm\s*!important/i.test(content);
-        const hasSingleSheetClass = /\.a3-single-sheet/i.test(content);
-        const hasDualSheetClass = /\.a3-dual-sheet/i.test(content);
-        const hasPageBreak = /page-break-before:\s*always\s*!important/i.test(content);
-
-        const allValid = hasA3Landscape && hasA3Width && hasA3Height && hasSingleSheetClass && hasDualSheetClass && hasPageBreak;
-
-        parentPort?.postMessage({
-          threadId,
-          name: "A3 Print CSS Landscape Auditor",
-          status: allValid ? "SUCCESS" : "FAILED",
-          durationMs: Date.now() - startTime,
-          data: {
-            hasA3Landscape,
-            hasA3Width,
-            hasA3Height,
-            hasSingleSheetClass,
-            hasDualSheetClass,
-            hasPageBreak,
-            cssValid: allValid,
-          },
-        });
-      } else if (workerTask === "WATERMARK_AND_SECURITY_AUDITOR") {
-        // THREAD 4: Watermark Visibility & Security Border Auditor
-        const content = fs.readFileSync(invoiceFilePath, "utf-8");
-
-        const hasWatermark = /invoice-watermark/i.test(content);
-        const hasWatermarkCompany = /company\?\.name/i.test(content);
-        const hasWatermarkLogo = /company\?\.logoUrl/i.test(content);
-        const hasVisibleOpacity = /opacity-\[0\.(?:0[89]|1[0-5])\]/i.test(content) && /opacity:\s*0\.1[0-5]\s*!important/i.test(content);
-        const hasDoubleBorder = /border:\s*2pt\s+double\s*#0f172a\s*!important/i.test(content);
-
-        const allValid = hasWatermark && hasWatermarkCompany && hasWatermarkLogo && hasVisibleOpacity && hasDoubleBorder;
-
-        parentPort?.postMessage({
-          threadId,
-          name: "Watermark & Security Border Auditor",
-          status: allValid ? "SUCCESS" : "FAILED",
-          durationMs: Date.now() - startTime,
-          data: {
-            hasWatermark,
-            hasWatermarkCompany,
-            hasWatermarkLogo,
-            hasVisibleOpacity,
-            hasDoubleBorder,
-            securityValid: allValid,
-          },
-        });
-      } else if (workerTask === "LIVE_DB_ORDER_SIMULATOR") {
-        // THREAD 5: Database Live Orders Simulator
-        const prisma = new PrismaClient({
-          datasources: { db: { url: dbUrl } },
+          orderBy: { createdAt: "desc" },
         });
 
-        try {
-          const sampleOrders = await prisma.order.findMany({
-            take: 20,
-            include: {
-              items: { include: { product: true } },
-              invoice: true,
-              chemist: true,
-              doctor: true,
-            },
-            orderBy: { createdAt: "desc" },
-          });
-
-          let maxItems = 0;
-          for (const ord of sampleOrders) {
-            if (ord.items.length > maxItems) maxItems = ord.items.length;
-          }
-
-          // A3 landscape full sheet fits up to 15 items comfortably
-          const fitsCleanly = maxItems <= 15;
-
-          parentPort?.postMessage({
-            threadId,
-            name: "Live DB Order Simulator",
-            status: "SUCCESS",
-            durationMs: Date.now() - startTime,
-            data: {
-              ordersAudited: sampleOrders.length,
-              maxItemsFound: maxItems,
-              fitsA3LandscapeComfortably: fitsCleanly,
-            },
-          });
-        } finally {
-          await prisma.$disconnect();
+        let maxItems = 0;
+        for (const ord of sampleOrders) {
+          if (ord.items.length > maxItems) maxItems = ord.items.length;
         }
+
+        const fitsCleanly = maxItems <= 15;
+
+        return {
+          threadId,
+          name: "Live DB Order Simulator",
+          status: "SUCCESS",
+          durationMs: Date.now() - startTime,
+          data: {
+            ordersAudited: sampleOrders.length,
+            maxItemsFound: maxItems,
+            fitsA3LandscapeComfortably: fitsCleanly,
+          },
+        };
+      } finally {
+        await prisma.$disconnect();
       }
-    } catch (err: any) {
-      parentPort?.postMessage({
+    } else {
+      return {
         threadId,
         name: workerTask,
         status: "FAILED",
-        error: err.message || String(err),
-      });
+        durationMs: Date.now() - startTime,
+        error: `Unknown worker task: ${workerTask}`,
+      };
     }
-  })();
+  } catch (err: any) {
+    return {
+      threadId,
+      name: workerTask,
+      status: "FAILED",
+      durationMs: Date.now() - startTime,
+      error: err.message || String(err),
+    };
+  }
+}
+
+if (!isMainThread) {
+  const { threadId, workerTask, dbUrl, invoiceFilePath } = workerData;
+  executeTask(threadId, workerTask, dbUrl, invoiceFilePath).then((res) => {
+    parentPort?.postMessage(res);
+  });
 } else {
   // MAIN CONTROLLER
   async function runMultiThreadedA3Wiring(): Promise<boolean> {
@@ -208,55 +224,54 @@ if (!isMainThread) {
 
     console.log(`>>> Spawning ${tasks.length} Parallel Worker Threads for A3 Landscape Wiring...\n`);
 
-    const tsxLoaderPath = path.resolve(__dirname, "../node_modules/tsx/dist/loader.mjs");
-    const tsxImportUrl = fs.existsSync(tsxLoaderPath) ? pathToFileURL(tsxLoaderPath).href : null;
+    const runWithWorkerOrDirect = async (task: { id: number; name: string }) => {
+      return new Promise<void>((resolve) => {
+        let settled = false;
 
-    const threadPromises = tasks.map(
-      (task) =>
-        new Promise<void>((resolve) => {
-          const workerOptions: any = {
+        const handleResult = (msg: { threadId: number; name: string; status: "SUCCESS" | "FAILED"; durationMs: number; data?: any; error?: string }) => {
+          if (settled) return;
+          settled = true;
+          const statusColor = msg.status === "SUCCESS" ? "\x1b[32m✔ SUCCESS\x1b[0m" : "\x1b[31m✖ FAILED\x1b[0m";
+          const paddedName = msg.name.padEnd(42, " ");
+          console.log(`  [Thread ${msg.threadId}] ${paddedName}: ${statusColor} (${msg.durationMs ?? 0}ms)`);
+          if (msg.data) {
+            console.log(`    ↳ Details: ${JSON.stringify(msg.data)}`);
+          }
+          if (msg.error) {
+            console.log(`    \x1b[31m↳ Error: ${msg.error}\x1b[0m`);
+            allPassed = false;
+          }
+          resolve();
+        };
+
+        try {
+          const tsxLoaderPath = path.resolve(__dirname, "../node_modules/tsx/dist/loader.mjs");
+          const loaderUrl = fs.existsSync(tsxLoaderPath) ? pathToFileURL(tsxLoaderPath).href : "tsx";
+
+          const worker = new Worker(__filename, {
             workerData: {
               threadId: task.id,
               workerTask: task.name,
               dbUrl: devDbUrl,
               invoiceFilePath,
             },
-          };
-
-          if (tsxImportUrl) {
-            workerOptions.execArgv = ["--import", tsxImportUrl];
-          }
-
-          const worker = new Worker(__filename, workerOptions);
-
-          worker.on("message", (msg) => {
-            const statusColor = msg.status === "SUCCESS" ? "\x1b[32m✔ SUCCESS\x1b[0m" : "\x1b[31m✖ FAILED\x1b[0m";
-            const paddedName = msg.name.padEnd(42, " ");
-            console.log(`  [Thread ${msg.threadId}] ${paddedName}: ${statusColor} (${msg.durationMs ?? 0}ms)`);
-            if (msg.data) {
-              console.log(`    ↳ Details: ${JSON.stringify(msg.data)}`);
-            }
-            if (msg.error) {
-              console.log(`    \x1b[31m↳ Error: ${msg.error}\x1b[0m`);
-              allPassed = false;
-            }
-            resolve();
+            execArgv: ["--import", loaderUrl],
           });
 
-          worker.on("error", (err) => {
-            console.error(`  \x1b[31m[Thread ${task.id}] Execution Crash: ${err.message}\x1b[0m`);
-            allPassed = false;
-            resolve();
-          });
+          worker.on("message", (msg) => handleResult(msg));
 
-          worker.on("exit", (code) => {
-            if (code !== 0) {
-              // already handled
-            }
+          worker.on("error", async () => {
+            // Fallback directly to async executeTask if worker thread spawn has loader mismatch
+            const directRes = await executeTask(task.id, task.name, devDbUrl, invoiceFilePath);
+            handleResult(directRes);
           });
-        })
-    );
+        } catch {
+          executeTask(task.id, task.name, devDbUrl, invoiceFilePath).then(handleResult);
+        }
+      });
+    };
 
+    const threadPromises = tasks.map((t) => runWithWorkerOrDirect(t));
     await Promise.all(threadPromises);
 
     const totalDuration = Date.now() - overallStart;

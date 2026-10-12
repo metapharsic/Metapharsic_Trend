@@ -92,7 +92,7 @@ async function runPostCommitSync() {
     spawnSync(mkdirCmd, { shell: true });
 
     // Copy committed file to VPS over PSCP
-    const pscpCmd = `"${PSCP_PATH}" -batch -i "${SSH_KEY_PATH}" "${fullLocalPath}" "${VPS_HOST}:${VPS_WEB_DIR}/${vpsRelPath}"`;
+    const pscpCmd = `"${PSCP_PATH}" -batch -i "${SSH_KEY_PATH}" "${fullLocalPath}" "${VPS_HOST}:${remoteFullDir}/"`;
     try {
       execSync(pscpCmd, { stdio: "ignore" });
       syncedCount++;
