@@ -220,15 +220,19 @@ function SingleInvoiceCard({
     >
       {/* 1. Senior Accountant Diagonal Watermark (Anti-Counterfeit Background) */}
       <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none select-none overflow-hidden">
-        <div className="invoice-watermark -rotate-25 text-center flex flex-col items-center justify-center text-slate-900">
-          {company?.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={company.logoUrl}
-              alt=""
-              className={`${isSingle ? "w-40 h-40 mb-1" : "w-28 h-28 mb-1"} object-contain grayscale opacity-60`}
-            />
-          )}
+        <div className="invoice-watermark opacity-[0.12] -rotate-25 text-center flex flex-col items-center justify-center text-slate-900 pointer-events-none select-none">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={company?.logoUrl || "/logo.png"}
+            alt="Watermark Logo"
+            className={`${isSingle ? "w-40 h-40 mb-1" : "w-28 h-28 mb-1"} object-contain grayscale opacity-60`}
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (target.src !== window.location.origin + "/logo.png") {
+                target.src = "/logo.png";
+              }
+            }}
+          />
           <span className={`${isSingle ? "text-3xl" : "text-xl"} font-serif font-black tracking-widest uppercase`}>
             {company?.name || "METAPHARSIC LIFESCIENCES"}
           </span>
@@ -246,15 +250,19 @@ function SingleInvoiceCard({
         {/* ==================================================================== */}
         <div className="border-b-2 border-slate-900 pb-1 flex items-start justify-between gap-2">
           {/* Company Identity */}
-          <div className="flex items-start gap-2">
-            {company?.logoUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={company.logoUrl}
-                alt="Logo"
-                className={`${isSingle ? "h-8" : "h-7"} w-auto object-contain border border-slate-300 p-0.5 bg-white shrink-0`}
-              />
-            )}
+          <div className="flex items-start gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={company?.logoUrl || "/logo.png"}
+              alt="Company Logo"
+              className={`${isSingle ? "h-10 max-w-[130px]" : "h-8 max-w-[100px]"} w-auto object-contain border border-slate-300 p-0.5 bg-white shrink-0 shadow-2xs`}
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (target.src !== window.location.origin + "/logo.png") {
+                  target.src = "/logo.png";
+                }
+              }}
+            />
             <div>
               <h1 className="invoice-company-name text-xs sm:text-sm font-black tracking-tight text-slate-950 uppercase leading-none">
                 {company?.name || "METAPHARSIC LIFESCIENCES"}
@@ -346,7 +354,7 @@ function SingleInvoiceCard({
         {/* ==================================================================== */}
         {/* SECTION 3: INVOICE & DISPATCH AUDIT MATRIX                             */}
         {/* ==================================================================== */}
-        <div className="border border-slate-800 bg-white grid grid-cols-4 sm:grid-cols-6 divide-x divide-slate-800 text-[8px] font-mono">
+        <div className="border border-slate-800 bg-transparent grid grid-cols-4 sm:grid-cols-6 divide-x divide-slate-800 text-[8px] font-mono">
           <div className="p-0.5 px-1">
             <span className="block text-[7px] font-sans font-bold text-slate-500 uppercase">Invoice No</span>
             <span className="font-bold text-slate-950 text-[9px]">{inv?.invoiceNo ?? "INV-PENDING"}</span>
@@ -376,8 +384,8 @@ function SingleInvoiceCard({
         {/* ==================================================================== */}
         {/* SECTION 4: STRICT ACCOUNTING LINE ITEMS TABLE                         */}
         {/* ==================================================================== */}
-        <div className="border border-slate-900 overflow-hidden bg-white">
-          <table className="invoice-table w-full border-collapse text-[8px]">
+        <div className="border border-slate-900 overflow-hidden bg-transparent">
+          <table className="invoice-table w-full border-collapse text-[8px] bg-transparent">
             <thead>
               <tr className="bg-slate-900 text-white font-mono font-bold uppercase text-[7.5px] border-b border-slate-900 tracking-tight">
                 <th className="py-0.5 px-1 text-center border-r border-slate-700 w-5">#</th>
@@ -478,11 +486,11 @@ function SingleInvoiceCard({
           
           {/* Column 1: Statutory GST Tax Schedule & Bank Remittance */}
           <div className="space-y-0.5">
-            <div className="border border-slate-800 bg-white">
+            <div className="border border-slate-800 bg-transparent">
               <div className="bg-slate-800 text-white font-mono text-[7.5px] font-bold px-1 py-0.2 uppercase">
                 Statutory GST Tax Summary
               </div>
-              <table className="w-full text-[7.5px] font-mono">
+              <table className="w-full text-[7.5px] font-mono bg-transparent">
                 <thead>
                   <tr className="bg-slate-100 text-slate-800 font-bold border-b border-slate-300">
                     <th className="py-0.2 px-1 text-left">Rate</th>
@@ -520,8 +528,8 @@ function SingleInvoiceCard({
               </table>
             </div>
 
-            {/* Electronic Bank Remittance */}
-            <div className="border border-slate-800 p-0.5 px-1 bg-white flex items-start justify-between gap-1 text-[7.5px] font-mono">
+            {/* Electronic Bank Remittance & High-Accuracy UPI QR Code */}
+            <div className="border border-slate-800 p-0.5 px-1 bg-transparent flex items-start justify-between gap-1 text-[7.5px] font-mono">
               <div className="space-y-0.2 leading-tight">
                 <span className="font-sans font-bold text-slate-900 uppercase block text-[7px]">
                   Bank Remittance (NEFT / RTGS):
@@ -529,19 +537,32 @@ function SingleInvoiceCard({
                 <p><span className="text-slate-500 font-sans">Bank:</span> <b>{company?.bankName ?? "State Bank of India"}</b></p>
                 <p><span className="text-slate-500 font-sans">A/C:</span> <b className="text-slate-950 font-bold">{company?.accountNo ?? "45259232976"}</b></p>
                 <p><span className="text-slate-500 font-sans">IFSC:</span> <b className="text-slate-950 font-bold">{company?.ifscCode ?? "SBIN0007109"}</b></p>
+                <p><span className="text-slate-500 font-sans">Branch:</span> <b>{company?.bankBranch ?? "Nacharam"}</b></p>
               </div>
               {qrDataUrl && (
-                <div className="text-center shrink-0 border-l border-slate-300 pl-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={qrDataUrl} alt="UPI QR" className="w-16 h-16 mx-auto" />
-                  <span className="text-[7px] text-slate-500 block truncate max-w-[70px] mt-0.5">{company?.upiId}</span>
+                <div className="text-center shrink-0 border-l border-slate-300 pl-1.5 flex flex-col items-center justify-center">
+                  <div className="bg-white p-0.5 border border-slate-400 rounded-none shadow-2xs">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={qrDataUrl}
+                      alt="Scan UPI QR"
+                      className={`${isSingle ? "w-16 h-16 sm:w-18 sm:h-18" : "w-14 h-14"} mx-auto object-contain`}
+                      style={{ imageRendering: "pixelated" }}
+                    />
+                  </div>
+                  <span className="text-[6.5px] font-sans font-black text-slate-950 uppercase tracking-tight mt-0.5">
+                    Scan & Pay (UPI)
+                  </span>
+                  <span className="text-[6px] text-slate-700 block truncate max-w-[75px] font-mono">
+                    {company?.upiId || "metapharsic@upi"}
+                  </span>
                 </div>
               )}
             </div>
           </div>
 
           {/* Column 2: Legal Declarations & Terms of Sale */}
-          <div className="border border-slate-800 p-1 bg-white space-y-0.5 flex flex-col justify-between text-[7px] leading-tight">
+          <div className="border border-slate-800 p-1 bg-transparent space-y-0.5 flex flex-col justify-between text-[7px] leading-tight">
             <div>
               <p className="font-mono font-black text-slate-950 uppercase border-b border-slate-300 pb-0.2 mb-0.5">
                 Statutory Pharma Warranty (Sec 19)
@@ -668,18 +689,32 @@ export default function InvoicePage() {
   }, [orderId]);
 
   useEffect(() => {
-    if (!order || !company) return;
+    if (!order) return;
     const inv = order.invoice;
     const finalAmount = Number(inv?.grandTotal ?? inv?.amount ?? 0);
+    const payeeVpa = company?.upiId || "SBIBHIM.INSTANT90889373636766474@sbipay";
+    const payeeName = company?.name || "Metapharsic Lifesciences";
+    const invoiceRef = inv?.invoiceNo || order.id.slice(0, 8);
+
+    // NPCI UPI Specification Compliant Deep-Link URI
     const upiUri = `upi://pay?pa=${encodeURIComponent(
-      company.upiId || "metapharsic@upi"
-    )}&pn=${encodeURIComponent(company.name)}&am=${finalAmount.toFixed(
+      payeeVpa
+    )}&pn=${encodeURIComponent(payeeName)}&am=${finalAmount.toFixed(
       2
     )}&cu=INR&tn=${encodeURIComponent(
-      `Inv ${inv?.invoiceNo || order.id.slice(0, 8)}`
+      `Inv ${invoiceRef}`
     )}`;
 
-    QRCode.toDataURL(upiUri, { width: 256, margin: 1 })
+    // High-Accuracy, High-Density Crisp QR Code Generation
+    QRCode.toDataURL(upiUri, {
+      errorCorrectionLevel: "H", // High accuracy: 30% error correction recovery
+      width: 512,                // Crisp 512x512 bitmap for laser printing & screen clarity
+      margin: 1,                 // Exact quiet zone
+      color: {
+        dark: "#000000",
+        light: "#ffffff",
+      },
+    })
       .then(setQrDataUrl)
       .catch((err) => console.error("QR Code Error:", err));
   }, [order, company]);
@@ -757,9 +792,21 @@ export default function InvoicePage() {
     <div className="min-h-screen bg-slate-200 py-6 px-3 print:bg-white print:p-0">
       {/* Strict Senior Accountant Print CSS for A3 Landscape, A4 Landscape (Exact Half-A4 Slips) and Sample Top-Slip */}
       <style>{`
+        .invoice-card table,
+        .invoice-card tbody tr,
+        .invoice-card td {
+          background-color: transparent !important;
+        }
+        .invoice-watermark {
+          opacity: 0.12;
+          font-size: 26pt;
+          display: flex;
+          visibility: visible;
+        }
         @media print {
           @page {
             size: A3 landscape !important;
+            size: A4 landscape !important;
             size: ${
               paperSize === "A3"
                 ? "A3 landscape"
@@ -778,6 +825,8 @@ export default function InvoicePage() {
           html, body {
             width: 420mm !important;
             height: 297mm !important;
+            width: 297mm !important;
+            height: 210mm !important;
             width: ${
               paperSize === "A3" ? "420mm" : paperSize === "A4" ? "297mm" : "210mm"
             } !important;
@@ -821,17 +870,18 @@ export default function InvoicePage() {
             page-break-inside: avoid !important;
             overflow: hidden !important;
           }
-          .a3-dual-sheet {
+          .dual-a4-sheet, .a3-dual-sheet {
             display: grid !important;
+            grid-template-columns: 141mm 141mm !important;
             grid-template-columns: ${
-              paperSize === "A3" ? "198mm 198mm" : "139.5mm 139.5mm"
+              paperSize === "A3" ? "198mm 198mm" : "141mm 141mm"
             } !important;
-            column-gap: 8mm !important;
+            column-gap: ${paperSize === "A3" ? "8mm" : "6mm"} !important;
             width: ${
-              paperSize === "A3" ? "404mm" : "287mm"
+              paperSize === "A3" ? "404mm" : "288mm"
             } !important;
             max-width: ${
-              paperSize === "A3" ? "404mm" : "287mm"
+              paperSize === "A3" ? "404mm" : "288mm"
             } !important;
             min-height: ${
               paperSize === "A3" ? "283mm" : "200mm"
@@ -1106,7 +1156,7 @@ export default function InvoicePage() {
         </div>
       ) : viewMode === "DUAL_2UP" ? (
         /* Dual 2-Up Side-by-Side Slips (Exact Half-A4 Slips on A4 Landscape / Half-A3 on A3 Landscape) */
-        <div className="a3-dual-sheet max-w-[1200px] mx-auto grid grid-cols-1 xl:grid-cols-2 print:grid-cols-2 gap-4 print:gap-2 items-start relative">
+        <div className="dual-a4-sheet a3-dual-sheet max-w-[1200px] mx-auto grid grid-cols-1 xl:grid-cols-2 print:grid-cols-2 gap-4 print:gap-2 items-start relative">
           {/* Left Invoice Slip */}
           <div className="invoice-half w-full">
             <SingleInvoiceCard
