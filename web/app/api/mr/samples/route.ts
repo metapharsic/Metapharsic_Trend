@@ -34,7 +34,7 @@ async function handler(req: AuthedRequest) {
       });
 
       const withValue = allProducts.map((p) => {
-        const unitValue = Number(p.ptr ?? p.price ?? 0);
+        const unitValue = Number(p.ptr ?? 0);
         const qty = CANONICAL_MR_SAMPLES[p.name] ?? 50;
         return {
           productId: p.id,

@@ -74,6 +74,7 @@ export interface ExcelDashboardExportOptions {
   generatedBy?: string;
   scopeMR?: string;
   period?: string;
+  searchFilterQuery?: string;
   kpis: Array<{ label: string; value: string | number; note?: string }>;
   mrSummaryTable?: {
     headers: string[];
@@ -165,7 +166,7 @@ function buildExecutiveDashboardSheet(workbook: ExcelJS.Workbook, options: Excel
 
   ws.mergeCells("A3:K3");
   const metaCell = ws.getCell("A3");
-  metaCell.value = `Exported: ${new Date().toLocaleString("en-IN")}   |   Scope: ${options.scopeMR || "All Representatives"}   |   Period: ${options.period || "Active Cycle"}   |   Classification: STRICTLY CONFIDENTIAL`;
+  metaCell.value = `Exported: ${new Date().toLocaleString("en-IN")}   |   Scope: ${options.scopeMR || "All Representatives"}   |   Period: ${options.period || "Active Cycle"}${options.searchFilterQuery ? `   |   Search Query: "${options.searchFilterQuery}"` : ""}   |   Classification: STRICTLY CONFIDENTIAL`;
   metaCell.font = { name: "Segoe UI", size: 9, italic: true, color: { argb: "CBD5E1" } };
   metaCell.fill = {
     type: "pattern",
@@ -627,7 +628,9 @@ function buildGranularRecordsSheet(workbook: ExcelJS.Workbook, options: ExcelDas
 
   ws.mergeCells(`A2:${String.fromCharCode(64 + Math.min(26, headers.length))}2`);
   const subCell = ws.getCell("A2");
-  subCell.value = `Total Records Exported: ${rows.length}   |   Reconciled with Live Database Engine   |   Strictly Confidential`;
+  subCell.value = options.searchFilterQuery
+    ? `Active Search Filter: "${options.searchFilterQuery}" (${rows.length} Matched Records)   |   Reconciled with Live Database Engine   |   Strictly Confidential`
+    : `Total Records Exported: ${rows.length}   |   Reconciled with Live Database Engine   |   Strictly Confidential`;
   subCell.font = { name: "Segoe UI", size: 9.5, italic: true, color: { argb: "DBEAFE" } };
   subCell.fill = {
     type: "pattern",
@@ -669,7 +672,6 @@ function buildGranularRecordsSheet(workbook: ExcelJS.Workbook, options: ExcelDas
 
     rowValues.forEach((val, colIndex) => {
       const cell = dataRow.getCell(colIndex + 1);
-      cell.value = val;
       cell.font = ExcelDesignSystem.fonts.cellRegular;
       cell.fill = {
         type: "pattern",
@@ -679,28 +681,240 @@ function buildGranularRecordsSheet(workbook: ExcelJS.Workbook, options: ExcelDas
       cell.border = ExcelDesignSystem.borders.thin;
 
       const header = headers[colIndex] || "";
+      const isCurrency =
+        header.includes("₹") ||
+        header.includes("Amount") ||
+        header.includes("Price") ||
+        header.includes("Rate") ||
+        header.includes("Revenue") ||
+        header.includes("Cost") ||
+        header.includes("Profit") ||
+        header.includes("Billed") ||
+        header.includes("Collected") ||
+        header.includes("Outstanding") ||
+        header.includes("Value") ||
+        header.includes("Contribution") ||
+        header.includes("Expenses") ||
+        header.includes("Credit Limit") ||
+        header.includes("Taxable") ||
+        header.includes("GST");
 
-      if (colIndex === 0 || header.includes("Name") || header.includes("Title")) {
-        cell.alignment = { horizontal: "left", vertical: "middle" };
-        cell.font = ExcelDesignSystem.fonts.cellBold;
-      } else if (typeof val === "number") {
-        cell.alignment = { horizontal: "right", vertical: "middle" };
-        if (header.includes("₹") || header.includes("Amount") || header.includes("Price") || header.includes("Rate") || header.includes("Revenue")) {
-          cell.numFmt = "₹#,##0.00";
-        } else {
-          cell.numFmt = "#,##0";
+      const isCount =
+        header.includes("Qty") ||
+        header.includes("Units") ||
+        header.includes("Stock") ||
+        header.includes("Calls") ||
+        header.includes("Orders") ||
+        header.includes("Visits") ||
+        header.includes("Count") ||
+        header.includes("Shortfall") ||
+        header.includes("Days");
+
+      const isPercentage =
+        header.includes("%") ||
+        header.includes("Margin") ||
+        header.includes("Attainment") ||
+        header.includes("Adherence") ||
+        header.includes("Efficiency") ||
+        header.includes("Utilization");
+
+      // Number parsing if string was passed
+      let numVal: number | null = null;
+      if (typeof val === "number") {
+        numVal = val;
+      } else if (typeof val === "string" && !val.includes("°") && !val.includes("-") && !val.includes(":") && !val.includes("/")) {
+        const cleaned = val.replace(/₹|,/g, "").trim();
+        const parsed = parseFloat(cleaned);
+        if (!isNaN(parsed) && String(parsed) === cleaned) {
+          numVal = parsed;
         }
-      } else if (String(val).endsWith("%")) {
-        cell.alignment = { horizontal: "center", vertical: "middle" };
+      }
+
+      if (numVal !== null) {
+        cell.value = numVal;
+        cell.alignment = { horizontal: "right", vertical: "middle" };
+        if (isCurrency) {
+          cell.numFmt = "₹#,##0.00";
+        } else if (isCount) {
+          cell.numFmt = "#,##0";
+        } else {
+          cell.numFmt = numVal % 1 !== 0 ? "#,##0.00" : "#,##0";
+        }
       } else {
-        cell.alignment = { horizontal: "left", vertical: "middle" };
+        cell.value = val;
+        const strVal = String(val || "").trim();
+
+        // Status badge formatting in Excel
+        if (
+          strVal === "HEALTHY" ||
+          strVal === "PAID" ||
+          strVal === "APPROVED" ||
+          strVal === "ADEQUATE" ||
+          strVal === "ACTIVE" ||
+          strVal === "GEO-VERIFIED" ||
+          strVal === "VERIFIED_ON_SITE" ||
+          strVal.startsWith("SAFE")
+        ) {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "D1FAE5" } };
+          cell.font = { name: "Segoe UI", size: 9, bold: true, color: { argb: "065F46" } };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+        } else if (
+          strVal === "HIGH_RISK" ||
+          strVal === "OUTSTANDING" ||
+          strVal === "LOW_STOCK" ||
+          strVal === "REJECTED" ||
+          strVal === "INACTIVE" ||
+          strVal === "MOCKED_GPS" ||
+          strVal === "OUT_OF_GEOFENCE" ||
+          strVal === "ANOMALY_FLAGGED" ||
+          strVal.startsWith("CRITICAL")
+        ) {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE4E6" } };
+          cell.font = { name: "Segoe UI", size: 9, bold: true, color: { argb: "9F1239" } };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+        } else if (
+          strVal === "MEDIUM_RISK" ||
+          strVal === "VICINITY_OK" ||
+          strVal.startsWith("ATTENTION") ||
+          strVal === "PENDING" ||
+          strVal === "HQ_ESTIMATE"
+        ) {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FEF3C7" } };
+          cell.font = { name: "Segoe UI", size: 9, bold: true, color: { argb: "92400E" } };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+        } else if (
+          strVal === "GPS Telemetry" ||
+          strVal === "Visit Geotag" ||
+          strVal === "Clinic Check-in" ||
+          strVal === "ACTIVE_ZONE"
+        ) {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "DBEAFE" } };
+          cell.font = { name: "Segoe UI", size: 9, bold: true, color: { argb: "1E40AF" } };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+        } else if (colIndex === 0 || header.includes("Name") || header.includes("Title")) {
+          cell.alignment = { horizontal: "left", vertical: "middle" };
+          cell.font = ExcelDesignSystem.fonts.cellBold;
+        } else if (isPercentage) {
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+        } else {
+          cell.alignment = { horizontal: "left", vertical: "middle" };
+        }
       }
     });
 
     currentRow++;
   });
 
-  autoFitColumns(ws, 14, 50);
+  // Executive Summary / Totals Row
+  if (rows.length > 0) {
+    const totalRow = ws.getRow(currentRow);
+    totalRow.height = 30;
+    const firstCell = totalRow.getCell(1);
+    firstCell.value = "TOTAL / COMPOSITE SUMMARY";
+    firstCell.font = { name: "Segoe UI", size: 10, bold: true, color: { argb: "0F172A" } };
+    firstCell.alignment = { horizontal: "left", vertical: "middle" };
+    firstCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "E2E8F0" } };
+    firstCell.border = {
+      top: { style: "thin", color: { argb: "0F172A" } },
+      bottom: { style: "double", color: { argb: "0F172A" } },
+      left: { style: "thin", color: { argb: "CBD5E1" } },
+      right: { style: "thin", color: { argb: "CBD5E1" } },
+    };
+
+    for (let colIndex = 1; colIndex < headers.length; colIndex++) {
+      const cell = totalRow.getCell(colIndex + 1);
+      const header = headers[colIndex] || "";
+      const isCurrency =
+        header.includes("₹") ||
+        header.includes("Amount") ||
+        header.includes("Price") ||
+        header.includes("Rate") ||
+        header.includes("Revenue") ||
+        header.includes("Cost") ||
+        header.includes("Profit") ||
+        header.includes("Billed") ||
+        header.includes("Collected") ||
+        header.includes("Outstanding") ||
+        header.includes("Value") ||
+        header.includes("Contribution") ||
+        header.includes("Expenses") ||
+        header.includes("Credit Limit") ||
+        header.includes("Taxable") ||
+        header.includes("GST");
+
+      const isCount =
+        header.includes("Qty") ||
+        header.includes("Units") ||
+        header.includes("Stock") ||
+        header.includes("Calls") ||
+        header.includes("Orders") ||
+        header.includes("Visits") ||
+        header.includes("Count") ||
+        header.includes("Shortfall");
+
+      const isPercentage =
+        header.includes("%") ||
+        header.includes("Margin") ||
+        header.includes("Attainment") ||
+        header.includes("Adherence") ||
+        header.includes("Efficiency") ||
+        header.includes("Utilization");
+
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "E2E8F0" } };
+      cell.border = {
+        top: { style: "thin", color: { argb: "0F172A" } },
+        bottom: { style: "double", color: { argb: "0F172A" } },
+        left: { style: "thin", color: { argb: "CBD5E1" } },
+        right: { style: "thin", color: { argb: "CBD5E1" } },
+      };
+
+      if (isCurrency || isCount) {
+        let sum = 0;
+        let validCount = 0;
+        rows.forEach((r) => {
+          const v = r[colIndex];
+          const num = typeof v === "number" ? v : typeof v === "string" ? parseFloat(v.replace(/[^0-9.-]/g, "")) : NaN;
+          if (!isNaN(num)) {
+            sum += num;
+            validCount++;
+          }
+        });
+        if (validCount > 0) {
+          cell.value = sum;
+          cell.font = { name: "Segoe UI", size: 9.5, bold: true, color: { argb: "0F172A" } };
+          cell.alignment = { horizontal: "right", vertical: "middle" };
+          cell.numFmt = isCurrency ? "₹#,##0.00" : "#,##0";
+        } else {
+          cell.value = "—";
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+        }
+      } else if (isPercentage) {
+        let pSum = 0;
+        let pCount = 0;
+        rows.forEach((r) => {
+          const v = r[colIndex];
+          const num = typeof v === "number" ? v : typeof v === "string" ? parseFloat(v.replace(/[^0-9.-]/g, "")) : NaN;
+          if (!isNaN(num)) {
+            pSum += num;
+            pCount++;
+          }
+        });
+        if (pCount > 0) {
+          cell.value = `${(pSum / pCount).toFixed(1)}% (Avg)`;
+          cell.font = { name: "Segoe UI", size: 9, bold: true, color: { argb: "0F172A" } };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+        } else {
+          cell.value = "—";
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+        }
+      } else {
+        cell.value = "—";
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      }
+    }
+  }
+
+  autoFitColumns(ws, 14, 52);
 }
 
 // ============================================================================
