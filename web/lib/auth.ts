@@ -4,7 +4,7 @@ import { Role } from "@prisma/client";
 
 const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "trend-mr-secure-access-token-secret-2026";
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "trend-mr-secure-refresh-token-secret-2026";
-const ACCESS_EXPIRES = process.env.JWT_ACCESS_EXPIRES_IN ?? "15m";
+const ACCESS_EXPIRES = process.env.JWT_ACCESS_EXPIRES_IN ?? "7d";
 const REFRESH_EXPIRES = process.env.JWT_REFRESH_EXPIRES_IN ?? "7d";
 
 export interface JWTPayload {

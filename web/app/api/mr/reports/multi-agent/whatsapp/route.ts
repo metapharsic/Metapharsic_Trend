@@ -94,6 +94,10 @@ async function getMultiAgentWhatsAppPreview(req: AuthedRequest) {
       Role.ZSM,
       Role.RM,
       Role.ASM,
+      Role.FINANCE,
+      Role.HR,
+      Role.MARKETING,
+      Role.WAREHOUSE,
     ] as Role[]).includes(req.user.role as Role);
 
     if (employeeId) {
@@ -191,6 +195,10 @@ async function dispatchMultiAgentWhatsAppReport(req: AuthedRequest) {
       Role.ZSM,
       Role.RM,
       Role.ASM,
+      Role.FINANCE,
+      Role.HR,
+      Role.MARKETING,
+      Role.WAREHOUSE,
     ] as Role[]).includes(req.user.role as Role);
 
     const body = await req.json();
@@ -621,6 +629,10 @@ export const GET = withAuth(getMultiAgentWhatsAppPreview, [
   Role.RM,
   Role.ASM,
   Role.MR,
+  Role.FINANCE,
+  Role.HR,
+  Role.MARKETING,
+  Role.WAREHOUSE,
 ]);
 
 // Management roles and MRs authorized for WhatsApp dispatch
@@ -632,5 +644,9 @@ export const POST = withAuth(dispatchMultiAgentWhatsAppReport, [
   Role.RM,
   Role.ASM,
   Role.MR,
+  Role.FINANCE,
+  Role.HR,
+  Role.MARKETING,
+  Role.WAREHOUSE,
 ]);
 

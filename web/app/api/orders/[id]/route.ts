@@ -347,6 +347,19 @@ async function deleteOrder(
   }
 }
 
-export const GET = withAuth(getOrder, [Role.MR, Role.ASM, Role.ADMIN, Role.DISTRIBUTOR, Role.MD]);
+export const GET = withAuth(getOrder, [
+  Role.ADMIN,
+  Role.MD,
+  Role.NSM,
+  Role.ZSM,
+  Role.RM,
+  Role.ASM,
+  Role.MR,
+  Role.DISTRIBUTOR,
+  Role.FINANCE,
+  Role.WAREHOUSE,
+  Role.MARKETING,
+  Role.HR,
+]);
 export const PUT = withAuth(updateOrder, [Role.MR, Role.ASM, Role.ADMIN, Role.MD, Role.WAREHOUSE]);
 export const DELETE = withAuth(deleteOrder, [Role.MR, Role.ASM, Role.ADMIN, Role.MD]);

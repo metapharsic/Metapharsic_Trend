@@ -5,7 +5,17 @@ import { ok, apiError, unauthorized } from "@/lib/api-response";
 
 async function getLedgerHistory(req: AuthedRequest) {
   try {
-    const isManager = req.user.role === Role.ASM || req.user.role === Role.ADMIN || req.user.role === Role.MD;
+    const isManager =
+      req.user.role === Role.ADMIN ||
+      req.user.role === Role.MD ||
+      req.user.role === Role.NSM ||
+      req.user.role === Role.ZSM ||
+      req.user.role === Role.RM ||
+      req.user.role === Role.ASM ||
+      req.user.role === Role.FINANCE ||
+      req.user.role === Role.WAREHOUSE ||
+      req.user.role === Role.MARKETING ||
+      req.user.role === Role.HR;
     let employeeId: string | undefined;
 
     if (!isManager) {
@@ -93,4 +103,16 @@ async function getLedgerHistory(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getLedgerHistory, [Role.MR, Role.ASM, Role.ADMIN, Role.MD]);
+export const GET = withAuth(getLedgerHistory, [
+  Role.ADMIN,
+  Role.MD,
+  Role.NSM,
+  Role.ZSM,
+  Role.RM,
+  Role.ASM,
+  Role.MR,
+  Role.FINANCE,
+  Role.WAREHOUSE,
+  Role.MARKETING,
+  Role.HR,
+]);

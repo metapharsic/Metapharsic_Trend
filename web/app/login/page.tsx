@@ -56,6 +56,9 @@ export default function LoginPage() {
     try {
       const res = await axios.post("/api/auth/login/manager", { email, password });
       localStorage.setItem("accessToken", res.data.data.accessToken);
+      if (res.data.data.refreshToken) {
+        localStorage.setItem("refreshToken", res.data.data.refreshToken);
+      }
       redirectForRole(res.data.data.user.role);
     } catch (err: any) {
       const managerMessage: string = err?.response?.data?.error?.message || "";
@@ -75,6 +78,9 @@ export default function LoginPage() {
           deviceUuid: getOrCreateDeviceUuid(),
         });
         localStorage.setItem("accessToken", mrRes.data.data.accessToken);
+        if (mrRes.data.data.refreshToken) {
+          localStorage.setItem("refreshToken", mrRes.data.data.refreshToken);
+        }
         redirectForRole(mrRes.data.data.user.role);
       } catch (mrErr: any) {
         setError(mrErr?.response?.data?.error?.message || "Login failed");

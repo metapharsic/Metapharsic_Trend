@@ -18,7 +18,17 @@ async function getOrders(req: AuthedRequest) {
       limit: searchParams.get("limit") ?? 20,
     });
 
-    const isManager = req.user.role === Role.ASM || req.user.role === Role.ADMIN || req.user.role === Role.MD;
+    const isManager =
+      req.user.role === Role.ADMIN ||
+      req.user.role === Role.MD ||
+      req.user.role === Role.NSM ||
+      req.user.role === Role.ZSM ||
+      req.user.role === Role.RM ||
+      req.user.role === Role.ASM ||
+      req.user.role === Role.FINANCE ||
+      req.user.role === Role.WAREHOUSE ||
+      req.user.role === Role.MARKETING ||
+      req.user.role === Role.HR;
 
     let employeeFilter: string | undefined;
     if (!isManager) {
@@ -310,7 +320,19 @@ async function createOrder(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getOrders, [Role.MR, Role.ASM, Role.ADMIN, Role.MD]);
+export const GET = withAuth(getOrders, [
+  Role.ADMIN,
+  Role.MD,
+  Role.NSM,
+  Role.ZSM,
+  Role.RM,
+  Role.ASM,
+  Role.MR,
+  Role.FINANCE,
+  Role.WAREHOUSE,
+  Role.MARKETING,
+  Role.HR,
+]);
 // MR is the first point of contact for a chemist — orders are booked from the
 // field, not injected by managers. ASM/ADMIN can view and advance fulfilment
 // status but never originate a sale themselves.

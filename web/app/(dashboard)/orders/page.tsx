@@ -177,10 +177,11 @@ export default function OrdersDashboard() {
     apiClient
       .get("/api/orders/secondary", { params: { page, limit: 20 } })
       .then((res) => {
-        setOrders(res.data.data.orders);
-        setOrdersTotal(res.data.data.pagination.total);
-        setOrdersTotalPages(res.data.data.pagination.totalPages);
-        setStatusCounts(res.data.data.statusCounts);
+        const ordersData = res.data?.data?.orders ?? [];
+        setOrders(ordersData);
+        setOrdersTotal(res.data?.data?.pagination?.total ?? ordersData.length);
+        setOrdersTotalPages(res.data?.data?.pagination?.totalPages ?? 1);
+        setStatusCounts(res.data?.data?.statusCounts ?? { PENDING: 0, CONFIRMED: 0, SHIPPED: 0, DELIVERED: 0, CANCELLED: 0 });
       })
       .catch((err) => console.error("Failed to load orders:", err))
       .finally(() => setLoading(false));

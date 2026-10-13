@@ -17,7 +17,17 @@ async function handler(req: AuthedRequest) {
       endDate,
     };
 
-    const isManager = req.user.role === Role.ADMIN || req.user.role === Role.MD || req.user.role === Role.NSM || req.user.role === Role.ZSM || req.user.role === Role.RM || req.user.role === Role.ASM;
+    const isManager =
+      req.user.role === Role.ADMIN ||
+      req.user.role === Role.MD ||
+      req.user.role === Role.NSM ||
+      req.user.role === Role.ZSM ||
+      req.user.role === Role.RM ||
+      req.user.role === Role.ASM ||
+      req.user.role === Role.FINANCE ||
+      req.user.role === Role.HR ||
+      req.user.role === Role.MARKETING ||
+      req.user.role === Role.WAREHOUSE;
 
     if (employeeId) {
       if (!isManager && req.user.role === Role.MR) {
@@ -63,4 +73,8 @@ export const GET = withAuth(handler, [
   Role.RM,
   Role.ASM,
   Role.MR,
+  Role.FINANCE,
+  Role.HR,
+  Role.MARKETING,
+  Role.WAREHOUSE,
 ]);
