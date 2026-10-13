@@ -210,6 +210,7 @@ export class SoftwareUpdateAgentsService {
     let pullOutput = "";
     let pullSuccess = false;
     try {
+      try { execSync("git config core.filemode false", { cwd, timeout: 5000 }); } catch {}
       pullOutput = execSync(`git pull origin ${branch}`, {
         cwd,
         encoding: "utf8",
@@ -217,8 +218,14 @@ export class SoftwareUpdateAgentsService {
       });
       pullSuccess = true;
     } catch (err: any) {
-      pullOutput = (err?.stdout || "") + "\n" + (err?.stderr || "") + "\n" + (err?.message || "");
-      pullSuccess = false;
+      try {
+        const ffOut = execSync(`git merge origin/${branch} --ff-only`, { cwd, encoding: "utf8", timeout: 20000 });
+        pullOutput = ffOut || "Fast-forward merge succeeded.";
+        pullSuccess = true;
+      } catch {
+        pullOutput = (err?.stdout || "") + "\n" + (err?.stderr || "") + "\n" + (err?.message || "");
+        pullSuccess = false;
+      }
     }
 
     try {
@@ -513,10 +520,16 @@ export class SoftwareUpdateAgentsService {
 
     const cwd = this.getRepoRoot();
     try {
-      execSync(`git merge ${hash} --no-edit`, { cwd, encoding: "utf8", timeout: 30000 });
-      fileLogs.push(`[GitHookSyncAgent] ✔ Merged commit #${hash} into current working branch.`);
+      try { execSync("git config core.filemode false", { cwd, timeout: 5000 }); } catch {}
+      const mergeOut = execSync(`git merge ${hash} --no-edit`, { cwd, encoding: "utf8", timeout: 30000 });
+      fileLogs.push(`[GitHookSyncAgent] ✔ Merged commit #${hash} into current working branch (${mergeOut.trim() || "OK"}).`);
     } catch (e: any) {
-      fileLogs.push(`[GitHookSyncAgent] Note: ${e?.message?.slice(0, 200) || "Merged directly."}`);
+      try {
+        execSync(`git checkout -B main ${hash}`, { cwd, encoding: "utf8", timeout: 30000 });
+        fileLogs.push(`[GitHookSyncAgent] ✔ Aligned workspace branch directly to commit #${hash}.`);
+      } catch {
+        fileLogs.push(`[GitHookSyncAgent] Note: ${e?.message?.slice(0, 200) || "Merged directly."}`);
+      }
     }
 
     const applyResult = await this.applyUpdate();
@@ -887,9 +900,9 @@ export class SoftwareUpdateAgentsService {
       fileLogs.push(`[BuildVerificationAgent] ✔ 15-day document expiry alert system verified.`);
 
       const restartCmd =
-        "(pm2 reload trend-mr --update-env && echo RESTARTED_VIA_PM2) || (systemctl restart trend-mr && echo RESTARTED_VIA_SYSTEMD) || (nohup npm start > /var/log/trend-mr-app.log 2>&1 & echo RESTARTED_VIA_NOHUP)";
+        "(npm run build && pm2 reload trend-mr --update-env && echo RESTARTED_VIA_PM2) || (pm2 reload trend-mr --update-env && echo RESTARTED_VIA_PM2) || (systemctl restart trend-mr && echo RESTARTED_VIA_SYSTEMD) || (nohup npm start > /var/log/trend-mr-app.log 2>&1 & echo RESTARTED_VIA_NOHUP)";
       try {
-        fileLogs.push(`[ProcessLifecycleAgent] Queuing PM2 hot reload (trend-mr)...`);
+        fileLogs.push(`[ProcessLifecycleAgent] Queuing background build & PM2 hot reload (trend-mr)...`);
         execSync(`(sleep 1 && ${restartCmd}) >/tmp/trend-mr-restart.log 2>&1 &`, { cwd: this.getCwd(), shell: "/bin/bash" as any });
         steps.push({ name: "Self-Restart Scheduled", ok: true, detail: "Detached PM2 reload queued successfully." });
         fileLogs.push(`[ProcessLifecycleAgent] ✔ Detached PM2 process reload queued with zero data loss.`);
