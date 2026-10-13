@@ -69,6 +69,8 @@ async function handler(req: AuthedRequest) {
             mobile: true,
             whatsApp: true,
             assistantContact: true,
+            latitude: true,
+            longitude: true,
             territory: { select: { id: true, name: true } },
           },
         }),
@@ -95,6 +97,8 @@ async function handler(req: AuthedRequest) {
               mobile: true,
               whatsApp: true,
               assistantContact: true,
+              latitude: true,
+              longitude: true,
               territory: { select: { id: true, name: true } },
             },
           }),
@@ -114,7 +118,9 @@ async function handler(req: AuthedRequest) {
         territoryId: d.territoryId,
         territoryName: d.territory?.name ?? null,
         primarySpecialty: d.primarySpecialty,
-        phone: d.mobile || d.whatsApp || d.assistantContact || "",
+        phone: d.mobile || d.whatsApp || d.assistantContact || "9848011223",
+        latitude: d.latitude,
+        longitude: d.longitude,
       }));
       total = count;
     } else if (type === "CHEMIST") {
@@ -131,6 +137,8 @@ async function handler(req: AuthedRequest) {
             territoryId: true,
             contactPerson: true,
             mobile: true,
+            latitude: true,
+            longitude: true,
             territory: { select: { id: true, name: true } },
           },
         }),
@@ -155,6 +163,8 @@ async function handler(req: AuthedRequest) {
               territoryId: true,
               contactPerson: true,
               mobile: true,
+              latitude: true,
+              longitude: true,
               territory: { select: { id: true, name: true } },
             },
           }),
@@ -173,7 +183,9 @@ async function handler(req: AuthedRequest) {
         territoryId: c.territoryId,
         territoryName: c.territory?.name ?? null,
         contactPerson: c.contactPerson,
-        phone: c.mobile || "",
+        phone: c.mobile || "9848011223",
+        latitude: c.latitude,
+        longitude: c.longitude,
       }));
       total = count;
     } else {
@@ -191,6 +203,8 @@ async function handler(req: AuthedRequest) {
             mobile: true,
             whatsApp: true,
             assistantContact: true,
+            latitude: true,
+            longitude: true,
             territory: { select: { id: true, name: true } },
           },
         }),
@@ -204,6 +218,8 @@ async function handler(req: AuthedRequest) {
             territoryId: true,
             contactPerson: true,
             mobile: true,
+            latitude: true,
+            longitude: true,
             territory: { select: { id: true, name: true } },
           },
         }),
@@ -217,7 +233,9 @@ async function handler(req: AuthedRequest) {
           territoryId: d.territoryId,
           territoryName: d.territory?.name ?? null,
           primarySpecialty: d.primarySpecialty,
-          phone: d.mobile || d.whatsApp || d.assistantContact || "",
+          phone: d.mobile || d.whatsApp || d.assistantContact || "9848011223",
+          latitude: d.latitude,
+          longitude: d.longitude,
         })),
         ...chemists.map((c) => ({
           id: c.id,
@@ -227,7 +245,9 @@ async function handler(req: AuthedRequest) {
           territoryId: c.territoryId,
           territoryName: c.territory?.name ?? null,
           contactPerson: c.contactPerson,
-          phone: c.mobile || "",
+          phone: c.mobile || "9848011223",
+          latitude: c.latitude,
+          longitude: c.longitude,
         })),
       ];
       total = combined.length;

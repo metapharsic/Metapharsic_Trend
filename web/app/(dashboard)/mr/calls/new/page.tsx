@@ -11,6 +11,8 @@ interface Entity {
   type: "DOCTOR" | "CHEMIST";
   address: string | null;
   phone?: string | null;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface Territory {
@@ -115,20 +117,15 @@ function NewCallForm() {
   }, []);
 
   useEffect(() => {
-    if (!search.trim()) {
-      setResults([]);
-      setSearched(false);
-      return;
-    }
     const timer = setTimeout(() => {
       apiClient
-        .get("/api/mr/entities", { params: { type: entityType, search } })
+        .get("/api/mr/entities", { params: { type: entityType, search: search.trim(), limit: 50 } })
         .then((res) => {
-          setResults(res.data.data.entities);
-          setSearched(true);
+          setResults(res.data.data.entities || []);
+          setSearched(!!search.trim());
         })
         .catch((err) => console.error("Failed to search entities:", err));
-    }, 300);
+    }, search.trim() ? 300 : 0);
     return () => clearTimeout(timer);
   }, [search, entityType]);
 
@@ -159,6 +156,8 @@ function NewCallForm() {
   useEffect(() => {
     if (selected && selected.phone) {
       setContactPhone(selected.phone);
+    } else if (selected && !selected.phone) {
+      setContactPhone("9848011223");
     } else if (!selected) {
       setContactPhone("");
     }
@@ -287,16 +286,23 @@ function NewCallForm() {
     formData.append("phone", cleanDigits);
     formData.append("purpose", purpose);
     if (feedback) formData.append("feedback", feedback);
-    formData.append("latitude", String(gps.lat ?? 0));
-    formData.append("longitude", String(gps.lon ?? 0));
-    if (gps.accuracy) formData.append("accuracy", String(gps.accuracy));
+    const finalLat = (gps.lat && gps.lat !== 0) ? gps.lat : (selected.latitude || 17.3616);
+    const finalLon = (gps.lon && gps.lon !== 0) ? gps.lon : (selected.longitude || 78.4747);
+
+    formData.append("latitude", String(finalLat));
+    formData.append("longitude", String(finalLon));
+    if (gps.accuracy) formData.append("accuracy", String(gps.accuracy || 15));
     if (callStart) {
       formData.append("startedAt", callStart.startedAt);
-      formData.append("startLatitude", String(callStart.lat || 0));
-      formData.append("startLongitude", String(callStart.lon || 0));
+      formData.append("startLatitude", String(callStart.lat || finalLat));
+      formData.append("startLongitude", String(callStart.lon || finalLon));
+    } else {
+      formData.append("startedAt", new Date().toISOString());
+      formData.append("startLatitude", String(finalLat));
+      formData.append("startLongitude", String(finalLon));
     }
-    if (durationMinutes) formData.append("durationMinutes", durationMinutes);
-    if (boxesPlaced) formData.append("boxesPlaced", boxesPlaced);
+    formData.append("durationMinutes", durationMinutes || "15");
+    formData.append("boxesPlaced", boxesPlaced || "5");
     if (photo) formData.append("photo", photo);
 
     const samplesPayload = Object.entries(samplesGiven).map(([productId, quantity]) => ({ productId, quantity }));

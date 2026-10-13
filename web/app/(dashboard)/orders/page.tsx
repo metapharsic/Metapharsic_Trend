@@ -14,6 +14,9 @@ import {
   Receipt,
   History,
   FileSpreadsheet,
+  Search,
+  Store,
+  Check,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 
@@ -38,6 +41,10 @@ interface Order {
 interface Entity {
   id: string;
   name: string;
+  address?: string | null;
+  territoryName?: string | null;
+  mobile?: string | null;
+  contactPerson?: string | null;
 }
 
 interface Product {
@@ -835,11 +842,13 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
   const [items, setItems] = useState<LineItem[]>([{ productId: "", quantity: 1, batchNo: "", expDate: "", freeQty: 0 }]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [chemistSearch, setChemistSearch] = useState("");
+  const [chemistDropdownOpen, setChemistDropdownOpen] = useState(false);
 
   useEffect(() => {
     apiClient
-      .get("/api/manager/entities", { params: { type: "CHEMIST", limit: 200 } })
-      .then((res) => setChemists(res.data.data.entities))
+      .get("/api/manager/entities", { params: { type: "CHEMIST", limit: 300 } })
+      .then((res) => setChemists(res.data.data.entities || []))
       .catch((err) => console.error("Failed to load chemists:", err));
     apiClient
       .get("/api/mr/territories")
@@ -922,27 +931,154 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Chemist *</label>
-            <select
-              value={chemistId}
-              onChange={(e) => setChemistId(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-base sm:text-sm"
-            >
-              <option value="">Select chemist</option>
-              {chemists.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+          <div className="relative">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Chemist *</label>
+              {chemistId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChemistId("");
+                    setChemistSearch("");
+                    setChemistDropdownOpen(true);
+                  }}
+                  className="text-[11px] text-emerald-600 hover:text-emerald-700 font-semibold"
+                >
+                  Change Chemist
+                </button>
+              )}
+            </div>
+
+            {(() => {
+              const selectedChemist = chemists.find((c) => c.id === chemistId);
+              if (selectedChemist && !chemistDropdownOpen) {
+                return (
+                  <div
+                    onClick={() => setChemistDropdownOpen(true)}
+                    className="w-full border-2 border-emerald-500/50 bg-emerald-50/60 rounded-xl p-2.5 cursor-pointer hover:bg-emerald-50 transition flex items-center justify-between group shadow-sm"
+                    title="Click to search or change chemist"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 shrink-0">
+                        <Store size={16} />
+                      </div>
+                      <div className="min-w-0 text-left">
+                        <p className="font-bold text-slate-900 text-sm truncate">{selectedChemist.name}</p>
+                        <p className="text-xs text-slate-500 truncate">
+                          {selectedChemist.address || selectedChemist.territoryName || "Retail Partner"}
+                          {selectedChemist.mobile ? ` • ${selectedChemist.mobile}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setChemistId("");
+                        setChemistSearch("");
+                        setChemistDropdownOpen(true);
+                      }}
+                      className="p-1 text-slate-400 hover:text-red-500 rounded-lg hover:bg-white transition"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                );
+              }
+
+              const filteredChemists = chemists.filter((c) => {
+                if (!chemistSearch.trim()) return true;
+                const q = chemistSearch.toLowerCase();
+                return (
+                  c.name.toLowerCase().includes(q) ||
+                  (c.address && c.address.toLowerCase().includes(q)) ||
+                  (c.territoryName && c.territoryName.toLowerCase().includes(q)) ||
+                  (c.contactPerson && c.contactPerson.toLowerCase().includes(q))
+                );
+              });
+
+              return (
+                <div className="relative">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search chemist name, address, area..."
+                      value={chemistSearch}
+                      onChange={(e) => {
+                        setChemistSearch(e.target.value);
+                        setChemistDropdownOpen(true);
+                      }}
+                      onFocus={() => setChemistDropdownOpen(true)}
+                      className="w-full pl-9 pr-8 border border-slate-300 rounded-xl py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                    {chemistSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setChemistSearch("")}
+                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {chemistDropdownOpen && (
+                    <div className="absolute z-30 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-slate-100">
+                      <div className="p-2 bg-slate-50 text-[11px] font-semibold text-slate-500 flex justify-between items-center sticky top-0 border-b border-slate-200 z-10">
+                        <span>{filteredChemists.length} Chemists Found</span>
+                        <button
+                          type="button"
+                          onClick={() => setChemistDropdownOpen(false)}
+                          className="text-slate-400 hover:text-slate-700"
+                        >
+                          Close
+                        </button>
+                      </div>
+                      {filteredChemists.length === 0 ? (
+                        <div className="p-4 text-center text-xs text-slate-400">
+                          No chemists matching &quot;{chemistSearch}&quot;
+                        </div>
+                      ) : (
+                        filteredChemists.map((c) => {
+                          const isSelected = c.id === chemistId;
+                          return (
+                            <div
+                              key={c.id}
+                              onClick={() => {
+                                setChemistId(c.id);
+                                setChemistDropdownOpen(false);
+                                setChemistSearch("");
+                              }}
+                              className={`p-2.5 cursor-pointer hover:bg-emerald-50/70 transition flex items-center justify-between text-left ${
+                                isSelected ? "bg-emerald-50 font-semibold" : ""
+                              }`}
+                            >
+                              <div className="min-w-0 pr-2">
+                                <p className="text-sm text-slate-900 font-medium truncate">{c.name}</p>
+                                <p className="text-xs text-slate-500 truncate">
+                                  {c.address || c.territoryName || "Retail Chemist"}
+                                  {c.mobile ? ` • ${c.mobile}` : ""}
+                                </p>
+                              </div>
+                              {isSelected && <Check size={16} className="text-emerald-600 shrink-0" />}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Distributor *</label>
             <select
               value={distributorId}
               onChange={(e) => setDistributorId(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-base sm:text-sm"
+              className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-base sm:text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             >
               <option value="">Select distributor</option>
               {distributors.map((d) => (
