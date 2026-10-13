@@ -47,5 +47,13 @@ web/reports-output/
 brain/
 scratch/
 .claude/
+*.pbix
+**/*.pbix
+*.zip
+**/*.zip
+*.bat
+**/*.bat
+web/*.sh
+web/test_mr_activity_wiring.js
 
 
