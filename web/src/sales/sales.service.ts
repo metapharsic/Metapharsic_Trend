@@ -214,11 +214,11 @@ export class SalesService {
   /**
    * Generate official GST Invoice for an Order with immutable party snapshot
    */
-  static async generateInvoice(data: GenerateInvoiceInput) {
+  static async generateInvoice(data: GenerateInvoiceInput, employeeUserId?: string) {
     const order = await db.order.findUnique({
       where: { id: data.orderId },
       include: {
-        chemist: true,
+        chemist: { include: { territory: true } },
         distributor: true,
         items: { include: { product: true } },
         invoice: true,
@@ -228,9 +228,22 @@ export class SalesService {
     if (!order) throw new Error("Order not found");
     if (order.invoice) return order.invoice; // Already generated
 
-    const companySettings = await db.companySettings.findFirst({
-      where: { id: "singleton" },
-    });
+    let bookingEmployeeId = order.employeeId;
+    if (employeeUserId) {
+      const emp = await db.employee.findUnique({
+        where: { userId: employeeUserId },
+        include: { territories: true },
+      });
+      if (emp) {
+        if (!bookingEmployeeId) {
+          bookingEmployeeId = emp.id;
+          await db.order.update({
+            where: { id: order.id },
+            data: { employeeId: emp.id },
+          });
+        }
+      }
+    }
 
     const party = order.chemist ?? order.distributor;
     const gstLines = order.items.map((i) => ({
@@ -244,6 +257,12 @@ export class SalesService {
     const invoiceNo = `INV-${Date.now().toString().slice(-8)}`;
 
     return db.$transaction(async (tx) => {
+      // Guard against concurrent generation requests on the same order
+      const existingInv = await tx.invoice.findUnique({
+        where: { orderId: order.id },
+      });
+      if (existingInv) return existingInv;
+
       const invoice = await tx.invoice.create({
         data: {
           orderId: order.id,
@@ -272,14 +291,19 @@ export class SalesService {
 
       // Post auto double-entry ledger entry
       try {
+        const gstAmount = Number(totals.totalGst ?? 0);
+        const grandTotal = Number(totals.grandTotal);
+        const salesAmount = grandTotal - gstAmount;
+
         await postAutoLedger(tx, {
           date: new Date(),
           narration: `Invoice ${invoiceNo} raised for ${party?.name || "Customer"}`,
           sourceType: "INVOICE",
           sourceId: invoice.id,
           lines: [
-            { accountCode: SYSTEM_ACCOUNT_CODES.accountsReceivable, debit: totals.grandTotal, credit: 0 },
-            { accountCode: SYSTEM_ACCOUNT_CODES.salesRevenue, debit: 0, credit: totals.grandTotal },
+            { accountCode: SYSTEM_ACCOUNT_CODES.accountsReceivable, debit: grandTotal, credit: 0 },
+            { accountCode: SYSTEM_ACCOUNT_CODES.salesRevenue, debit: 0, credit: salesAmount },
+            ...(gstAmount > 0 ? [{ accountCode: SYSTEM_ACCOUNT_CODES.gstPayable, debit: 0, credit: gstAmount }] : []),
           ],
         });
       } catch (e) {

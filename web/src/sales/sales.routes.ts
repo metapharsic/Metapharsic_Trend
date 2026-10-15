@@ -118,7 +118,34 @@ export async function generateInvoiceHandler(req: AuthedRequest) {
       return badRequest("Validation error", parsed.error.flatten());
     }
 
-    const invoice = await SalesService.generateInvoice(parsed.data);
+    // If MR, ensure they are authorized to generate invoice for this order (either booked it or in their territory)
+    if (req.user.role === Role.MR) {
+      const employee = await import("@/lib/db").then((m) =>
+        m.db.employee.findUnique({
+          where: { userId: req.user.sub },
+          include: { territories: { select: { id: true } } },
+        })
+      );
+      if (!employee) return unauthorized("Employee record not found");
+
+      const order = await import("@/lib/db").then((m) =>
+        m.db.order.findUnique({
+          where: { id: parsed.data.orderId },
+          select: { employeeId: true, chemist: { select: { territoryId: true } } },
+        })
+      );
+      if (!order) return notFound("Order not found");
+
+      const inTerritory = order.chemist?.territoryId
+        ? employee.territories.some((t) => t.id === order.chemist?.territoryId)
+        : true;
+
+      if (order.employeeId && order.employeeId !== employee.id && !inTerritory) {
+        return forbidden("You can only generate invoices for orders you booked or in your territory");
+      }
+    }
+
+    const invoice = await SalesService.generateInvoice(parsed.data, req.user.role === Role.MR ? req.user.sub : undefined);
     return created({ invoice });
   } catch (err: any) {
     console.error("[POST /api/sales/invoices/generate]", err);
@@ -207,6 +234,7 @@ export const generateInvoiceRoute = withAuth(generateInvoiceHandler, [
   Role.MD,
   Role.ASM,
   Role.WAREHOUSE,
+  Role.MR,
 ]);
 export const getInvoicesRoute = withAuth(getInvoicesHandler);
 export const recordCollectionRoute = withAuth(recordCollectionHandler, [

@@ -282,6 +282,43 @@ async function updateOrderItemsInner(req: AuthedRequest, id: string, body: unkno
       if (wasPaid) {
         await reverseAutoLedger(tx, "INVOICE", `${updatedInvoice.id}-payment`);
       }
+    } else {
+      // Order had no invoice — generate it so the order can be billed and collected against
+      const party = existing.chemist ?? existing.distributor;
+      const createdInvoice = await tx.invoice.create({
+        data: {
+          orderId: id,
+          invoiceNo: `INV-${order.createdAt.getTime()}-${order.id.slice(0, 6).toUpperCase()}`,
+          amount: newOrderValue,
+          paid: false,
+          partyName: party ? party.name : "Customer",
+          partyGstNo: (party as any)?.gstNo ?? null,
+          partyAddress: (party as any)?.address ?? null,
+          partyDlNo: (party as any)?.licenseNo ?? null,
+          partyPhone: (party as any)?.mobile ?? null,
+          totalItems: gstTotals.totalItems,
+          totalQty: gstTotals.totalQty,
+          totalDiscount: gstTotals.totalDiscount,
+          totalGst: gstTotals.totalGst,
+          roundOff: gstTotals.roundOff,
+          grandTotal: gstTotals.grandTotal,
+        },
+      });
+
+      const gstAmount = Number(gstTotals.totalGst ?? 0);
+      const grandTotal = Number(gstTotals.grandTotal ?? newOrderValue);
+      const salesAmount = grandTotal - gstAmount;
+      await postAutoLedger(tx, {
+        sourceType: "INVOICE",
+        sourceId: createdInvoice.id,
+        date: createdInvoice.createdAt,
+        narration: `Invoice ${createdInvoice.invoiceNo} — generated`,
+        lines: [
+          { accountCode: SYSTEM_ACCOUNT_CODES.accountsReceivable, debit: grandTotal },
+          { accountCode: SYSTEM_ACCOUNT_CODES.salesRevenue, credit: salesAmount },
+          ...(gstAmount > 0 ? [{ accountCode: SYSTEM_ACCOUNT_CODES.gstPayable, credit: gstAmount }] : []),
+        ],
+      });
     }
     return order;
   });
