@@ -284,7 +284,7 @@ async function updateOrderItemsInner(req: AuthedRequest, id: string, body: unkno
       }
     } else {
       // Order had no invoice — generate it so the order can be billed and collected against
-      const party = existing.chemist ?? existing.distributor;
+      const party = order.chemist ?? order.distributor;
       const createdInvoice = await tx.invoice.create({
         data: {
           orderId: id,

@@ -1,6 +1,6 @@
 import { Role } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
-import { ok, created, badRequest, notFound, unauthorized, apiError } from "@/lib/api-response";
+import { ok, created, badRequest, notFound, unauthorized, forbidden, apiError } from "@/lib/api-response";
 import {
   CreateSalesOrderSchema,
   UpdateOrderStatusSchema,

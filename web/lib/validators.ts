@@ -113,7 +113,7 @@ export const UpdateLedgerSchema = CreateLedgerSchema.omit({ doctorId: true, chem
 
 export const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(20),
+  limit: z.coerce.number().int().min(1).max(500).default(20),
 });
 
 // ─── Tour Plan ───────────────────────────────────────────────

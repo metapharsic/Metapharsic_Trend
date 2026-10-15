@@ -847,35 +847,69 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
   const [chemistDropdownOpen, setChemistDropdownOpen] = useState(false);
 
   useEffect(() => {
+    // 1. Load chemists with multi-source fallback
     apiClient
       .get("/api/manager/entities", { params: { type: "CHEMIST", limit: 300 } })
-      .then((res) => setChemists(res.data.data.entities || []))
-      .catch((err) => console.error("Failed to load chemists:", err));
+      .then((res) => {
+        const ents = res.data?.data?.entities || [];
+        if (ents.length > 0) {
+          setChemists(ents);
+        } else {
+          apiClient
+            .get("/api/mr/entities", { params: { type: "CHEMIST", limit: 200 } })
+            .then((r2) => setChemists(r2.data?.data?.entities || []));
+        }
+      })
+      .catch(() => {
+        apiClient
+          .get("/api/mr/entities", { params: { type: "CHEMIST", limit: 200 } })
+          .then((r2) => setChemists(r2.data?.data?.entities || []))
+          .catch((err) => console.error("Failed to load chemists:", err));
+      });
+
+    // 2. Load distributors with fallback to all distributors if territory has no dedicated distributor
     apiClient
       .get("/api/mr/territories")
       .then(async (res) => {
-        const territories: { id: string }[] = res.data.data.territories ?? [];
-        if (territories.length === 0) {
-          setDistributors([]);
-          return;
-        }
-        const results = await Promise.all(
-          territories.map((t) =>
-            apiClient.get("/api/manager/entities", {
-              params: { type: "DISTRIBUTOR", territoryId: t.id, limit: 200 },
-            })
-          )
-        );
+        const territories: { id: string }[] = res.data?.data?.territories ?? [];
         const merged = new Map<string, Entity>();
-        for (const res of results) {
-          for (const d of res.data.data.entities as Entity[]) merged.set(d.id, d);
+        if (territories.length > 0) {
+          const results = await Promise.all(
+            territories.map((t) =>
+              apiClient.get("/api/manager/entities", {
+                params: { type: "DISTRIBUTOR", territoryId: t.id, limit: 200 },
+              }).catch(() => null)
+            )
+          );
+          for (const r of results) {
+            if (r?.data?.data?.entities) {
+              for (const d of r.data.data.entities as Entity[]) merged.set(d.id, d);
+            }
+          }
+        }
+        // Fallback: If MR's territory has no dedicated distributor, load all active distributors
+        if (merged.size === 0) {
+          const allRes = await apiClient
+            .get("/api/manager/entities", { params: { type: "DISTRIBUTOR", limit: 200 } })
+            .catch(() => null);
+          if (allRes?.data?.data?.entities) {
+            for (const d of allRes.data.data.entities as Entity[]) merged.set(d.id, d);
+          }
         }
         setDistributors(Array.from(merged.values()));
       })
-      .catch((err) => console.error("Failed to load distributors:", err));
+      .catch(async () => {
+        const allRes = await apiClient
+          .get("/api/manager/entities", { params: { type: "DISTRIBUTOR", limit: 200 } })
+          .catch(() => null);
+        if (allRes?.data?.data?.entities) {
+          setDistributors(allRes.data.data.entities);
+        }
+      });
+
     apiClient
       .get("/api/products", { params: { limit: 100 } })
-      .then((res) => setProducts(res.data.data.products))
+      .then((res) => setProducts(res.data?.data?.products || []))
       .catch((err) => console.error("Failed to load products:", err));
   }, []);
 
