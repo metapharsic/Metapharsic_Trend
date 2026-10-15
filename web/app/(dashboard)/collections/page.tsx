@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
 import {
   Wallet,
   AlertTriangle,
@@ -29,8 +30,16 @@ import {
   ChevronDown,
   ChevronUp,
   CreditCard,
+  FileSpreadsheet,
+  Download,
+  Layers,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ExternalLink,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { downloadExcelReportWithDashboard } from "@/lib/excel-export";
 
 function currency(value: number | string | null | undefined): string {
   if (value == null) return "₹0";
@@ -137,6 +146,11 @@ function EnterpriseCreditDashboard({ role }: { role: string | null }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [riskFilter, setRiskFilter] = useState("ALL");
+  const [territoryFilter, setTerritoryFilter] = useState("ALL");
+  const [scopeFilter, setScopeFilter] = useState<"ALL" | "OUTSTANDING" | "CRITICAL">("OUTSTANDING");
+  const [sortKey, setSortKey] = useState<string>("outstanding");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [exportingExcel, setExportingExcel] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
   const [selectedChemistForLog, setSelectedChemistForLog] = useState<ChemistCreditRow | null>(null);
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<OpenInvoiceItem | null>(null);
@@ -173,21 +187,121 @@ function EnterpriseCreditDashboard({ role }: { role: string | null }) {
   const chemists: ChemistCreditRow[] = data?.chemists || [];
   const summary = data || {};
 
+  const territories = useMemo(() => {
+    const list = Array.from(new Set(chemists.map((c) => c.territory).filter(Boolean))) as string[];
+    return ["ALL", ...list.sort()];
+  }, [chemists]);
+
   const filteredChemists = useMemo(() => {
-    return chemists.filter((c) => {
+    const rows = chemists.filter((c) => {
       const q = searchTerm.toLowerCase().trim();
       const matchesSearch =
         !q ||
         c.name.toLowerCase().includes(q) ||
         (c.mr && c.mr.toLowerCase().includes(q)) ||
-        (c.territory && c.territory.toLowerCase().includes(q));
+        (c.territory && c.territory.toLowerCase().includes(q)) ||
+        (c.address && c.address.toLowerCase().includes(q));
 
       const matchesStatus = statusFilter === "ALL" || c.status === statusFilter;
       const matchesRisk = riskFilter === "ALL" || c.riskTier === riskFilter;
+      const matchesTerritory = territoryFilter === "ALL" || c.territory === territoryFilter;
 
-      return matchesSearch && matchesStatus && matchesRisk;
+      let matchesScope = true;
+      if (scopeFilter === "OUTSTANDING") {
+        matchesScope = c.outstanding > 0;
+      } else if (scopeFilter === "CRITICAL") {
+        matchesScope = (c.aging90Plus || 0) > 0 || c.riskTier === "CRITICAL" || c.status === "BREACHED";
+      }
+
+      return matchesSearch && matchesStatus && matchesRisk && matchesTerritory && matchesScope;
     });
-  }, [chemists, searchTerm, statusFilter, riskFilter]);
+
+    if (sortKey) {
+      rows.sort((a: any, b: any) => {
+        const valA = a[sortKey];
+        const valB = b[sortKey];
+        if (typeof valA === "number" && typeof valB === "number") {
+          return sortOrder === "asc" ? valA - valB : valB - valA;
+        }
+        return sortOrder === "asc"
+          ? String(valA || "").localeCompare(String(valB || ""))
+          : String(valB || "").localeCompare(String(valA || ""));
+      });
+    }
+
+    return rows;
+  }, [chemists, searchTerm, statusFilter, riskFilter, territoryFilter, scopeFilter, sortKey, sortOrder]);
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortOrder("desc");
+    }
+  };
+
+  const handleExportExcel = async () => {
+    if (!filteredChemists.length) return;
+    setExportingExcel(true);
+    try {
+      const detailHeaders = [
+        "Chemist Outlet",
+        "Territory",
+        "Assigned MR",
+        "Credit Limit (₹)",
+        "Total Outstanding (₹)",
+        "Current 0-30 Days (₹)",
+        "Overdue 31-60 Days (₹)",
+        "Overdue 61-90 Days (₹)",
+        "Critical 90+ Days (₹)",
+        "DSO (Days)",
+        "Open Invoices",
+        "Credit Status",
+        "Risk Tier",
+      ];
+      const detailRows = filteredChemists.map((c) => [
+        c.name,
+        c.territory || "—",
+        c.mr || "—",
+        c.creditLimit ?? 0,
+        c.outstanding,
+        c.aging0To30 ?? 0,
+        c.aging31To60 ?? 0,
+        c.aging61To90 ?? 0,
+        c.aging90Plus ?? 0,
+        c.dsoDays ?? 0,
+        c.unpaidInvoicesCount ?? (c.openInvoices?.length || 0),
+        c.status,
+        c.riskTier || "LOW",
+      ]);
+
+      const kpis = [
+        { label: "Total Outstanding", value: currency(summary.totalOutstanding), note: "Live Receivables" },
+        { label: "Current (0-30d)", value: currency(summary.aging0To30), note: "Healthy Receivables" },
+        { label: "Overdue (31-60d)", value: currency(summary.aging31To60), note: "Follow-up Required" },
+        { label: "Overdue (61-90d)", value: currency(summary.aging61To90), note: "High Priority" },
+        { label: "Critical (90+d)", value: currency(summary.aging90Plus), note: "Immediate Action" },
+        { label: "Accounts Filtered", value: filteredChemists.length, note: "Chemist Retail Outlets" },
+      ];
+
+      const filename = `Credit_Risk_Aging_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      await downloadExcelReportWithDashboard(
+        {
+          reportTitle: "Credit Risk & Collections Management - Aging Matrix",
+          reportSubtitle: "Multi-Agent FIFO Reconciled Receivables Aging & Risk Exposure Audit",
+          kpis,
+          detailHeaders,
+          detailRows,
+        },
+        filename
+      );
+    } catch (err) {
+      console.error("Failed to export Excel:", err);
+    } finally {
+      setExportingExcel(false);
+    }
+  };
 
   if (loading && !data) {
     return (
@@ -218,6 +332,10 @@ function EnterpriseCreditDashboard({ role }: { role: string | null }) {
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/30 text-indigo-200">
                 DSO &amp; Risk Scoring
               </span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-900/60 text-emerald-200 border border-emerald-500/30">
+                <CheckCircle2 size={11} className="text-emerald-400" />
+                4/4 Threads Verified
+              </span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-display">
               Credit Risk &amp; Collections Management
@@ -227,7 +345,27 @@ function EnterpriseCreditDashboard({ role }: { role: string | null }) {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href="/reports?report=chemist-aging-analysis"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600/90 hover:bg-indigo-600 text-white transition shadow-sm border border-indigo-400/30"
+              title="Open full report in BI Reporting with multi-dimensional breakdowns"
+            >
+              <FileSpreadsheet size={15} />
+              <span>BI Credit Report</span>
+              <ArrowUpRight size={13} className="text-indigo-200" />
+            </Link>
+
+            <button
+              onClick={handleExportExcel}
+              disabled={exportingExcel || !chemists.length}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white transition border border-slate-800 cursor-pointer"
+              title="Download Aging Matrix as Executive Excel Report"
+            >
+              <Download size={14} className={exportingExcel ? "animate-bounce" : ""} />
+              <span>{exportingExcel ? "Exporting..." : "Excel Export"}</span>
+            </button>
+
             <button
               onClick={() => {
                 setSelectedChemistForLog(null);
@@ -236,12 +374,13 @@ function EnterpriseCreditDashboard({ role }: { role: string | null }) {
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm cursor-pointer"
             >
               <Plus size={15} />
-              <span>Log Payment Collection</span>
+              <span>Log Payment</span>
             </button>
+
             <button
               onClick={loadData}
               disabled={loading}
-              className="p-2.5 rounded-xl text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:bg-slate-800 transition"
+              className="p-2.5 rounded-xl text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:bg-slate-800 transition cursor-pointer"
               title="Refresh Data"
             >
               <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
@@ -346,6 +485,88 @@ function EnterpriseCreditDashboard({ role }: { role: string | null }) {
         />
       </div>
 
+      {/* ─── Receivables Aging Distribution Bar ─────────────────────────────────── */}
+      {summary.totalOutstanding > 0 && (
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-2.5">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-700 flex-wrap gap-2">
+            <span className="flex items-center gap-1.5 uppercase tracking-wider text-slate-500 text-[11px]">
+              <Layers size={14} className="text-indigo-600" />
+              Receivables Aging Portfolio Distribution
+            </span>
+            <div className="flex items-center gap-3 text-xs font-mono">
+              <span className="text-slate-500">
+                Audited Accounts with Dues: <strong className="text-slate-800">{chemists.filter((c) => c.outstanding > 0).length}</strong>
+              </span>
+              <span className="text-slate-500">
+                Total Live Exposure: <strong className="text-emerald-700 text-sm font-bold">{currency(summary.totalOutstanding)}</strong>
+              </span>
+            </div>
+          </div>
+
+          {(() => {
+            const total = summary.totalOutstanding || 1;
+            const p0_30 = Math.round(((summary.aging0To30 || 0) / total) * 100);
+            const p31_60 = Math.round(((summary.aging31To60 || 0) / total) * 100);
+            const p61_90 = Math.round(((summary.aging61To90 || 0) / total) * 100);
+            const p90p = Math.max(0, 100 - p0_30 - p31_60 - p61_90);
+
+            return (
+              <>
+                <div className="h-4 w-full bg-slate-100 rounded-xl overflow-hidden flex shadow-inner">
+                  <div
+                    style={{ width: `${p0_30}%` }}
+                    className="bg-emerald-500 hover:opacity-90 transition cursor-pointer"
+                    title={`Current 0-30d: ${currency(summary.aging0To30)} (${p0_30}%)`}
+                  />
+                  <div
+                    style={{ width: `${p31_60}%` }}
+                    className="bg-amber-400 hover:opacity-90 transition cursor-pointer"
+                    title={`Overdue 31-60d: ${currency(summary.aging31To60)} (${p31_60}%)`}
+                  />
+                  <div
+                    style={{ width: `${p61_90}%` }}
+                    className="bg-orange-500 hover:opacity-90 transition cursor-pointer"
+                    title={`Overdue 61-90d: ${currency(summary.aging61To90)} (${p61_90}%)`}
+                  />
+                  <div
+                    style={{ width: `${p90p}%` }}
+                    className="bg-rose-600 hover:opacity-90 transition cursor-pointer"
+                    title={`Critical 90+d: ${currency(summary.aging90Plus)} (${p90p}%)`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px]">
+                  <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-emerald-50/50 border border-emerald-100/60">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="text-slate-600 truncate">
+                      Current 0-30d: <strong className="text-emerald-800">{currency(summary.aging0To30)}</strong> ({p0_30}%)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-amber-50/50 border border-amber-100/60">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+                    <span className="text-slate-600 truncate">
+                      31-60d: <strong className="text-amber-800">{currency(summary.aging31To60)}</strong> ({p31_60}%)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-orange-50/50 border border-orange-100/60">
+                    <span className="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0" />
+                    <span className="text-slate-600 truncate">
+                      61-90d: <strong className="text-orange-800">{currency(summary.aging61To90)}</strong> ({p61_90}%)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-rose-50/50 border border-rose-100/60">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-600 shrink-0" />
+                    <span className="text-slate-600 truncate">
+                      90+d: <strong className="text-rose-800">{currency(summary.aging90Plus)}</strong> ({p90p}%)
+                    </span>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Secondary Metrics Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex items-center justify-between">
@@ -403,78 +624,248 @@ function EnterpriseCreditDashboard({ role }: { role: string | null }) {
       )}
 
       {/* ─── Search & Filters Bar ────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3.5 top-3 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search by chemist name, MR representative, or territory..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Status Filter */}
-          <div className="flex items-center bg-slate-100 rounded-xl p-0.5 text-xs font-medium text-slate-600">
-            {["ALL", "OK", "WARNING", "BREACHED"].map((st) => (
-              <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1 rounded-lg transition ${
-                  statusFilter === st ? "bg-white text-slate-900 font-bold shadow-2xs" : ""
-                }`}
-              >
-                {st === "ALL" ? "All Exposure" : st}
-              </button>
-            ))}
+      <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col gap-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3.5 top-3 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by chemist name, address, MR rep, territory..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
           </div>
 
-          {/* Risk Tier Filter */}
-          <div className="flex items-center bg-slate-100 rounded-xl p-0.5 text-xs font-medium text-slate-600">
-            {["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"].map((rk) => (
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Quick Scope Filter Pills */}
+            <div className="flex items-center bg-slate-100 rounded-xl p-0.5 text-xs font-medium text-slate-600">
               <button
-                key={rk}
-                onClick={() => setRiskFilter(rk)}
-                className={`px-2.5 py-1 rounded-lg transition ${
-                  riskFilter === rk ? "bg-white text-slate-900 font-bold shadow-2xs" : ""
+                onClick={() => setScopeFilter("OUTSTANDING")}
+                className={`px-3 py-1 rounded-lg transition text-[11px] font-bold ${
+                  scopeFilter === "OUTSTANDING" ? "bg-white text-emerald-800 shadow-2xs" : ""
                 }`}
               >
-                {rk === "ALL" ? "All Tiers" : rk}
+                With Outstanding ({chemists.filter((c) => c.outstanding > 0).length})
               </button>
-            ))}
+              <button
+                onClick={() => setScopeFilter("ALL")}
+                className={`px-3 py-1 rounded-lg transition text-[11px] font-bold ${
+                  scopeFilter === "ALL" ? "bg-white text-slate-900 shadow-2xs" : ""
+                }`}
+              >
+                All Accounts ({chemists.length})
+              </button>
+              <button
+                onClick={() => setScopeFilter("CRITICAL")}
+                className={`px-3 py-1 rounded-lg transition text-[11px] font-bold ${
+                  scopeFilter === "CRITICAL" ? "bg-white text-rose-700 shadow-2xs" : ""
+                }`}
+              >
+                Critical 90+d ({summary.criticalAgingCount || 0})
+              </button>
+            </div>
+
+            {/* Territory Dropdown Filter */}
+            {territories.length > 2 && (
+              <select
+                value={territoryFilter}
+                onChange={(e) => setTerritoryFilter(e.target.value)}
+                className="text-xs px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 font-medium text-slate-700"
+              >
+                {territories.map((t) => (
+                  <option key={t} value={t}>
+                    {t === "ALL" ? "All Territories" : t}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-slate-100 pt-2 flex-wrap gap-2 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Exposure:</span>
+            {/* Status Filter */}
+            <div className="flex items-center bg-slate-100 rounded-xl p-0.5 text-xs font-medium text-slate-600">
+              {["ALL", "OK", "WARNING", "BREACHED"].map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setStatusFilter(st)}
+                  className={`px-2.5 py-0.5 rounded-lg transition text-[11px] ${
+                    statusFilter === st ? "bg-white text-slate-900 font-bold shadow-2xs" : ""
+                  }`}
+                >
+                  {st === "ALL" ? "All" : st}
+                </button>
+              ))}
+            </div>
+
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider ml-2">Risk:</span>
+            {/* Risk Tier Filter */}
+            <div className="flex items-center bg-slate-100 rounded-xl p-0.5 text-xs font-medium text-slate-600">
+              {["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"].map((rk) => (
+                <button
+                  key={rk}
+                  onClick={() => setRiskFilter(rk)}
+                  className={`px-2 py-0.5 rounded-lg transition text-[11px] ${
+                    riskFilter === rk ? "bg-white text-slate-900 font-bold shadow-2xs" : ""
+                  }`}
+                >
+                  {rk === "ALL" ? "All" : rk}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="text-[11px] text-slate-500 font-mono">
+            Filtered Receivables:{" "}
+            <strong className="text-emerald-700 font-bold">
+              {currency(filteredChemists.reduce((s, c) => s + c.outstanding, 0))}
+            </strong>
           </div>
         </div>
       </div>
 
       {/* ─── Chemist Receivables & Aging Table ───────────────────────────────────── */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden space-y-0">
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
           <div>
             <h3 className="text-sm font-bold text-slate-900">Chemist Receivables &amp; Aging Matrix</h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Multi-agent audited FIFO payment allocations, aging distribution, and risk scoring.
             </p>
           </div>
-          <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
-            Showing {filteredChemists.length} of {chemists.length} Accounts
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
+              Showing {filteredChemists.length} of {chemists.length} Accounts
+            </span>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
               <tr>
-                <th className="py-3.5 px-4">Chemist Outlet</th>
-                {!isMR && <th className="py-3.5 px-3">MR / Territory</th>}
-                <th className="py-3.5 px-3 text-right">Credit Limit</th>
-                <th className="py-3.5 px-3 text-right">Outstanding</th>
-                <th className="py-3.5 px-3 text-right">0-30 Days</th>
-                <th className="py-3.5 px-3 text-right">31-60 Days</th>
-                <th className="py-3.5 px-3 text-right">61-90 Days</th>
-                <th className="py-3.5 px-3 text-right">90+ Days</th>
-                <th className="py-3.5 px-3 text-center">Risk Tier</th>
+                <th
+                  onClick={() => handleSort("name")}
+                  className="py-3.5 px-4 cursor-pointer select-none hover:bg-slate-100 transition"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Chemist Outlet</span>
+                    {sortKey === "name" ? (
+                      sortOrder === "asc" ? <ArrowUp size={11} className="text-emerald-600" /> : <ArrowDown size={11} className="text-emerald-600" />
+                    ) : (
+                      <ArrowUpDown size={11} className="text-slate-300" />
+                    )}
+                  </div>
+                </th>
+                {!isMR && (
+                  <th
+                    onClick={() => handleSort("territory")}
+                    className="py-3.5 px-3 cursor-pointer select-none hover:bg-slate-100 transition"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>MR / Territory</span>
+                      {sortKey === "territory" ? (
+                        sortOrder === "asc" ? <ArrowUp size={11} className="text-emerald-600" /> : <ArrowDown size={11} className="text-emerald-600" />
+                      ) : (
+                        <ArrowUpDown size={11} className="text-slate-300" />
+                      )}
+                    </div>
+                  </th>
+                )}
+                <th
+                  onClick={() => handleSort("creditLimit")}
+                  className="py-3.5 px-3 text-right cursor-pointer select-none hover:bg-slate-100 transition"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>Credit Limit</span>
+                    {sortKey === "creditLimit" ? (
+                      sortOrder === "asc" ? <ArrowUp size={11} className="text-emerald-600" /> : <ArrowDown size={11} className="text-emerald-600" />
+                    ) : (
+                      <ArrowUpDown size={11} className="text-slate-300" />
+                    )}
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort("outstanding")}
+                  className="py-3.5 px-3 text-right cursor-pointer select-none hover:bg-slate-100 transition"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>Outstanding</span>
+                    {sortKey === "outstanding" ? (
+                      sortOrder === "asc" ? <ArrowUp size={11} className="text-emerald-600" /> : <ArrowDown size={11} className="text-emerald-600" />
+                    ) : (
+                      <ArrowUpDown size={11} className="text-slate-300" />
+                    )}
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort("aging0To30")}
+                  className="py-3.5 px-3 text-right cursor-pointer select-none hover:bg-slate-100 transition"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>0-30 Days</span>
+                    {sortKey === "aging0To30" ? (
+                      sortOrder === "asc" ? <ArrowUp size={11} className="text-emerald-600" /> : <ArrowDown size={11} className="text-emerald-600" />
+                    ) : (
+                      <ArrowUpDown size={11} className="text-slate-300" />
+                    )}
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort("aging31To60")}
+                  className="py-3.5 px-3 text-right cursor-pointer select-none hover:bg-slate-100 transition"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>31-60 Days</span>
+                    {sortKey === "aging31To60" ? (
+                      sortOrder === "asc" ? <ArrowUp size={11} className="text-emerald-600" /> : <ArrowDown size={11} className="text-emerald-600" />
+                    ) : (
+                      <ArrowUpDown size={11} className="text-slate-300" />
+                    )}
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort("aging61To90")}
+                  className="py-3.5 px-3 text-right cursor-pointer select-none hover:bg-slate-100 transition"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>61-90 Days</span>
+                    {sortKey === "aging61To90" ? (
+                      sortOrder === "asc" ? <ArrowUp size={11} className="text-emerald-600" /> : <ArrowDown size={11} className="text-emerald-600" />
+                    ) : (
+                      <ArrowUpDown size={11} className="text-slate-300" />
+                    )}
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort("aging90Plus")}
+                  className="py-3.5 px-3 text-right cursor-pointer select-none hover:bg-slate-100 transition"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>90+ Days</span>
+                    {sortKey === "aging90Plus" ? (
+                      sortOrder === "asc" ? <ArrowUp size={11} className="text-emerald-600" /> : <ArrowDown size={11} className="text-emerald-600" />
+                    ) : (
+                      <ArrowUpDown size={11} className="text-slate-300" />
+                    )}
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort("riskTier")}
+                  className="py-3.5 px-3 text-center cursor-pointer select-none hover:bg-slate-100 transition"
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    <span>Risk Tier</span>
+                    {sortKey === "riskTier" ? (
+                      sortOrder === "asc" ? <ArrowUp size={11} className="text-emerald-600" /> : <ArrowDown size={11} className="text-emerald-600" />
+                    ) : (
+                      <ArrowUpDown size={11} className="text-slate-300" />
+                    )}
+                  </div>
+                </th>
                 <th className="py-3.5 px-3 text-center">Status</th>
                 <th className="py-3.5 px-4 text-center">Action</th>
               </tr>

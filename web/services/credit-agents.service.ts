@@ -121,6 +121,7 @@ export class CreditAgentsService {
   public static async executeCreditPipeline(params: {
     employeeId?: string;
     territoryId?: string;
+    territoryIds?: string[];
   } = {}): Promise<MultiAgentCreditPipelineResponse> {
     const now = new Date();
     const nowIso = now.toISOString();
@@ -173,9 +174,13 @@ export class CreditAgentsService {
     ]);
     const reconciliationLatency = Date.now() - t0Invoices;
 
-    // Filter by employee scope if MR view
-    const targetChemists = params.employeeId
+    // Filter by territory scope or employee scope if MR view
+    const targetChemists = params.territoryIds && params.territoryIds.length > 0
+      ? chemists.filter((c) => c.territoryId && params.territoryIds!.includes(c.territoryId))
+      : params.employeeId
       ? chemists.filter((c) => c.territory?.employee?.id === params.employeeId)
+      : params.territoryId
+      ? chemists.filter((c) => c.territoryId === params.territoryId)
       : chemists;
 
     const targetChemistIds = new Set(targetChemists.map((c) => c.id));

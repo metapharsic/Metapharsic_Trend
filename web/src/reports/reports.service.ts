@@ -12,6 +12,7 @@ import {
   AgentStatusType,
 } from "./reports.agents";
 import { startOfUtcMonth, startOfUtcDay, addUtcDays } from "@/lib/date";
+import { CreditAgentsService } from "@/services/credit-agents.service";
 
 export class ReportsService {
   /**
@@ -139,23 +140,27 @@ export class ReportsService {
       }
 
       case "chemist-aging-analysis": {
-        const chemists = await ReportsSql.getChemistAgingData(territoryIds);
-        const rows = chemists.map((chem) => {
-          const totalSales = chem.orders.reduce((sum, o) => sum + Number(o.invoice?.grandTotal ?? o.invoice?.amount ?? 0), 0);
-          const totalPaid = chem.collections.reduce((sum, c) => sum + Number(c.amount ?? 0), 0);
-          const outstanding = Math.max(totalSales - totalPaid, 0);
-          const limit = Number(chem.creditLimit ?? 0);
-          const creditUtilization = limit > 0 ? Math.round((outstanding / limit) * 100) : 0;
-
-          return {
-            chemist: chem.name,
-            territory: chem.territory?.name || "Unassigned",
-            creditLimit: limit,
-            outstanding,
-            creditUtilization,
-            riskCategory: creditUtilization > 90 ? "HIGH" : creditUtilization > 60 ? "MEDIUM" : "LOW",
-          };
+        const pipelineRes = await CreditAgentsService.executeCreditPipeline({
+          territoryIds: territoryIds ?? undefined,
         });
+        const rows = pipelineRes.creditData.chemists.map((c) => ({
+          chemist: c.chemistName,
+          billingName: c.billingName || c.chemistName,
+          territory: c.territoryName,
+          mrName: c.mrName,
+          creditLimit: c.creditLimit !== null ? c.creditLimit : 0,
+          outstanding: c.totalOutstanding,
+          aging0To30: c.current0To30,
+          aging31To60: c.overdue31To60,
+          aging61To90: c.overdue61To90,
+          aging90Plus: c.overdue90Plus,
+          dsoDays: c.dsoDays,
+          unpaidInvoicesCount: c.unpaidInvoicesCount,
+          totalBilled: c.totalBilledRevenue,
+          totalCollected: c.totalCollected,
+          creditUtilization: c.limitUtilizationPct,
+          riskCategory: c.riskTier,
+        }));
         return { id: "chemist-aging-analysis", title: "Chemist Aging & Credit Risk Analysis", rows };
       }
 

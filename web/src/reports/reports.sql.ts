@@ -42,7 +42,7 @@ export class ReportsSql {
       include: {
         territory: { select: { id: true, name: true } },
         orders: {
-          where: { status: OrderStatus.DELIVERED },
+          where: { status: { not: OrderStatus.CANCELLED } },
           include: { invoice: true, items: true },
         },
         collections: true,

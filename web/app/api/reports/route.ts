@@ -10,6 +10,7 @@ import {
   round2,
   type CostBasisSource,
 } from "@/lib/pricing";
+import { CreditAgentsService } from "@/services/credit-agents.service";
 
 // ADMIN/MD/NSM see company-wide data; ZSM/RM/ASM are scoped to their own
 // territories only — mirrors the scoping already enforced on api/mr/dashboard.
@@ -1106,47 +1107,51 @@ const REPORTS = {
 
   "chemist-aging-analysis": {
     category: "Financial & Outstanding",
-    title: "Chemist Outstanding & Aging Analysis",
-    description: "Chemist credit limits, payment collections, outstanding balances, and credit risk tiers.",
-    run: async (territoryIds: string[] | null, dateRange: { startDate: Date; endDate?: Date }) => {
-      const chemists = await db.chemist.findMany({
-        where: territoryIds ? { territoryId: { in: territoryIds } } : undefined,
-        include: {
-          territory: { select: { name: true } },
-          orders: {
-            where: { createdAt: { gte: dateRange.startDate, ...(dateRange.endDate ? { lt: dateRange.endDate } : {}) } },
-            include: { items: { select: { price: true, quantity: true } } },
-          },
-          collections: {
-            where: { createdAt: { gte: dateRange.startDate, ...(dateRange.endDate ? { lt: dateRange.endDate } : {}) } },
-            select: { amount: true },
-          },
-        },
+    title: "Chemist Aging & Credit Risk Analysis",
+    description: "Audited FIFO invoice receivables aging (0-30, 31-60, 61-90, 90+ days), credit limits, utilization %, DSO, and automated risk tiers.",
+    run: async (territoryIds: string[] | null) => {
+      const pipelineRes = await CreditAgentsService.executeCreditPipeline({
+        territoryIds: territoryIds ?? undefined,
       });
+      const chemists = pipelineRes.creditData.chemists;
 
-      return chemists.map((c) => {
-        const totalBilled = c.orders.reduce((sum, o) => {
-          const orderSum = o.items.reduce((iSum, it) => iSum + Number(it.price) * it.quantity, 0);
-          return sum + orderSum;
-        }, 0);
-        const totalCollected = c.collections.reduce((sum, col) => sum + Number(col.amount || 0), 0);
-        const outstanding = Math.max(0, totalBilled - totalCollected);
-        const creditLimit = Number(c.creditLimit || 50000);
-        const utilizationPct = creditLimit > 0 ? Math.round((outstanding / creditLimit) * 100) : 0;
-        const riskCategory = utilizationPct > 80 ? "HIGH_RISK" : utilizationPct > 50 ? "MEDIUM_RISK" : "HEALTHY";
-
-        return {
-          chemist: c.name,
-          contactPerson: c.contactPerson || "Proprietor",
-          territory: c.territory?.name || "General",
-          creditLimit,
-          totalBilled,
-          totalCollected,
-          outstanding,
-          utilizationPct: `${utilizationPct}%`,
-          riskCategory,
-        };
-      }).sort((a, b) => b.outstanding - a.outstanding);
+      return chemists.map((c) => ({
+        chemist: c.chemistName,
+        billingName: c.billingName || c.chemistName,
+        territory: c.territoryName,
+        mrName: c.mrName,
+        creditLimit: c.creditLimit !== null ? c.creditLimit : "No Limit",
+        outstanding: c.totalOutstanding,
+        aging0To30: c.current0To30,
+        aging31To60: c.overdue31To60,
+        aging61To90: c.overdue61To90,
+        aging90Plus: c.overdue90Plus,
+        dsoDays: c.dsoDays,
+        unpaidInvoicesCount: c.unpaidInvoicesCount,
+        totalBilled: c.totalBilledRevenue,
+        totalCollected: c.totalCollected,
+        utilizationPct: c.creditLimit !== null ? `${c.limitUtilizationPct}%` : "—",
+        riskCategory: c.riskTier,
+        creditStatus: c.status,
+        lastPaymentDate: c.lastPaymentDate ? new Date(c.lastPaymentDate).toISOString().slice(0, 10) : "Never",
+        lastPaymentAmount: c.lastPaymentAmount ?? 0,
+      })).sort((a, b) => b.outstanding - a.outstanding || (typeof b.creditLimit === "number" && typeof a.creditLimit === "number" ? b.creditLimit - a.creditLimit : 0));
+    },
+    summary: async (territoryIds: string[] | null) => {
+      const pipelineRes = await CreditAgentsService.executeCreditPipeline({
+        territoryIds: territoryIds ?? undefined,
+      });
+      const s = pipelineRes.creditData.summary;
+      return {
+        totalOutstanding: s.totalOutstanding,
+        aging0To30: s.aging0To30,
+        aging31To60: s.aging31To60,
+        aging61To90: s.aging61To90,
+        aging90Plus: s.aging90Plus,
+        dsoAverage: s.dsoAverage,
+        criticalAgingCount: s.criticalAgingCount,
+        breachedCount: s.breachedCount,
+      };
     },
   },
 

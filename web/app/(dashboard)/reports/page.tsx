@@ -132,13 +132,25 @@ const KEY_LABELS: Record<string, string> = {
   balanceStock: "Balance Stock",
   stockValue: "Stock Value",
   chemist: "Chemist Name",
+  billingName: "Billing / Trade Name",
   contactPerson: "Contact Person",
   creditLimit: "Credit Limit (₹)",
   totalBilled: "Total Billed (₹)",
   totalCollected: "Total Collected (₹)",
   outstanding: "Outstanding (₹)",
+  aging0To30: "Current (0-30d) (₹)",
+  aging31To60: "Overdue (31-60d) (₹)",
+  aging61To90: "Overdue (61-90d) (₹)",
+  aging90Plus: "Critical (90+d) (₹)",
+  dsoDays: "DSO (Days)",
+  unpaidInvoicesCount: "Open Invoices",
+  creditUtilization: "Credit Utilized %",
   utilizationPct: "Limit Utilized",
+  creditStatus: "Credit Status",
   riskCategory: "Risk Tier",
+  riskTier: "Risk Tier",
+  lastPaymentDate: "Last Payment Date",
+  lastPaymentAmount: "Last Payment Amount (₹)",
   invoiceNo: "Invoice No",
   orderNo: "Order No",
   partyName: "Party / Chemist",
@@ -283,7 +295,11 @@ export default function ReportsDashboard() {
       .then((res) => {
         const list = res.data?.data?.reports ?? [];
         setReports(list);
-        if (list.length > 0 && !selected) {
+        const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+        const queryReport = urlParams?.get("report");
+        if (queryReport && list.some((r: any) => r.id === queryReport)) {
+          setSelected(queryReport);
+        } else if (list.length > 0 && !selected) {
           setSelected(list[0].id);
         }
       })
