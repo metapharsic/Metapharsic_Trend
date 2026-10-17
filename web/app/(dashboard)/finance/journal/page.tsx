@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { BookOpen, Plus, X, Trash2 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 
 interface Account {
   id: string;
@@ -135,17 +136,19 @@ export default function JournalEntriesPage() {
           <div className="space-y-2">
             {lines.map((l, i) => (
               <div key={i} className="flex gap-2 items-center">
-                <select
+                <SearchableSelect
                   value={l.accountId}
                   onChange={(e) => updateLine(i, { accountId: e.target.value })}
-                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm flex-1"
+                  placeholder="Select account…"
+                  searchPlaceholder="Search account code or name..."
+                  className="flex-1"
                   required
                 >
                   <option value="">Select account…</option>
                   {accounts.map((a) => (
                     <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
                   ))}
-                </select>
+                </SearchableSelect>
                 <input
                   type="number"
                   step="0.01"

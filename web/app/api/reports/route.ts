@@ -68,13 +68,27 @@ function getReportDateRange(timeframe?: string | null, customStart?: string | nu
  * Regional headquarters and territory geocenter coordinates for accurate field force mapping
  */
 const TERRITORY_GEO_CENTROIDS: Record<string, { lat: number; lng: number }> = {
-  "Santosh Nagar & Yakutpura": { lat: 17.3524, lng: 78.5023 },
-  "Hyderabad": { lat: 17.3616, lng: 78.4747 },
-  "Tarnaka": { lat: 17.4285, lng: 78.5350 },
-  "Shanti Nagar & Taranaka": { lat: 17.4271, lng: 78.5382 },
-  "North Delhi Central": { lat: 28.7041, lng: 77.1025 },
+  "Tarnaka Core & Lalaguda": { lat: 17.4285, lng: 78.5310 },
+  "Shanti Nagar & HMT Nagar": { lat: 17.4485, lng: 78.5080 },
+  "Lalapet & Moula Ali": { lat: 17.4460, lng: 78.5380 },
+  "Nacharam & Mallapur": { lat: 17.4360, lng: 78.5620 },
+  "VST, Musheerabad & RTC X Roads": { lat: 17.4120, lng: 78.5020 },
+  "Habsiguda & Uppal": { lat: 17.4110, lng: 78.5490 },
   "Secunderabad Commercial": { lat: 17.4399, lng: 78.4983 },
+  "Santosh Nagar & IS Sadan": { lat: 17.3590, lng: 78.5010 },
+  "Charminar, Ghansi Bazar & Shah Gunj": { lat: 17.3640, lng: 78.4740 },
+  "Yakutpura & Rein Bazar": { lat: 17.3620, lng: 78.4870 },
+  "Talab Katta & Saidabad": { lat: 17.3670, lng: 78.5060 },
+  "Baba Nagar & Phoolbagh": { lat: 17.3665, lng: 78.4990 },
+  "Pisalbanda & Balapur": { lat: 17.3380, lng: 78.5120 },
   "Banjara Hills & Jubilee": { lat: 17.4325, lng: 78.4071 },
+  "Hyderabad Central & First Lancer": { lat: 17.3616, lng: 78.4747 },
+  "North Delhi Central": { lat: 28.7041, lng: 77.1025 },
+  // Backwards compatibility aliases
+  "Tarnaka": { lat: 17.4285, lng: 78.5350 },
+  "Santosh Nagar & Yakutpura": { lat: 17.3524, lng: 78.5023 },
+  "Shanti Nagar & Taranaka": { lat: 17.4271, lng: 78.5382 },
+  "Hyderabad": { lat: 17.3616, lng: 78.4747 },
 };
 
 function formatCoordinates(lat: number, lng: number): string {

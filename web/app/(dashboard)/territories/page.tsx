@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 
 interface Employee {
   id: string;
@@ -332,10 +333,12 @@ export default function TerritoriesDashboard() {
 
             <div className="space-y-1">
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Assign Representative (Optional)</label>
-              <select
+              <SearchableSelect
                 value={newEmployeeId}
                 onChange={(e) => setNewEmployeeId(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Vacant (Unassigned)"
+                searchPlaceholder="Search representative..."
+                allowClear
               >
                 <option value="">Vacant (Unassigned)</option>
                 {mrEmployees.map((e) => (
@@ -343,7 +346,7 @@ export default function TerritoriesDashboard() {
                     {e.firstName} {e.lastName}
                   </option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
 
             {error && <p className="text-xs text-red-600 font-semibold">{error}</p>}
@@ -428,10 +431,12 @@ export default function TerritoriesDashboard() {
 
             <div className="space-y-1">
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Choose Representative</label>
-              <select
+              <SearchableSelect
                 value={assignEmployeeId}
                 onChange={(e) => setAssignEmployeeId(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Vacant (Unassigned)"
+                searchPlaceholder="Search representative..."
+                allowClear
               >
                 <option value="">Vacant (Unassigned)</option>
                 {mrEmployees.map((e) => (
@@ -439,7 +444,7 @@ export default function TerritoriesDashboard() {
                     {e.firstName} {e.lastName}
                   </option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
 
             <button

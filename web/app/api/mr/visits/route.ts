@@ -12,6 +12,7 @@ import { getWorkflowSettings } from "@/lib/workflow-settings";
 import { startOfUtcDay, addUtcDays } from "@/lib/date";
 import { VisitDeduplicationAgentsService } from "@/services/visit-deduplication-agents.service";
 import { CallComplianceAgentsService } from "@/services/call-compliance-agents.service";
+import { NearbyChemistAgentsService } from "@/services/nearby-chemist-agents.service";
 
 
 async function getVisits(req: AuthedRequest) {
@@ -447,8 +448,35 @@ async function createVisit(req: AuthedRequest) {
 
     CacheService.invalidate('admin_kpis');
 
-    
-    return ok({ visitId: visit.id, success: true });
+    // Nearby Chemist Coordination & Tour Plan Real-Time Sync Agent
+    const nearbyChemistId = formData.get("nearbyChemistId") ? String(formData.get("nearbyChemistId")) : null;
+    const nearbyChemistName = formData.get("nearbyChemistName") ? String(formData.get("nearbyChemistName")) : null;
+    const nearbyChemistType = formData.get("nearbyChemistType") ? String(formData.get("nearbyChemistType")) : null;
+    const nearbyChemistNotes = formData.get("nearbyChemistNotes") ? String(formData.get("nearbyChemistNotes")) : null;
+
+    let nearbyChemistSyncResult: any = null;
+    if (doctorId && (nearbyChemistId || nearbyChemistName)) {
+      try {
+        nearbyChemistSyncResult = await NearbyChemistAgentsService.processVisitWithNearbyChemist({
+          visitId: visit.id,
+          employeeId: employee.id,
+          doctorId,
+          nearbyChemistId,
+          nearbyChemistName,
+          placementType: (nearbyChemistType as any) || "NEAREST_CHEMIST",
+          notes: nearbyChemistNotes || feedback || "Completed call with nearby chemist tagged",
+          boxesPlaced: boxesPlaced ? Number(boxesPlaced) : 5,
+        });
+      } catch (e) {
+        console.error("[POST /api/mr/visits] Nearby chemist agent processing error:", e);
+      }
+    }
+
+    return ok({
+      visitId: visit.id,
+      success: true,
+      nearbyChemistSync: nearbyChemistSyncResult,
+    });
   } catch (err) {
     if (err instanceof Error && (err.message.startsWith("Insufficient sample stock") || err.message.startsWith("Insufficient gift stock"))) {
       return badRequest(err.message);

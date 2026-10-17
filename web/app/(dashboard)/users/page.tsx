@@ -32,6 +32,7 @@ import {
   Info,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 import { Role } from "@prisma/client";
 import {
   ROLES_RESPONSIBILITIES_CATALOG,
@@ -833,20 +834,21 @@ export default function UserManagementPage() {
               {/* Role Selection with Responsibility Preview */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Functional System Role *</label>
-                <select
+                <SearchableSelect
                   value={formData.role}
                   onChange={(e) => {
                     const newRole = e.target.value as Role;
                     setFormData({ ...formData, role: newRole, managerId: "" });
                   }}
-                  className="w-full px-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                  searchPlaceholder="Search role name, department..."
+                  placeholder="Select System Role..."
                 >
                   {Object.values(Role).map((r) => (
                     <option key={r} value={r}>
                       {r} — {ROLES_RESPONSIBILITIES_CATALOG[r]?.title || r} ({ROLES_RESPONSIBILITIES_CATALOG[r]?.department || "General"})
                     </option>
                   ))}
-                </select>
+                </SearchableSelect>
 
                 {/* Live Role Responsibility Card Preview */}
                 {ROLES_RESPONSIBILITIES_CATALOG[formData.role] && (
@@ -870,10 +872,12 @@ export default function UserManagementPage() {
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
                     Reporting Manager ({ROLES_RESPONSIBILITIES_CATALOG[formData.role]?.reportingLine})
                   </label>
-                  <select
+                  <SearchableSelect
                     value={formData.managerId}
                     onChange={(e) => setFormData({ ...formData, managerId: e.target.value })}
-                    className="w-full px-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                    placeholder="Select Reporting Manager..."
+                    searchPlaceholder="Search manager by name or role..."
+                    allowClear
                   >
                     <option value="">Select Reporting Manager...</option>
                     {eligibleManagers.map((m) => (
@@ -881,7 +885,7 @@ export default function UserManagementPage() {
                         {m.employee!.firstName} {m.employee!.lastName} ({m.role}) — {m.email}
                       </option>
                     ))}
-                  </select>
+                  </SearchableSelect>
                 </div>
               )}
 

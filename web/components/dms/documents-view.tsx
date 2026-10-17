@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { DocRecord, DocumentVersion, DocumentWorkflow, DocumentAuditTrail, DocumentStats, ExpiryNotificationItem } from '@/types/dms';
 import { generateExcelCsv, downloadFile } from '@/lib/excel-export';
+import { SearchableSelect } from '@/components/searchable-select';
 
 export const DocumentsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'DOCUMENTS' | 'VERSION_HISTORY' | 'WORKFLOW' | 'REPORTS'>('DOCUMENTS');
@@ -530,10 +531,13 @@ export const DocumentsView: React.FC = () => {
               <div className="flex items-center gap-2 text-sm text-slate-400">
                 <Filter className="w-4 h-4" />
                 <span>Category:</span>
-                <select
+                <SearchableSelect
                   value={selectedCategory}
                   onChange={e => setSelectedCategory(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-xl text-sm px-3 py-1.5 text-slate-200 focus:outline-none focus:border-cyan-500"
+                  className="w-40"
+                  buttonClassName="bg-slate-950 border-slate-800 text-slate-200 text-sm px-3 py-1.5 rounded-xl"
+                  placeholder="All Categories"
+                  searchPlaceholder="Filter category..."
                 >
                   <option value="All">All Categories</option>
                   <option value="SOP">SOP</option>
@@ -542,15 +546,18 @@ export const DocumentsView: React.FC = () => {
                   <option value="Compliance">Compliance</option>
                   <option value="Policy">Policy</option>
                   <option value="Other">Other</option>
-                </select>
+                </SearchableSelect>
               </div>
 
               <div className="flex items-center gap-2 text-sm text-slate-400">
                 <span>Status:</span>
-                <select
+                <SearchableSelect
                   value={selectedStatus}
                   onChange={e => setSelectedStatus(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-xl text-sm px-3 py-1.5 text-slate-200 focus:outline-none focus:border-cyan-500"
+                  className="w-48"
+                  buttonClassName="bg-slate-950 border-slate-800 text-slate-200 text-sm px-3 py-1.5 rounded-xl"
+                  placeholder="All Statuses"
+                  searchPlaceholder="Filter status..."
                 >
                   <option value="All">All Statuses</option>
                   <option value="Expiring15">⚠️ Expiring within 15 Days</option>
@@ -559,7 +566,7 @@ export const DocumentsView: React.FC = () => {
                   <option value="Expiring">Expiring</option>
                   <option value="Pending">Pending</option>
                   <option value="Archived">Archived</option>
-                </select>
+                </SearchableSelect>
               </div>
 
               <button
@@ -858,18 +865,20 @@ export const DocumentsView: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Category</label>
-                  <select
+                  <SearchableSelect
                     value={newDoc.category}
                     onChange={e => setNewDoc({ ...newDoc, category: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-cyan-500"
-                  >
-                    <option value="SOP">SOP</option>
-                    <option value="License">License</option>
-                    <option value="Report">Report</option>
-                    <option value="Compliance">Compliance</option>
-                    <option value="Policy">Policy</option>
-                    <option value="Other">Other</option>
-                  </select>
+                    placeholder="Select category..."
+                    options={[
+                      { value: "SOP", label: "SOP" },
+                      { value: "License", label: "License" },
+                      { value: "Report", label: "Report" },
+                      { value: "Compliance", label: "Compliance" },
+                      { value: "Policy", label: "Policy" },
+                      { value: "Other", label: "Other" }
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Version</label>
@@ -885,15 +894,17 @@ export const DocumentsView: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Status</label>
-                  <select
+                  <SearchableSelect
                     value={newDoc.status}
                     onChange={e => setNewDoc({ ...newDoc, status: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-cyan-500"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Draft">Draft</option>
-                    <option value="Pending">Pending Review</option>
-                  </select>
+                    placeholder="Select status..."
+                    options={[
+                      { value: "Active", label: "Active" },
+                      { value: "Draft", label: "Draft" },
+                      { value: "Pending", label: "Pending Review" }
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Expiry Date (Optional)</label>

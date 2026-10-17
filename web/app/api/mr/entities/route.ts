@@ -26,18 +26,9 @@ async function handler(req: AuthedRequest) {
 
     let territoryFilter: { in: string[] } | undefined = undefined;
 
+    // Only filter by territory if explicitly requested via query param
     if (territoryId) {
       territoryFilter = { in: [territoryId] };
-    } else if (!isManager) {
-      const employee = await db.employee.findUnique({
-        where: { userId: req.user.sub },
-        include: { territories: true },
-      });
-      const ids = employee?.territories.map((t) => t.id) || [];
-      // Only restrict if MR has explicitly assigned territories; otherwise allow broad search
-      if (ids.length > 0) {
-        territoryFilter = { in: ids };
-      }
     }
 
     const doctorWhere = {
@@ -71,6 +62,8 @@ async function handler(req: AuthedRequest) {
             assistantContact: true,
             latitude: true,
             longitude: true,
+            beatName: true,
+            subArea: true,
             territory: { select: { id: true, name: true } },
           },
         }),
@@ -99,6 +92,8 @@ async function handler(req: AuthedRequest) {
               assistantContact: true,
               latitude: true,
               longitude: true,
+              beatName: true,
+              subArea: true,
               territory: { select: { id: true, name: true } },
             },
           }),
@@ -117,6 +112,8 @@ async function handler(req: AuthedRequest) {
         address: d.clinicAddress,
         territoryId: d.territoryId,
         territoryName: d.territory?.name ?? null,
+        beatName: d.beatName ?? null,
+        subArea: d.subArea ?? null,
         primarySpecialty: d.primarySpecialty,
         phone: d.mobile || d.whatsApp || d.assistantContact || "9848011223",
         latitude: d.latitude,
@@ -139,6 +136,8 @@ async function handler(req: AuthedRequest) {
             mobile: true,
             latitude: true,
             longitude: true,
+            beatName: true,
+            subArea: true,
             territory: { select: { id: true, name: true } },
           },
         }),
@@ -165,6 +164,8 @@ async function handler(req: AuthedRequest) {
               mobile: true,
               latitude: true,
               longitude: true,
+              beatName: true,
+              subArea: true,
               territory: { select: { id: true, name: true } },
             },
           }),
@@ -182,6 +183,8 @@ async function handler(req: AuthedRequest) {
         address: c.address,
         territoryId: c.territoryId,
         territoryName: c.territory?.name ?? null,
+        beatName: c.beatName ?? null,
+        subArea: c.subArea ?? null,
         contactPerson: c.contactPerson,
         phone: c.mobile || "9848011223",
         latitude: c.latitude,

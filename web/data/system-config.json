@@ -1,126 +1,607 @@
 {
-  "appVersion": "v1.1.0",
+  "appVersion": "v1.2.0",
   "targetVersion": "v1.2.0",
   "githubRepoUrl": "https://github.com/metapharsic/Metapharsic_Trend.git",
   "targetBranch": "main",
   "autoPullEnabled": true,
   "autoPullSchedule": "TWICE_WEEKLY",
   "autoSyncOnPull": false,
-  "lastCheckedAt": "2026-10-02T14:45:42.704Z",
-  "lastPulledAt": "2026-10-11T16:00:01.161Z",
+  "lastCheckedAt": "2026-10-13T17:07:13.056Z",
+  "lastPulledAt": "2026-10-14T21:30:00.688Z",
   "lastPullStatus": "NO_CHANGES",
   "lastPulledFiles": [
     {
       "filename": ".gitignore",
       "status": "modified",
-      "additions": 1,
-      "deletions": 0,
-      "impactedComponent": "Core Application Platform"
-    },
-    {
-      "filename": "web/app/(dashboard)/admin/accounts-jotter/page.tsx",
-      "status": "modified",
-      "additions": 2,
-      "deletions": 2,
-      "impactedComponent": "Core Application Platform"
-    },
-    {
-      "filename": "web/app/(dashboard)/mr/reports/page.tsx",
-      "status": "modified",
-      "additions": 44,
-      "deletions": 0,
-      "impactedComponent": "Field Force & DCR CRM"
-    },
-    {
-      "filename": "web/app/(dashboard)/reports/mr-daily-calls/page.tsx",
-      "status": "modified",
-      "additions": 168,
-      "deletions": 34,
-      "impactedComponent": "Field Force & DCR CRM"
-    },
-    {
-      "filename": "web/app/(dashboard)/reports/page.tsx",
-      "status": "modified",
-      "additions": 121,
-      "deletions": 26,
-      "impactedComponent": "Core Application Platform"
-    },
-    {
-      "filename": "web/app/api/reports/potential-customers/route.ts",
-      "status": "added",
-      "additions": 110,
-      "deletions": 0,
-      "impactedComponent": "Core Application Platform"
-    },
-    {
-      "filename": "web/components/dashboard-shell.tsx",
-      "status": "modified",
-      "additions": 10,
-      "deletions": 5,
-      "impactedComponent": "User Interface & Navigation Shell"
-    },
-    {
-      "filename": "web/data/system-config.json",
-      "status": "modified",
-      "additions": 750,
-      "deletions": 81,
-      "impactedComponent": "Core Application Platform"
-    },
-    {
-      "filename": "web/lib/excel-export.ts",
-      "status": "modified",
-      "additions": 448,
-      "deletions": 193,
-      "impactedComponent": "Core Application Platform"
-    },
-    {
-      "filename": "web/scripts/test_potential_customer_excel.ts",
-      "status": "added",
-      "additions": 144,
-      "deletions": 0,
-      "impactedComponent": "Core Application Platform"
-    },
-    {
-      "filename": "web/services/potential-customers-agents.service.ts",
-      "status": "added",
-      "additions": 624,
+      "additions": 8,
       "deletions": 0,
       "impactedComponent": "Core Application Platform"
     }
   ],
   "lastFetchedCommits": [
     {
-      "hash": "3182dcd",
-      "author": "Metapharsic Admin",
-      "date": "2026-10-11",
-      "message": "feat: entity license parser agent, profile management updates, and synchronized system config"
+      "hash": "ba5d1928",
+      "author": "root",
+      "date": "2026-10-13",
+      "message": "chore: sync system configuration state"
     },
     {
-      "hash": "83cb414",
-      "author": "Metapharsic Admin",
-      "date": "2026-10-11",
-      "message": "feat(navigation): multi-threaded database provisioning for sidebar modules & system artifacts with zero hardcoding"
+      "hash": "0604773f",
+      "author": "root",
+      "date": "2026-10-13",
+      "message": "sync(vps): update system configuration and sync logs"
     },
     {
-      "hash": "ee1aab5",
+      "hash": "a1d124be",
       "author": "Metapharsic Admin",
-      "date": "2026-10-08",
-      "message": "feat: multi-agent potential customer intelligence & professional native xlsx export engine"
+      "date": "2026-10-13",
+      "message": "chore(git): ignore helper scripts, packages, and reports in root gitignore"
     },
     {
-      "hash": "d2a43bc",
+      "hash": "c6d1dbef",
       "author": "Metapharsic Admin",
-      "date": "2026-10-02",
-      "message": "fix(vps): restore exceljs backward compat export, formData typing, and auto-npm-install hook"
+      "date": "2026-10-13",
+      "message": "fix(ota): make git pull and commit apply resilient against dirty tree and rebuild in self-update mode"
     },
     {
-      "hash": "0b359b7",
+      "hash": "fad8e2a2",
       "author": "Metapharsic Admin",
-      "date": "2026-10-02",
-      "message": "feat: multi-agent deal closure intelligence, professional xlsx export & call compliance"
+      "date": "2026-10-13",
+      "message": "feat(billing-calls): add searchable chemist combobox in bill generation and unify call creation pattern for Abdul Mannan and Abdul Mubeen using multi-threading"
     }
   ],
   "pullHistory": [
+    {
+      "timestamp": "2026-10-14T21:30:00.688Z",
+      "type": "AUTO",
+      "branch": "main",
+      "beforeHash": "ba5d1928",
+      "afterHash": "ba5d1928",
+      "status": "NO_CHANGES",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": ".gitignore",
+          "status": "modified",
+          "additions": 8,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "ba5d1928",
+          "author": "root",
+          "date": "2026-10-13",
+          "message": "chore: sync system configuration state"
+        },
+        {
+          "hash": "0604773f",
+          "author": "root",
+          "date": "2026-10-13",
+          "message": "sync(vps): update system configuration and sync logs"
+        },
+        {
+          "hash": "a1d124be",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "chore(git): ignore helper scripts, packages, and reports in root gitignore"
+        },
+        {
+          "hash": "c6d1dbef",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "fix(ota): make git pull and commit apply resilient against dirty tree and rebuild in self-update mode"
+        },
+        {
+          "hash": "fad8e2a2",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "feat(billing-calls): add searchable chemist combobox in bill generation and unify call creation pattern for Abdul Mannan and Abdul Mubeen using multi-threading"
+        }
+      ],
+      "logMessage": "Already up to date.\n",
+      "id": "pull-1792013400690-bh8ta"
+    },
+    {
+      "timestamp": "2026-10-13T17:14:40.373Z",
+      "type": "MANUAL",
+      "branch": "a1d124be",
+      "beforeHash": "ba5d1928",
+      "afterHash": "a1d124be",
+      "status": "SUCCESS",
+      "filesCount": 1,
+      "files": [
+        {
+          "filename": ".gitignore",
+          "status": "modified",
+          "additions": 8,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "a1d124be",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "chore(git): ignore helper scripts, packages, and reports in root gitignore"
+        }
+      ],
+      "logMessage": "🎉 Successful Note: Commit #a1d124be is fully applied and verified live on PM2 with zero downtime!\n\n✔ The commit #a1d124be is applied with the below changes:\n  • [MODIFIED] .gitignore (+8/-0) — Core Application Platform",
+      "id": "pull-1791911680374-8l6y9"
+    },
+    {
+      "timestamp": "2026-10-13T17:14:23.749Z",
+      "type": "MANUAL",
+      "branch": "c972536d",
+      "beforeHash": "ba5d1928",
+      "afterHash": "c972536d",
+      "status": "SUCCESS",
+      "filesCount": 5,
+      "files": [
+        {
+          "filename": "web/__tests__/enhanced-reporting.test.ts",
+          "status": "modified",
+          "additions": 136,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/reports/page.tsx",
+          "status": "modified",
+          "additions": 682,
+          "deletions": 206,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/mr/samples/route.ts",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/api/reports/route.ts",
+          "status": "modified",
+          "additions": 611,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/excel-export.ts",
+          "status": "modified",
+          "additions": 227,
+          "deletions": 13,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "c972536d",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "feat(reports): enhance Executive BI & Pharma reports with universal search-filtered professional Excel exports"
+        }
+      ],
+      "logMessage": "🎉 Successful Note: Commit #c972536d is fully applied and verified live on PM2 with zero downtime!\n\n✔ The commit #c972536d is applied with the below changes:\n  • [MODIFIED] web/__tests__/enhanced-reporting.test.ts (+136/-0) — Core Application Platform\n  • [MODIFIED] web/app/(dashboard)/reports/page.tsx (+682/-206) — Core Application Platform\n  • [MODIFIED] web/app/api/mr/samples/route.ts (+1/-1) — Field Force & DCR CRM\n  • [MODIFIED] web/app/api/reports/route.ts (+611/-0) — Core Application Platform\n  • [MODIFIED] web/lib/excel-export.ts (+227/-13) — Core Application Platform",
+      "id": "pull-1791911663752-2go9u"
+    },
+    {
+      "timestamp": "2026-10-13T17:14:08.542Z",
+      "type": "MANUAL",
+      "branch": "c972536d",
+      "beforeHash": "ba5d1928",
+      "afterHash": "c972536d",
+      "status": "SUCCESS",
+      "filesCount": 5,
+      "files": [
+        {
+          "filename": "web/__tests__/enhanced-reporting.test.ts",
+          "status": "modified",
+          "additions": 136,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/reports/page.tsx",
+          "status": "modified",
+          "additions": 682,
+          "deletions": 206,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/mr/samples/route.ts",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/api/reports/route.ts",
+          "status": "modified",
+          "additions": 611,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/excel-export.ts",
+          "status": "modified",
+          "additions": 227,
+          "deletions": 13,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "c972536d",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "feat(reports): enhance Executive BI & Pharma reports with universal search-filtered professional Excel exports"
+        }
+      ],
+      "logMessage": "🎉 Successful Note: Commit #c972536d is fully applied and verified live on PM2 with zero downtime!\n\n✔ The commit #c972536d is applied with the below changes:\n  • [MODIFIED] web/__tests__/enhanced-reporting.test.ts (+136/-0) — Core Application Platform\n  • [MODIFIED] web/app/(dashboard)/reports/page.tsx (+682/-206) — Core Application Platform\n  • [MODIFIED] web/app/api/mr/samples/route.ts (+1/-1) — Field Force & DCR CRM\n  • [MODIFIED] web/app/api/reports/route.ts (+611/-0) — Core Application Platform\n  • [MODIFIED] web/lib/excel-export.ts (+227/-13) — Core Application Platform",
+      "id": "pull-1791911648543-ctgda"
+    },
+    {
+      "timestamp": "2026-10-13T17:13:47.790Z",
+      "type": "MANUAL",
+      "branch": "0363715e",
+      "beforeHash": "ba5d1928",
+      "afterHash": "0363715e",
+      "status": "SUCCESS",
+      "filesCount": 2,
+      "files": [
+        {
+          "filename": "web/app/invoices/[id]/page.tsx",
+          "status": "modified",
+          "additions": 91,
+          "deletions": 41,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/scripts/multithreaded_invoice_accuracy_wire.ts",
+          "status": "added",
+          "additions": 332,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "0363715e",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "feat(invoice): wire company logo, visible security watermark, and high-accuracy UPI QR code"
+        }
+      ],
+      "logMessage": "🎉 Successful Note: Commit #0363715e is fully applied and verified live on PM2 with zero downtime!\n\n✔ The commit #0363715e is applied with the below changes:\n  • [MODIFIED] web/app/invoices/[id]/page.tsx (+91/-41) — Core Application Platform\n  • [ADDED] web/scripts/multithreaded_invoice_accuracy_wire.ts (+332/-0) — Core Application Platform",
+      "id": "pull-1791911627790-ucgu5"
+    },
+    {
+      "timestamp": "2026-10-13T17:12:33.807Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "ba5d1928",
+      "afterHash": "ba5d1928",
+      "status": "NO_CHANGES",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": ".gitignore",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/admin/accounts-jotter/page.tsx",
+          "status": "modified",
+          "additions": 2,
+          "deletions": 2,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/mr/reports/page.tsx",
+          "status": "modified",
+          "additions": 44,
+          "deletions": 0,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/(dashboard)/reports/mr-daily-calls/page.tsx",
+          "status": "modified",
+          "additions": 168,
+          "deletions": 34,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/(dashboard)/reports/page.tsx",
+          "status": "modified",
+          "additions": 121,
+          "deletions": 26,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/reports/potential-customers/route.ts",
+          "status": "added",
+          "additions": 110,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/components/dashboard-shell.tsx",
+          "status": "modified",
+          "additions": 10,
+          "deletions": 5,
+          "impactedComponent": "User Interface & Navigation Shell"
+        },
+        {
+          "filename": "web/data/system-config.json",
+          "status": "modified",
+          "additions": 750,
+          "deletions": 81,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/excel-export.ts",
+          "status": "modified",
+          "additions": 448,
+          "deletions": 193,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/scripts/test_potential_customer_excel.ts",
+          "status": "added",
+          "additions": 144,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/potential-customers-agents.service.ts",
+          "status": "added",
+          "additions": 624,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "ba5d1928",
+          "author": "root",
+          "date": "2026-10-13",
+          "message": "chore: sync system configuration state"
+        },
+        {
+          "hash": "0604773f",
+          "author": "root",
+          "date": "2026-10-13",
+          "message": "sync(vps): update system configuration and sync logs"
+        },
+        {
+          "hash": "a1d124be",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "chore(git): ignore helper scripts, packages, and reports in root gitignore"
+        },
+        {
+          "hash": "c6d1dbef",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "fix(ota): make git pull and commit apply resilient against dirty tree and rebuild in self-update mode"
+        },
+        {
+          "hash": "fad8e2a2",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "feat(billing-calls): add searchable chemist combobox in bill generation and unify call creation pattern for Abdul Mannan and Abdul Mubeen using multi-threading"
+        }
+      ],
+      "logMessage": "Already up to date.\n",
+      "id": "pull-1791911553809-zoppk"
+    },
+    {
+      "timestamp": "2026-10-13T17:08:56.244Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "0604773f",
+      "afterHash": "0604773f",
+      "status": "NO_CHANGES",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": ".gitignore",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/admin/accounts-jotter/page.tsx",
+          "status": "modified",
+          "additions": 2,
+          "deletions": 2,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/(dashboard)/mr/reports/page.tsx",
+          "status": "modified",
+          "additions": 44,
+          "deletions": 0,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/(dashboard)/reports/mr-daily-calls/page.tsx",
+          "status": "modified",
+          "additions": 168,
+          "deletions": 34,
+          "impactedComponent": "Field Force & DCR CRM"
+        },
+        {
+          "filename": "web/app/(dashboard)/reports/page.tsx",
+          "status": "modified",
+          "additions": 121,
+          "deletions": 26,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/api/reports/potential-customers/route.ts",
+          "status": "added",
+          "additions": 110,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/components/dashboard-shell.tsx",
+          "status": "modified",
+          "additions": 10,
+          "deletions": 5,
+          "impactedComponent": "User Interface & Navigation Shell"
+        },
+        {
+          "filename": "web/data/system-config.json",
+          "status": "modified",
+          "additions": 750,
+          "deletions": 81,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/excel-export.ts",
+          "status": "modified",
+          "additions": 448,
+          "deletions": 193,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/scripts/test_potential_customer_excel.ts",
+          "status": "added",
+          "additions": 144,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/potential-customers-agents.service.ts",
+          "status": "added",
+          "additions": 624,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "0604773f",
+          "author": "root",
+          "date": "2026-10-13",
+          "message": "sync(vps): update system configuration and sync logs"
+        },
+        {
+          "hash": "a1d124be",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "chore(git): ignore helper scripts, packages, and reports in root gitignore"
+        },
+        {
+          "hash": "c6d1dbef",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "fix(ota): make git pull and commit apply resilient against dirty tree and rebuild in self-update mode"
+        },
+        {
+          "hash": "fad8e2a2",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "feat(billing-calls): add searchable chemist combobox in bill generation and unify call creation pattern for Abdul Mannan and Abdul Mubeen using multi-threading"
+        },
+        {
+          "hash": "c972536d",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "feat(reports): enhance Executive BI & Pharma reports with universal search-filtered professional Excel exports"
+        }
+      ],
+      "logMessage": "Already up to date.\n",
+      "id": "pull-1791911336245-mbnof"
+    },
+    {
+      "id": "pull-1791911233056",
+      "timestamp": "2026-10-13T17:07:13.056Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "85a4623",
+      "afterHash": "a1d124b",
+      "status": "SUCCESS",
+      "filesCount": 5,
+      "files": [
+        {
+          "filename": "web/app/(dashboard)/orders/page.tsx",
+          "status": "modified",
+          "additions": 85,
+          "deletions": 12,
+          "impactedComponent": "User Interface"
+        },
+        {
+          "filename": "web/scripts/multithreaded_wire_mr_call_patterns.ts",
+          "status": "added",
+          "additions": 425,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/lib/excel-export.ts",
+          "status": "modified",
+          "additions": 180,
+          "deletions": 15,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/app/invoices/[id]/page.tsx",
+          "status": "modified",
+          "additions": 45,
+          "deletions": 8,
+          "impactedComponent": "Core Application Platform"
+        },
+        {
+          "filename": "web/services/software-update-agents.service.ts",
+          "status": "modified",
+          "additions": 25,
+          "deletions": 7,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "a1d124b",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "chore(git): ignore helper scripts, packages, and reports in root gitignore"
+        },
+        {
+          "hash": "c6d1dbe",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "fix(ota): make git pull and commit apply resilient against dirty tree and rebuild in self-update mode"
+        },
+        {
+          "hash": "fad8e2a",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "feat(billing-calls): add searchable chemist combobox in bill generation and unify call creation pattern for Abdul Mannan and Abdul Mubeen"
+        },
+        {
+          "hash": "c972536",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "feat(reports): enhance Executive BI and Pharma reports with universal search-filtered professional Excel exports"
+        },
+        {
+          "hash": "0363715",
+          "author": "Metapharsic Admin",
+          "date": "2026-10-13",
+          "message": "feat(invoice): wire company logo, visible security watermark, and high-accuracy UPI QR code"
+        }
+      ],
+      "logMessage": "🎉 Successful Note: Commit #a1d124be is fully applied and verified live on PM2 with zero downtime!"
+    },
     {
       "timestamp": "2026-10-11T16:00:01.161Z",
       "type": "AUTO",

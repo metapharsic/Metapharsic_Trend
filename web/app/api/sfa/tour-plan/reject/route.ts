@@ -22,6 +22,28 @@ async function rejectTourPlan(req: AuthedRequest) {
       data: { status: TourPlanStatus.REJECTED },
     });
 
+    const monthStr = plan.month.toISOString().slice(0, 7);
+    await db.notification.upsert({
+      where: {
+        employeeId_code: {
+          employeeId: plan.employeeId,
+          code: `TOUR_PLAN_DECISION_${plan.id}`,
+        },
+      },
+      create: {
+        employeeId: plan.employeeId,
+        code: `TOUR_PLAN_DECISION_${plan.id}`,
+        severity: "WARNING",
+        message: `Your Tour Plan for ${monthStr} was REJECTED. Please revise the beat route and resubmit for approval.`,
+        action: `/tour-plans`,
+        read: false,
+      },
+      update: {
+        message: `Your Tour Plan for ${monthStr} was REJECTED. Please revise the beat route and resubmit for approval.`,
+        read: false,
+      },
+    });
+
     return ok({ tourPlanId: updated.id, status: updated.status });
   } catch (err) {
     console.error("[POST /api/sfa/tour-plan/reject]", err);

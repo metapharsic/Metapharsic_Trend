@@ -15,6 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 
 interface ExpenseClaim {
   id: string;
@@ -375,16 +376,17 @@ function EditClaimModal({
         </div>
         <div>
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
-          <select
+          <SearchableSelect
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
+            placeholder="Select category"
+            searchPlaceholder="Search category..."
           >
             <option value="Travel & Fuel">Travel & Fuel</option>
             <option value="Hotel & Accommodation">Hotel & Accommodation</option>
             <option value="Meals">Meals</option>
             <option value="Miscellaneous">Miscellaneous</option>
-          </select>
+          </SearchableSelect>
         </div>
         <div>
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Description</label>
@@ -472,17 +474,18 @@ function NewClaimModal({ onClose, onSubmitted }: { onClose: () => void; onSubmit
 
         <div>
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
-          <select
+          <SearchableSelect
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-base sm:text-sm"
+            placeholder="Select category"
+            searchPlaceholder="Search category..."
           >
             <option value="">Select category</option>
             <option value="Travel & Fuel">Travel & Fuel</option>
             <option value="Hotel & Accommodation">Hotel & Accommodation</option>
             <option value="Meals">Meals</option>
             <option value="Miscellaneous">Miscellaneous</option>
-          </select>
+          </SearchableSelect>
         </div>
 
         <div>

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { IndianRupee, Plus, X } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 
 interface Account {
   id: string;
@@ -98,15 +99,16 @@ export default function ChartOfAccountsPage() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Type</label>
-            <select
+            <SearchableSelect
               value={form.type}
               onChange={(e) => setForm({ ...form, type: e.target.value })}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
+              className="w-40"
+              searchPlaceholder="Search type..."
             >
               {["ASSET", "LIABILITY", "INCOME", "EXPENSE", "EQUITY"].map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
-            </select>
+            </SearchableSelect>
           </div>
           <button
             disabled={saving}

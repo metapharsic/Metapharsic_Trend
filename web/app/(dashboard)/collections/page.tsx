@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { downloadExcelReportWithDashboard } from "@/lib/excel-export";
+import { SearchableSelect } from "@/components/searchable-select";
 
 function currency(value: number | string | null | undefined): string {
   if (value == null) return "₹0";
@@ -668,17 +669,18 @@ function EnterpriseCreditDashboard({ role }: { role: string | null }) {
 
             {/* Territory Dropdown Filter */}
             {territories.length > 2 && (
-              <select
-                value={territoryFilter}
-                onChange={(e) => setTerritoryFilter(e.target.value)}
-                className="text-xs px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 font-medium text-slate-700"
-              >
-                {territories.map((t) => (
-                  <option key={t} value={t}>
-                    {t === "ALL" ? "All Territories" : t}
-                  </option>
-                ))}
-              </select>
+              <div className="w-44">
+                <SearchableSelect
+                  value={territoryFilter}
+                  onChange={(e) => setTerritoryFilter(e.target.value)}
+                  className="text-xs rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700"
+                  placeholder="Filter territory..."
+                  options={territories.map((t) => ({
+                    value: t,
+                    label: t === "ALL" ? "All Territories" : t
+                  }))}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -1352,20 +1354,16 @@ function LogPaymentModal({
             <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
               Select Chemist Outlet *
             </label>
-            <select
+            <SearchableSelect
               value={chemistId}
               onChange={(e) => setChemistId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            >
-              <option value="" disabled>
-                Select Chemist Store...
-              </option>
-              {chemists.map((c) => (
-                <option key={c.chemistId} value={c.chemistId}>
-                  {c.name} (Outstanding: {currency(c.outstanding)})
-                </option>
-              ))}
-            </select>
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+              placeholder="Select Chemist Store..."
+              options={chemists.map((c) => ({
+                value: c.chemistId,
+                label: `${c.name} (Outstanding: ${currency(c.outstanding)})`
+              }))}
+            />
           </div>
 
           {selectedChemist && (
@@ -1405,16 +1403,18 @@ function LogPaymentModal({
               <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
                 Payment Mode
               </label>
-              <select
+              <SearchableSelect
                 value={paymentMode}
                 onChange={(e) => setPaymentMode(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800"
-              >
-                <option value="CASH">Cash</option>
-                <option value="CHEQUE">Cheque</option>
-                <option value="BANK_TRANSFER">Bank Transfer (NEFT/RTGS)</option>
-                <option value="UPI">UPI / QR Code</option>
-              </select>
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+                placeholder="Payment mode..."
+                options={[
+                  { value: "CASH", label: "Cash" },
+                  { value: "CHEQUE", label: "Cheque" },
+                  { value: "BANK_TRANSFER", label: "Bank Transfer (NEFT/RTGS)" },
+                  { value: "UPI", label: "UPI / QR Code" }
+                ]}
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
@@ -1800,25 +1800,19 @@ function RetrievePaymentModal({
           <label className="block text-xs font-bold text-slate-800">
             Select Reversal / Retrieval Reason:
           </label>
-          <select
+          <SearchableSelect
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-indigo-500"
-          >
-            <option value="Payment recorded by mistake / wrong entry">
-              ⚠️ Payment recorded by mistake / wrong entry
-            </option>
-            <option value="Cheque bounced / instrument dishonored">
-              🔴 Cheque bounced / instrument dishonored
-            </option>
-            <option value="Duplicate payment entry">
-              📑 Duplicate payment entry
-            </option>
-            <option value="Customer requested refund / entry correction">
-              🔄 Customer requested refund / entry correction
-            </option>
-            <option value="OTHER">✍️ Custom reason...</option>
-          </select>
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800"
+            placeholder="Select reversal reason..."
+            options={[
+              { value: "Payment recorded by mistake / wrong entry", label: "⚠️ Payment recorded by mistake / wrong entry" },
+              { value: "Cheque bounced / instrument dishonored", label: "🔴 Cheque bounced / instrument dishonored" },
+              { value: "Duplicate payment entry", label: "📑 Duplicate payment entry" },
+              { value: "Customer requested refund / entry correction", label: "🔄 Customer requested refund / entry correction" },
+              { value: "OTHER", label: "✍️ Custom reason..." }
+            ]}
+          />
 
           {reason === "OTHER" && (
             <input

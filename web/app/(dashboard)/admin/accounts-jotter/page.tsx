@@ -22,6 +22,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 import { exportCurrentPageToExcel } from "@/lib/excel-export";
 
 interface AccountOption {
@@ -315,15 +316,16 @@ export default function AdminAccountsJotterPage() {
             {/* Payment Mode */}
             <div className="sm:col-span-3">
               <label className="block text-[11px] font-bold text-gray-600 mb-1">Paid / Received Via</label>
-              <select
+              <SearchableSelect
                 value={paymentMode}
                 onChange={(e) => setPaymentMode(e.target.value as any)}
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-600"
+                placeholder="Select Payment Mode..."
+                searchPlaceholder="Search mode..."
               >
                 <option value="CASH">Cash in Hand (A/C 1001)</option>
                 <option value="BANK_TRANSFER">Bank Account / RTGS / NEFT (A/C 1002)</option>
                 <option value="UPI">UPI / QR Payment (A/C 1002)</option>
-              </select>
+              </SearchableSelect>
             </div>
 
             {/* Narration / Jot Memo */}
@@ -368,10 +370,12 @@ export default function AdminAccountsJotterPage() {
             {presetType === "CUSTOM_ENTRY" && data?.accounts && (
               <div className="flex items-center gap-2 flex-wrap bg-amber-50 border border-amber-200 p-2 rounded-xl text-xs">
                 <span className="font-bold text-amber-800">Debit A/C:</span>
-                <select
+                <SearchableSelect
                   value={customDebitId}
                   onChange={(e) => setCustomDebitId(e.target.value)}
-                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs"
+                  placeholder="Select Debit Account..."
+                  searchPlaceholder="Search account name or code..."
+                  className="w-auto min-w-[240px]"
                 >
                   <option value="">Select Debit Account...</option>
                   {data.accounts.map((a) => (
@@ -379,13 +383,15 @@ export default function AdminAccountsJotterPage() {
                       {a.code} - {a.name} ({a.type})
                     </option>
                   ))}
-                </select>
+                </SearchableSelect>
 
                 <span className="font-bold text-amber-800">Credit A/C:</span>
-                <select
+                <SearchableSelect
                   value={customCreditId}
                   onChange={(e) => setCustomCreditId(e.target.value)}
-                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs"
+                  placeholder="Select Credit Account..."
+                  searchPlaceholder="Search account name or code..."
+                  className="w-auto min-w-[240px]"
                 >
                   <option value="">Select Credit Account...</option>
                   {data.accounts.map((a) => (
@@ -393,7 +399,7 @@ export default function AdminAccountsJotterPage() {
                       {a.code} - {a.name} ({a.type})
                     </option>
                   ))}
-                </select>
+                </SearchableSelect>
               </div>
             )}
           </div>

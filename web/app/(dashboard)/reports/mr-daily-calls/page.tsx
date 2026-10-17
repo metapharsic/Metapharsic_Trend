@@ -35,6 +35,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 import { downloadExcelReportWithDashboard } from "@/lib/excel-export";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -698,20 +699,24 @@ export default function MrDailyCallsReportPage() {
 
             {/* MR Selector dropdown */}
             {data && data.allMrs.length > 0 && (
-              <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-xl px-3 py-1.5">
-                <User size={14} className="text-indigo-300 shrink-0" />
-                <select
+              <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-xl px-2 py-1">
+                <User size={14} className="text-indigo-300 shrink-0 ml-1" />
+                <SearchableSelect
                   value={selectedMr}
                   onChange={(e) => setSelectedMr(e.target.value)}
-                  className="bg-transparent text-xs text-white outline-none cursor-pointer"
+                  placeholder="All Representative MRs"
+                  searchPlaceholder="Search MR..."
+                  buttonClassName="bg-transparent border-0 shadow-none text-white text-xs px-2 py-0.5"
+                  className="w-auto min-w-[200px]"
+                  allowClear
                 >
-                  <option value="" className="bg-slate-900 text-white">All Representative MRs</option>
+                  <option value="">All Representative MRs</option>
                   {data.allMrs.map((mr) => (
-                    <option key={mr.id} value={mr.id} className="bg-slate-900 text-white">
+                    <option key={mr.id} value={mr.id}>
                       {mr.name}
                     </option>
                   ))}
-                </select>
+                </SearchableSelect>
               </div>
             )}
 

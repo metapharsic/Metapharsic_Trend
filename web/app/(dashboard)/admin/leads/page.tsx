@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Target, Trash2, Stethoscope, Store } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 
 type LeadStatus = "NEW" | "IN_PROGRESS" | "CONVERTED" | "LOST";
 
@@ -128,17 +129,18 @@ export default function AdminLeadsPage() {
                       <p className="text-xs text-gray-400">MR: {l.mrName}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <select
+                      <SearchableSelect
                         value={l.status}
                         onChange={(e) => updateStatus(l.id, e.target.value as LeadStatus)}
-                        className={`text-[11px] font-bold px-2 py-1 rounded-md border-0 ${STATUS_STYLES[l.status]}`}
+                        className="w-32"
+                        buttonClassName={`text-[11px] font-bold px-2 py-1 rounded-md border-0 ${STATUS_STYLES[l.status]}`}
                       >
                         {(["NEW", "IN_PROGRESS", "CONVERTED", "LOST"] as const).map((s) => (
                           <option key={s} value={s}>
                             {s.replace("_", " ")}
                           </option>
                         ))}
-                      </select>
+                      </SearchableSelect>
                       {role !== "ASM" && (
                         <button onClick={() => deleteLead(l.id)} className="text-gray-400 hover:text-red-500 p-1 -m-1" title="Delete lead">
                           <Trash2 size={13} />

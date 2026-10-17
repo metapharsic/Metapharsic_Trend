@@ -43,6 +43,7 @@ import {
   LineItemCommercialDetail,
 } from "@/services/commercial-agents.service";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 
 type AdminCommercialViewOption =
   | "invoices"
@@ -981,21 +982,21 @@ export function AdminPtrCalculator() {
               </div>
               <div className="flex items-center gap-3 flex-wrap">
                 {liveData?.invoices && liveData.invoices.length > 0 && (
-                  <select
-                    onChange={(e) => {
-                      const inv = liveData.invoices.find((i) => i.id === e.target.value);
-                      if (inv) setSelectedInvoice(inv);
-                    }}
-                    defaultValue=""
-                    className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="" disabled>Inspect Live Database Invoice ({liveData.invoices.length} available)...</option>
-                    {liveData.invoices.map((inv) => (
-                      <option key={inv.id} value={inv.id}>
-                        {inv.invoiceNo} — {inv.chemistName} (₹{currency(inv.totalRevenue)})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="w-72">
+                    <SearchableSelect
+                      onChange={(e) => {
+                        const inv = liveData.invoices.find((i) => i.id === e.target.value);
+                        if (inv) setSelectedInvoice(inv);
+                      }}
+                      value=""
+                      className="text-xs bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-700"
+                      placeholder={`Inspect Live Invoice (${liveData.invoices.length})...`}
+                      options={liveData.invoices.map((inv) => ({
+                        value: inv.id,
+                        label: `${inv.invoiceNo} — ${inv.chemistName} (₹${currency(inv.totalRevenue)})`
+                      }))}
+                    />
+                  </div>
                 )}
                 <button
                   onClick={handleResetSimulator}

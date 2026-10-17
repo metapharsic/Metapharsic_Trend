@@ -25,6 +25,28 @@ async function approveTourPlan(req: AuthedRequest) {
       data: { status: TourPlanStatus.APPROVED, approvedById: approver.id },
     });
 
+    const monthStr = plan.month.toISOString().slice(0, 7);
+    await db.notification.upsert({
+      where: {
+        employeeId_code: {
+          employeeId: plan.employeeId,
+          code: `TOUR_PLAN_DECISION_${plan.id}`,
+        },
+      },
+      create: {
+        employeeId: plan.employeeId,
+        code: `TOUR_PLAN_DECISION_${plan.id}`,
+        severity: "SUCCESS",
+        message: `Your Tour Plan for ${monthStr} has been APPROVED by ${approver.firstName} ${approver.lastName}.`,
+        action: `/tour-plans`,
+        read: false,
+      },
+      update: {
+        message: `Your Tour Plan for ${monthStr} has been APPROVED by ${approver.firstName} ${approver.lastName}.`,
+        read: false,
+      },
+    });
+
     return ok({ tourPlanId: updated.id, status: updated.status });
   } catch (err) {
     console.error("[POST /api/sfa/tour-plan/approve]", err);

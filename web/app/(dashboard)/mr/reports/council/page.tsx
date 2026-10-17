@@ -46,6 +46,7 @@ import {
   Lock,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 
 interface AgentStatus {
   agentCode: string;
@@ -816,17 +817,19 @@ export default function MultiAgentMrReportPage() {
               <User className="h-4 w-4 text-indigo-500" />
               <span>Select MR Rep:</span>
             </div>
-            <select
+            <SearchableSelect
               value={selectedMrId}
               onChange={(e) => setSelectedMrId(e.target.value)}
-              className="rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2 text-sm font-medium text-slate-900 dark:text-slate-100 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+              placeholder="Select MR Rep..."
+              searchPlaceholder="Search MR by name, territory, grade..."
+              className="w-auto min-w-[280px]"
             >
               {reports.map((r) => (
                 <option key={r.mrId} value={r.mrId}>
                   {r.fullName} ({r.territories.map((t) => t.name).join(", ") || "General"}) — Grade {r.councilEvaluation.overallGrade}
                 </option>
               ))}
-            </select>
+            </SearchableSelect>
           </div>
 
           {/* Timeframe Scope Selector */}

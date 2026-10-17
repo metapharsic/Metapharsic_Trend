@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { LicenseAutoFill } from "@/components/entities/license-autofill";
+import { SearchableSelect } from "@/components/searchable-select";
 
 type EntityType = "DOCTOR" | "CHEMIST" | "DISTRIBUTOR" | "HOSPITAL" | "EMPLOYEE";
 
@@ -409,69 +410,61 @@ export default function MasterProfiles() {
 
           {/* Territory Filter */}
           <div className="min-w-[180px]">
-            <select
+            <SearchableSelect
               value={selectedTerritory}
               onChange={(e) => setSelectedTerritory(e.target.value)}
-              className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-sm text-slate-700"
-            >
-              <option value="">All Territories</option>
-              {territories.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+              className="w-full text-sm border border-slate-200 rounded-xl bg-white shadow-sm text-slate-700"
+              placeholder="All Territories"
+              options={[
+                { value: "", label: "All Territories" },
+                ...territories.map((t) => ({ value: t.id, label: t.name }))
+              ]}
+            />
           </div>
 
           {/* Dynamic Tab-Specific Filter */}
           {activeTab === "DOCTOR" && (
             <div className="min-w-[170px]">
-              <select
+              <SearchableSelect
                 value={selectedFilter}
                 onChange={(e) => setSelectedFilter(e.target.value)}
-                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-sm text-slate-700"
-              >
-                <option value="">All Specialties</option>
-                {SPECIALTY_OPTIONS.map((spec) => (
-                  <option key={spec} value={spec}>
-                    {spec}
-                  </option>
-                ))}
-              </select>
+                className="w-full text-sm border border-slate-200 rounded-xl bg-white shadow-sm text-slate-700"
+                placeholder="All Specialties"
+                options={[
+                  { value: "", label: "All Specialties" },
+                  ...SPECIALTY_OPTIONS.map((spec) => ({ value: spec, label: spec }))
+                ]}
+              />
             </div>
           )}
 
           {activeTab === "CHEMIST" && (
             <div className="min-w-[160px]">
-              <select
+              <SearchableSelect
                 value={selectedFilter}
                 onChange={(e) => setSelectedFilter(e.target.value)}
-                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-sm text-slate-700"
-              >
-                <option value="">All Chemist Types</option>
-                {CHEMIST_TYPE_OPTIONS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+                className="w-full text-sm border border-slate-200 rounded-xl bg-white shadow-sm text-slate-700"
+                placeholder="All Chemist Types"
+                options={[
+                  { value: "", label: "All Chemist Types" },
+                  ...CHEMIST_TYPE_OPTIONS.map((t) => ({ value: t, label: t }))
+                ]}
+              />
             </div>
           )}
 
           {activeTab === "EMPLOYEE" && (
             <div className="min-w-[150px]">
-              <select
+              <SearchableSelect
                 value={selectedFilter}
                 onChange={(e) => setSelectedFilter(e.target.value)}
-                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-sm text-slate-700"
-              >
-                <option value="">All Roles</option>
-                {EMPLOYEE_ROLE_OPTIONS.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
+                className="w-full text-sm border border-slate-200 rounded-xl bg-white shadow-sm text-slate-700"
+                placeholder="All Roles"
+                options={[
+                  { value: "", label: "All Roles" },
+                  ...EMPLOYEE_ROLE_OPTIONS.map((r) => ({ value: r, label: r }))
+                ]}
+              />
             </div>
           )}
 
@@ -1335,17 +1328,13 @@ function AppendEntityModal({
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                     Assigned Role
                   </label>
-                  <select
+                  <SearchableSelect
                     value={empRole}
                     onChange={(e) => setEmpRole(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white"
-                  >
-                    {EMPLOYEE_ROLE_OPTIONS.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </select>
+                    className="w-full border border-slate-200 rounded-xl text-sm bg-white"
+                    placeholder="Select Role"
+                    options={EMPLOYEE_ROLE_OPTIONS.map((r) => ({ value: r, label: r }))}
+                  />
                 </div>
               </div>
 
@@ -1353,18 +1342,16 @@ function AppendEntityModal({
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                   Primary Territory
                 </label>
-                <select
+                <SearchableSelect
                   value={territoryId}
                   onChange={(e) => setTerritoryId(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white"
-                >
-                  <option value="">Select Territory</option>
-                  {territories.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
+                  className="w-full border border-slate-200 rounded-xl text-sm bg-white"
+                  placeholder="Select Territory"
+                  options={[
+                    { value: "", label: "Select Territory" },
+                    ...territories.map((t) => ({ value: t.id, label: t.name }))
+                  ]}
+                />
               </div>
 
               <div>
@@ -1425,18 +1412,16 @@ function AppendEntityModal({
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                     Assigned Territory *
                   </label>
-                  <select
+                  <SearchableSelect
                     value={territoryId}
                     onChange={(e) => setTerritoryId(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white"
-                  >
-                    <option value="">Select Territory</option>
-                    {territories.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                    className="w-full border border-slate-200 rounded-xl text-sm bg-white"
+                    placeholder="Select Territory"
+                    options={[
+                      { value: "", label: "Select Territory" },
+                      ...territories.map((t) => ({ value: t.id, label: t.name }))
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -1458,17 +1443,13 @@ function AppendEntityModal({
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                         Primary Specialty *
                       </label>
-                      <select
+                      <SearchableSelect
                         value={primarySpecialty}
                         onChange={(e) => setPrimarySpecialty(e.target.value)}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white"
-                      >
-                        {SPECIALTY_OPTIONS.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
+                        className="w-full border border-slate-200 rounded-xl text-sm bg-white"
+                        placeholder="Select Specialty"
+                        options={SPECIALTY_OPTIONS.map((s) => ({ value: s, label: s }))}
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -1848,18 +1829,16 @@ function EditEntityModal({
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                 Territory
               </label>
-              <select
+              <SearchableSelect
                 value={territoryId}
                 onChange={(e) => setTerritoryId(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white"
-              >
-                <option value="">Select Territory</option>
-                {territories.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                className="w-full border border-slate-200 rounded-xl text-sm bg-white"
+                placeholder="Select Territory"
+                options={[
+                  { value: "", label: "Select Territory" },
+                  ...territories.map((t) => ({ value: t.id, label: t.name }))
+                ]}
+              />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -2047,30 +2026,28 @@ function EditEntityModal({
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                   Assigned Role
                 </label>
-                <select
+                <SearchableSelect
                   value={empRole}
                   onChange={(e) => setEmpRole(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white"
-                >
-                  {EMPLOYEE_ROLE_OPTIONS.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
+                  className="w-full border border-slate-200 rounded-xl text-sm bg-white"
+                  placeholder="Select Role"
+                  options={EMPLOYEE_ROLE_OPTIONS.map((r) => ({ value: r, label: r }))}
+                />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                   Account Status
                 </label>
-                <select
+                <SearchableSelect
                   value={isActive ? "true" : "false"}
                   onChange={(e) => setIsActive(e.target.value === "true")}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white"
-                >
-                  <option value="true">Active</option>
-                  <option value="false">Deactivated</option>
-                </select>
+                  className="w-full border border-slate-200 rounded-xl text-sm bg-white"
+                  placeholder="Select Status"
+                  options={[
+                    { value: "true", label: "Active" },
+                    { value: "false", label: "Deactivated" }
+                  ]}
+                />
               </div>
             </div>
           )}

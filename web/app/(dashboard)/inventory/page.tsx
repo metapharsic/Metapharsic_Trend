@@ -21,6 +21,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 import { costBasis, type CostBasisSource } from "@/lib/pricing";
 import { ProductPricingAgentsService } from "@/services/product-pricing-agents.service";
 
@@ -636,29 +637,33 @@ export default function InventoryPage() {
           <form onSubmit={handleAllocate} className="p-4 flex flex-col sm:flex-row gap-3 items-end">
             <div className="flex-1 w-full space-y-1">
               <label className="text-xs font-semibold text-slate-600">MR</label>
-              <select
+              <SearchableSelect
                 value={allocEmployeeId}
                 onChange={(e) => setAllocEmployeeId(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs"
+                placeholder="Select MR"
+                searchPlaceholder="Search MR..."
+                allowClear
               >
                 <option value="">Select MR</option>
                 {mrList.map((m) => (
                   <option key={m.employeeId} value={m.employeeId}>{m.firstName} {m.lastName}</option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
             <div className="flex-1 w-full space-y-1">
               <label className="text-xs font-semibold text-slate-600">Product</label>
-              <select
+              <SearchableSelect
                 value={allocProductId}
                 onChange={(e) => setAllocProductId(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs"
+                placeholder="Select product"
+                searchPlaceholder="Search product..."
+                allowClear
               >
                 <option value="">Select product</option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
             <div className="w-full sm:w-28 space-y-1">
               <label className="text-xs font-semibold text-slate-600">Qty</label>

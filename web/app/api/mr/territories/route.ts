@@ -18,17 +18,22 @@ async function handler(req: AuthedRequest) {
       include: { territories: { select: { id: true, name: true } } },
     });
 
-    if (employee?.territories && employee.territories.length > 0 && !isManager) {
-      return ok({ territories: employee.territories });
-    }
-
-    // Fall back to all active territories if unassigned or if manager/admin
+    // Merge and return all active territories for all users so any MR can pick any area
     const allTerritories = await db.territory.findMany({
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+        region: true,
+        zone: true,
+        _count: { select: { doctors: true, chemists: true } },
+      },
       orderBy: { name: "asc" },
     });
 
-    return ok({ territories: allTerritories });
+    return ok({
+      territories: allTerritories,
+      assignedTerritories: employee?.territories ?? [],
+    });
   } catch (err) {
     console.error("[GET /api/mr/territories]", err);
     return apiError("INTERNAL_SERVER_ERROR", "Failed to fetch territories", 500);

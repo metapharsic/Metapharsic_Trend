@@ -173,6 +173,8 @@ model Doctor {
   experienceYears            Int?
   practiceType               String?
   clinicAddress              String
+  subArea                    String?
+  beatName                   String?
   latitude                   Float
   longitude                  Float
   territoryId                String
@@ -240,6 +242,8 @@ model Chemist {
   name          String
   contactPerson String
   address       String
+  subArea       String?
+  beatName      String?
   latitude      Float
   longitude     Float
   territoryId   String
@@ -490,8 +494,14 @@ model TourPlanDay {
   date             DateTime  @db.Date
   territoryId      String
   territory        Territory @relation(fields: [territoryId], references: [id])
+  beatName         String?
+  subArea          String?
   plannedDoctorId  String?
   plannedDoctor    Doctor?   @relation(fields: [plannedDoctorId], references: [id])
+  isCompleted      Boolean   @default(false)
+  visitStatus      String    @default("PENDING")
+  completedAt      DateTime?
+  completionNotes  String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

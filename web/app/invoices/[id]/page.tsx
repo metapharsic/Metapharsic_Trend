@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Printer, ArrowLeft, Download, Layers, FileText, CheckCircle2, Scissors } from "lucide-react";
 import QRCode from "qrcode";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 import { computeLineTotals, computeLineTotalsWithSplit, determineTaxSplit, taxClassSummaryWithSplit, computeFreeStripsValue } from "@/lib/gst";
 
 // ============================================================================
@@ -1066,25 +1067,27 @@ export default function InvoicePage() {
             {viewMode === "DUAL_2UP" && (
               <div className="flex items-center gap-2 ml-2 pl-2 border-l border-slate-700 font-mono text-[11px]">
                 <span className="text-slate-400">Left:</span>
-                <select
+                <SearchableSelect
                   value={leftCopy}
                   onChange={(e) => setLeftCopy(e.target.value as any)}
-                  className="bg-slate-800 border border-slate-600 text-white px-1.5 py-0.5 font-bold"
+                  className="w-28"
+                  buttonClassName="bg-slate-800 border-slate-600 text-white px-2 py-0.5 font-bold text-[11px]"
                 >
                   <option value="ORIGINAL">Original</option>
                   <option value="DUPLICATE">Duplicate</option>
                   <option value="TRIPLICATE">Triplicate</option>
-                </select>
+                </SearchableSelect>
                 <span className="text-slate-400">Right:</span>
-                <select
+                <SearchableSelect
                   value={rightCopy}
                   onChange={(e) => setRightCopy(e.target.value as any)}
-                  className="bg-slate-800 border border-slate-600 text-white px-1.5 py-0.5 font-bold"
+                  className="w-28"
+                  buttonClassName="bg-slate-800 border-slate-600 text-white px-2 py-0.5 font-bold text-[11px]"
                 >
                   <option value="DUPLICATE">Duplicate</option>
                   <option value="TRIPLICATE">Triplicate</option>
                   <option value="ORIGINAL">Original</option>
-                </select>
+                </SearchableSelect>
               </div>
             )}
           </div>

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { X, AlertCircle, CheckCircle2, ShieldCheck, Package } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 
 interface ClaimModalProps {
   onClose: () => void;
@@ -130,51 +131,54 @@ export function RaiseClaimModal({ onClose, onClaimCreated }: ClaimModalProps) {
 
             <div className="space-y-1.5">
               <label className="font-bold text-slate-700">Chemist / Pharmacy *</label>
-              <select
+              <SearchableSelect
                 value={chemistId}
                 onChange={(e) => setChemistId(e.target.value)}
                 required
                 disabled={fetching}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="Select Chemist..."
+                searchPlaceholder="Search chemist pharmacy..."
               >
                 <option value="">Select Chemist...</option>
                 {chemists.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
 
             <div className="space-y-1.5">
               <label className="font-bold text-slate-700">Stockist / Distributor *</label>
-              <select
+              <SearchableSelect
                 value={distributorId}
                 onChange={(e) => setDistributorId(e.target.value)}
                 required
                 disabled={fetching}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="Select Distributor..."
+                searchPlaceholder="Search distributor..."
               >
                 <option value="">Select Distributor...</option>
                 {distributors.map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2 space-y-1.5">
                 <label className="font-bold text-slate-700">Product SKU *</label>
-                <select
+                <SearchableSelect
                   value={productId}
                   onChange={(e) => setProductId(e.target.value)}
                   required
                   disabled={fetching}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder="Select Product..."
+                  searchPlaceholder="Search product SKU..."
                 >
                   <option value="">Select Product...</option>
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
                   ))}
-                </select>
+                </SearchableSelect>
               </div>
 
               <div className="space-y-1.5">

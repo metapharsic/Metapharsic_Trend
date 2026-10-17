@@ -2,8 +2,9 @@
 
 import React, { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MapPin, Search, X, Camera, Plus, AlertTriangle, Phone } from "lucide-react";
+import { MapPin, Search, X, Camera, Plus, AlertTriangle, Phone, Store, Building, CheckCircle2, RefreshCw, Sparkles } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 
 interface Entity {
   id: string;
@@ -92,6 +93,47 @@ function NewCallForm() {
   const [geofenceRadiusMeters, setGeofenceRadiusMeters] = useState(100);
   const [gpsAccuracyWarnMeters, setGpsAccuracyWarnMeters] = useState(50);
   const [requirePhoto, setRequirePhoto] = useState(false);
+
+  // Nearby Chemist State (Auto-discovered when Doctor is selected)
+  interface NearbyChemist {
+    id: string;
+    name: string;
+    address: string;
+    subArea: string | null;
+    beatName: string | null;
+    distanceMeters: number;
+    distanceKm: number;
+    proximityLabel: string;
+  }
+  const [nearbyChemists, setNearbyChemists] = useState<NearbyChemist[]>([]);
+  const [loadingNearbyChemists, setLoadingNearbyChemists] = useState(false);
+  const [nearbyPlacementType, setNearbyPlacementType] = useState<"NEAREST_CHEMIST" | "DOCTOR_DESIGNATED_CHEMIST" | "IN_HOUSE" | "NONE">("NEAREST_CHEMIST");
+  const [selectedNearbyChemistId, setSelectedNearbyChemistId] = useState<string>("");
+  const [customNearbyChemistName, setCustomNearbyChemistName] = useState<string>("");
+  const [nearbyPlacementNotes, setNearbyPlacementNotes] = useState<string>("");
+
+  // Load nearby chemists whenever a DOCTOR is selected
+  useEffect(() => {
+    if (selected && selected.type === "DOCTOR") {
+      setLoadingNearbyChemists(true);
+      apiClient
+        .get("/api/mr/nearby-chemists", {
+          params: { doctorId: selected.id, latitude: gps.lat, longitude: gps.lon },
+        })
+        .then((res) => {
+          const list: NearbyChemist[] = res.data.data.chemists || [];
+          setNearbyChemists(list);
+          if (list.length > 0) {
+            setSelectedNearbyChemistId(list[0].id);
+          }
+        })
+        .catch((err) => console.error("Failed to load nearby chemists:", err))
+        .finally(() => setLoadingNearbyChemists(false));
+    } else {
+      setNearbyChemists([]);
+      setSelectedNearbyChemistId("");
+    }
+  }, [selected?.id, selected?.type]);
 
   useEffect(() => {
     apiClient
@@ -320,6 +362,24 @@ function NewCallForm() {
       );
     }
 
+    if (selected.type === "DOCTOR" && nearbyPlacementType !== "NONE") {
+      formData.append("nearbyChemistType", nearbyPlacementType);
+      if (selectedNearbyChemistId && nearbyPlacementType !== "IN_HOUSE") {
+        formData.append("nearbyChemistId", selectedNearbyChemistId);
+      }
+      const chosen = nearbyChemists.find((c) => c.id === selectedNearbyChemistId);
+      const name =
+        nearbyPlacementType === "IN_HOUSE"
+          ? "In-House Clinic Dispensary"
+          : nearbyPlacementType === "DOCTOR_DESIGNATED_CHEMIST"
+          ? customNearbyChemistName || chosen?.name || "Doctor Designated Chemist"
+          : chosen?.name || "Nearest Chemist";
+      formData.append("nearbyChemistName", name);
+      if (nearbyPlacementNotes) {
+        formData.append("nearbyChemistNotes", nearbyPlacementNotes);
+      }
+    }
+
     setSubmitting(true);
     try {
       await apiClient.post("/api/mr/visits", formData, {
@@ -387,6 +447,141 @@ function NewCallForm() {
                   Entering a valid mobile number is mandatory even for existing doctors/chemists. This automatically updates their master file.
                 </p>
               </div>
+
+              {/* ── NEARBY CHEMIST / TAGGED PHARMACY SECTION ── */}
+              {selected.type === "DOCTOR" && (
+                <div className="pt-3 border-t border-slate-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Store size={14} className="text-purple-600" />
+                      <span>Nearby Chemist / Tagged Retail Store</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Sparkles size={10} /> Multi-Agent Proximity
+                    </span>
+                  </div>
+
+                  {/* 4 Mode Pills */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setNearbyPlacementType("NEAREST_CHEMIST")}
+                      className={`p-2 rounded-xl border text-center transition-all ${
+                        nearbyPlacementType === "NEAREST_CHEMIST"
+                          ? "bg-purple-600 text-white border-purple-600 shadow-xs font-bold"
+                          : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
+                      }`}
+                    >
+                      Nearest Chemist
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNearbyPlacementType("DOCTOR_DESIGNATED_CHEMIST")}
+                      className={`p-2 rounded-xl border text-center transition-all ${
+                        nearbyPlacementType === "DOCTOR_DESIGNATED_CHEMIST"
+                          ? "bg-purple-600 text-white border-purple-600 shadow-xs font-bold"
+                          : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
+                      }`}
+                    >
+                      Dr. Designated
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNearbyPlacementType("IN_HOUSE")}
+                      className={`p-2 rounded-xl border text-center transition-all ${
+                        nearbyPlacementType === "IN_HOUSE"
+                          ? "bg-purple-600 text-white border-purple-600 shadow-xs font-bold"
+                          : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
+                      }`}
+                    >
+                      In-House Clinic
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNearbyPlacementType("NONE")}
+                      className={`p-2 rounded-xl border text-center transition-all ${
+                        nearbyPlacementType === "NONE"
+                          ? "bg-slate-700 text-white border-slate-700 shadow-xs font-bold"
+                          : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      Skip / None
+                    </button>
+                  </div>
+
+                  {/* Nearest Chemist or Doctor Designated Selector */}
+                  {(nearbyPlacementType === "NEAREST_CHEMIST" || nearbyPlacementType === "DOCTOR_DESIGNATED_CHEMIST") && (
+                    <div className="space-y-2.5 bg-purple-50/50 p-3 rounded-xl border border-purple-200/70">
+                      {loadingNearbyChemists ? (
+                        <div className="text-xs text-purple-700 py-3 flex items-center justify-center gap-2">
+                          <RefreshCw size={14} className="animate-spin text-purple-600" />
+                          <span>Searching nearest retail pharmacies via ProximityCorrelationAgent...</span>
+                        </div>
+                      ) : nearbyChemists.length > 0 ? (
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold text-slate-700">
+                            {nearbyPlacementType === "NEAREST_CHEMIST"
+                              ? "Select Nearest Beat Chemist:"
+                              : "Select Doctor's Partnered Chemist:"}
+                          </label>
+                          <SearchableSelect
+                            value={selectedNearbyChemistId}
+                            onChange={(e) => setSelectedNearbyChemistId(e.target.value)}
+                            placeholder="Select Beat Chemist..."
+                            searchPlaceholder="Search nearby chemist store..."
+                            allowClear
+                          >
+                            {nearbyChemists.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name} — {c.proximityLabel} {c.subArea ? `(${c.subArea})` : ""}
+                              </option>
+                            ))}
+                          </SearchableSelect>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500">
+                          No chemists found in this territory directory yet. Enter doctor-designated store below.
+                        </p>
+                      )}
+
+                      {nearbyPlacementType === "DOCTOR_DESIGNATED_CHEMIST" && (
+                        <input
+                          type="text"
+                          value={customNearbyChemistName}
+                          onChange={(e) => setCustomNearbyChemistName(e.target.value)}
+                          placeholder="Or type doctor-specified chemist name..."
+                          className="w-full border border-purple-200 rounded-xl px-3 py-2 text-xs bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-purple-400 outline-none"
+                        />
+                      )}
+
+                      <div className="space-y-1 pt-1">
+                        <label className="text-[11px] font-bold text-slate-700">
+                          Stock / Sample Placement Notes at Chemist:
+                        </label>
+                        <input
+                          type="text"
+                          value={nearbyPlacementNotes}
+                          onChange={(e) => setNearbyPlacementNotes(e.target.value)}
+                          placeholder="e.g. 5 boxes left for Dr. prescription availability, inquiry recorded"
+                          className="w-full border border-purple-200 rounded-xl px-3 py-2 text-xs bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-purple-400 outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {nearbyPlacementType === "IN_HOUSE" && (
+                    <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-200/70 text-xs text-purple-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <Building size={14} className="text-purple-600" />
+                        <span>In-House Clinic Dispensary Tagged</span>
+                      </div>
+                      <p className="text-[11px] text-slate-600">
+                        Samples will be recorded as direct dispensary placement in doctor's in-house clinic pharmacy.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : showAddEntity ? (
             <div className="space-y-3 border border-emerald-200 rounded-xl p-4 bg-emerald-50/40">
@@ -438,10 +633,11 @@ function NewCallForm() {
                 placeholder="Mobile (optional)"
                 className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-base sm:text-sm"
               />
-              <select
+              <SearchableSelect
                 value={newTerritoryId}
                 onChange={(e) => setNewTerritoryId(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-base sm:text-sm"
+                placeholder="Select territory *"
+                searchPlaceholder="Search territory..."
               >
                 <option value="">Select territory *</option>
                 {territories.map((t) => (
@@ -449,7 +645,7 @@ function NewCallForm() {
                     {t.name}
                   </option>
                 ))}
-              </select>
+              </SearchableSelect>
 
               <p className="text-xs text-slate-500 flex items-center gap-1.5">
                 <MapPin size={12} />

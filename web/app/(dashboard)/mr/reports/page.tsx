@@ -40,6 +40,7 @@ import {
   Award,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 import { exportCurrentPageToExcel, downloadExcelReportWithDashboard } from "@/lib/excel-export";
 
 type Period = "daily" | "weekly" | "monthly" | "custom" | "all";
@@ -754,10 +755,13 @@ export default function MrReportsPage() {
                       <span>Representative Scope:</span>
                     </div>
                     {reps.length > 0 ? (
-                      <select
+                      <SearchableSelect
                         value={selectedRep}
                         onChange={(e) => setSelectedRep(e.target.value)}
-                        className="rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-900 dark:text-slate-100 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                        placeholder="⚡ All MRs Fleet Combined"
+                        searchPlaceholder="Search MR name or territory..."
+                        className="w-auto min-w-[240px]"
+                        allowClear
                       >
                         <option value="">⚡ All MRs Fleet Combined ({reps.length} Reps)</option>
                         {reps.map((r) => {
@@ -769,7 +773,7 @@ export default function MrReportsPage() {
                             </option>
                           );
                         })}
-                      </select>
+                      </SearchableSelect>
                     ) : (
                       <span className="text-xs font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl">
                         My Call Reports Only
@@ -1276,10 +1280,13 @@ export default function MrReportsPage() {
                       <User size={13} className="text-emerald-500" />
                       Select MR:
                     </span>
-                    <select
+                    <SearchableSelect
                       value={selectedRep}
                       onChange={(e) => setSelectedRep(e.target.value)}
-                      className="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none cursor-pointer focus:ring-2 focus:ring-emerald-500"
+                      placeholder="All Medical Representatives"
+                      searchPlaceholder="Search MR..."
+                      className="w-auto min-w-[220px]"
+                      allowClear
                     >
                       <option value="">All Medical Representatives ({reps.length})</option>
                       {reps.map((r) => {
@@ -1291,7 +1298,7 @@ export default function MrReportsPage() {
                           </option>
                         );
                       })}
-                    </select>
+                    </SearchableSelect>
                   </div>
 
                   {/* CLOSE THIS WEEK TOGGLE & EXCEL BUTTON */}

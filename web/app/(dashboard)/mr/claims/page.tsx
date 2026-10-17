@@ -27,6 +27,7 @@ import {
   TrendingDown,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 
 type ClaimStatus = "PENDING_MR" | "PENDING_ASM" | "APPROVED" | "COMPLETED" | "REJECTED";
 
@@ -445,10 +446,12 @@ export default function MyClaimsPage() {
           </div>
 
           <div className="min-w-[180px]">
-            <select
+            <SearchableSelect
               value={chemistFilter}
               onChange={(e) => setChemistFilter(e.target.value)}
-              className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-700"
+              placeholder="All Chemists"
+              searchPlaceholder="Search chemist..."
+              allowClear
             >
               <option value="">All Chemists</option>
               {chemists.map((c) => (
@@ -456,7 +459,7 @@ export default function MyClaimsPage() {
                   {c.name}
                 </option>
               ))}
-            </select>
+            </SearchableSelect>
           </div>
 
           {hasActiveFilters && (
@@ -773,11 +776,12 @@ function AppendClaimModal({
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                 Chemist Store *
               </label>
-              <select
+              <SearchableSelect
                 required
                 value={chemistId}
                 onChange={(e) => setChemistId(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
+                placeholder="Select Chemist..."
+                searchPlaceholder="Search chemist store..."
               >
                 <option value="">Select Chemist...</option>
                 {chemists.map((c) => (
@@ -785,18 +789,19 @@ function AppendClaimModal({
                     {c.name}
                   </option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                 Fulfilling Distributor *
               </label>
-              <select
+              <SearchableSelect
                 required
                 value={distributorId}
                 onChange={(e) => setDistributorId(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
+                placeholder="Select Distributor..."
+                searchPlaceholder="Search distributor..."
               >
                 <option value="">Select Distributor...</option>
                 {distributors.map((d) => (
@@ -804,7 +809,7 @@ function AppendClaimModal({
                     {d.name}
                   </option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
           </div>
 
@@ -814,11 +819,12 @@ function AppendClaimModal({
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                 Defective / Expired Product *
               </label>
-              <select
+              <SearchableSelect
                 required
                 value={productId}
                 onChange={(e) => setProductId(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
+                placeholder="Select Product..."
+                searchPlaceholder="Search product name or SKU..."
               >
                 <option value="">Select Product...</option>
                 {products.map((p) => (
@@ -826,7 +832,7 @@ function AppendClaimModal({
                     {p.name} {p.ptr ? `(PTR ₹${p.ptr})` : ""}
                   </option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
 
             <div>
@@ -1206,34 +1212,36 @@ function EditClaimModal({
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                 Chemist Store
               </label>
-              <select
+              <SearchableSelect
                 value={chemistId}
                 onChange={(e) => setChemistId(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
+                placeholder="Select Chemist..."
+                searchPlaceholder="Search chemist store..."
               >
                 {chemists.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                 Distributor
               </label>
-              <select
+              <SearchableSelect
                 value={distributorId}
                 onChange={(e) => setDistributorId(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
+                placeholder="Select Distributor..."
+                searchPlaceholder="Search distributor..."
               >
                 {distributors.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name}
                   </option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
           </div>
 
@@ -1242,17 +1250,18 @@ function EditClaimModal({
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                 Product
               </label>
-              <select
+              <SearchableSelect
                 value={productId}
                 onChange={(e) => setProductId(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
+                placeholder="Select Product..."
+                searchPlaceholder="Search product name..."
               >
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>
                 ))}
-              </select>
+              </SearchableSelect>
             </div>
 
             <div>

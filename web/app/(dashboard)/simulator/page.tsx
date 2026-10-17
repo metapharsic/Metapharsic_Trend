@@ -23,6 +23,7 @@ import {
   Check,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 
 interface Product {
   id: string;
@@ -347,17 +348,18 @@ export default function SimulatorDashboard() {
             <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-3">
               <Package className="text-fuchsia-600" size={18} /> Product SKU
             </h3>
-            <select
+            <SearchableSelect
               value={selectedProductId}
               onChange={(e) => setSelectedProductId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+              placeholder="Select product SKU..."
+              searchPlaceholder="Search product name or SKU..."
             >
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} ({p.sku})
                 </option>
               ))}
-            </select>
+            </SearchableSelect>
             {product && (
               <div className="mt-3 flex gap-4 text-xs text-slate-500 font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                 <span>MRP: <strong className="text-slate-800">₹{product.mrp}</strong></span>

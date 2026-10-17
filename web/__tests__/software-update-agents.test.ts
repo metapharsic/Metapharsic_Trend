@@ -35,11 +35,20 @@ describe("SoftwareUpdateAgentsService Multi-Agent Pipeline", () => {
   });
 
   it("executes apply update gracefully", async () => {
-    const result = await SoftwareUpdateAgentsService.applyUpdate();
+    const spy = jest.spyOn(SoftwareUpdateAgentsService as any, "runRemote").mockReturnValue({
+      ok: true,
+      output: "Remote command simulated successfully",
+    });
 
-    expect(result.success).toBe(true);
-    expect(result.version).toBe("v1.2.0");
-    expect(result.appliedCommitHash).toBeTruthy();
-    expect(result.message).toBeTruthy();
+    try {
+      const result = await SoftwareUpdateAgentsService.applyUpdate();
+
+      expect(result.success).toBe(true);
+      expect(result.version).toBe("v1.2.0");
+      expect(result.appliedCommitHash).toBeTruthy();
+      expect(result.message).toBeTruthy();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

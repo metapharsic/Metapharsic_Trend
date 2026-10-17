@@ -19,6 +19,7 @@ import {
   Check,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 
 interface OrderItem {
   id: string;
@@ -516,17 +517,18 @@ export default function OrdersDashboard() {
                 placeholder="Customer name (e.g. Chemist)"
                 className="min-w-[180px] px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
               />
-              <select
+              <SearchableSelect
                 name="paid"
                 data-testid="invoice-search-paid"
                 value={invoicePaid}
                 onChange={(e) => setInvoicePaid(e.target.value as "" | "true" | "false")}
-                className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+                className="min-w-[150px]"
+                placeholder="All Invoices"
               >
                 <option value="">All Invoices</option>
                 <option value="true">Paid Only</option>
                 <option value="false">Unpaid Only</option>
-              </select>
+              </SearchableSelect>
               {(invoiceQ || invoiceCustomer || invoicePaid) && (
                 <button
                   type="button"
@@ -1110,10 +1112,12 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
 
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Distributor *</label>
-            <select
+            <SearchableSelect
               value={distributorId}
               onChange={(e) => setDistributorId(e.target.value)}
-              className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-base sm:text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              placeholder="Select distributor"
+              searchPlaceholder="Search distributor name..."
+              allowClear
             >
               <option value="">Select distributor</option>
               {distributors.map((d) => (
@@ -1121,7 +1125,7 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
                   {d.name}
                 </option>
               ))}
-            </select>
+            </SearchableSelect>
           </div>
         </div>
 
@@ -1136,10 +1140,12 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
               return (
                 <div key={index} className="border border-slate-200 rounded-lg p-3 space-y-2">
                   <div className="flex items-center gap-2">
-                    <select
+                    <SearchableSelect
                       value={item.productId}
                       onChange={(e) => updateItem(index, { productId: e.target.value })}
-                      className="flex-1 border border-slate-300 rounded-lg px-3 py-2.5 text-base sm:text-sm"
+                      placeholder="Select product"
+                      searchPlaceholder="Search product SKU or name..."
+                      className="flex-1"
                     >
                       <option value="">Select product</option>
                       {products.map((p) => (
@@ -1147,7 +1153,7 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
                           {p.name} — SKU {p.sku}
                         </option>
                       ))}
-                    </select>
+                    </SearchableSelect>
                     <input
                       type="number"
                       min={1}
@@ -1333,17 +1339,17 @@ function EditOrderModal({
               </div>
               <div>
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Order Status</p>
-                <select
+                <SearchableSelect
                   value={orderStatus}
                   onChange={(e) => setOrderStatus(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-2.5 py-1 text-sm font-semibold text-slate-800 mt-0.5"
+                  placeholder="Order Status"
                 >
                   <option value="PENDING">PENDING</option>
                   <option value="CONFIRMED">CONFIRMED</option>
                   <option value="SHIPPED">SHIPPED</option>
                   <option value="DELIVERED">DELIVERED</option>
                   <option value="CANCELLED">CANCELLED</option>
-                </select>
+                </SearchableSelect>
               </div>
             </div>
 
@@ -1358,10 +1364,12 @@ function EditOrderModal({
                   return (
                     <div key={index} className="border border-slate-200 rounded-lg p-3 space-y-2">
                       <div className="flex items-center gap-2">
-                        <select
+                        <SearchableSelect
                           value={item.productId}
                           onChange={(e) => updateItem(index, { productId: e.target.value })}
-                          className="flex-1 border border-slate-300 rounded-lg px-3 py-2.5 text-base sm:text-sm"
+                          placeholder="Select product"
+                          searchPlaceholder="Search product SKU or name..."
+                          className="flex-1"
                         >
                           <option value="">Select product</option>
                           {products.map((p) => (
@@ -1369,7 +1377,7 @@ function EditOrderModal({
                               {p.name} — SKU {p.sku}
                             </option>
                           ))}
-                        </select>
+                        </SearchableSelect>
                         <input
                           type="number"
                           min={1}

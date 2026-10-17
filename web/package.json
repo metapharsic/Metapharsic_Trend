@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start -p 5555",
     "lint": "next lint",
-    "test": "jest --maxWorkers=2",
+    "test": "jest --runInBand",
     "test:watch": "jest --watch",
     "test:setup": "prisma db push --skip-generate",
     "db:generate": "prisma generate",
@@ -19,7 +19,8 @@
     "db:dedupe-visits": "tsx scripts/deduplicate-visits-agent.ts",
     "db:push-vps": "tsx scripts/push-local-to-vps.ts",
     "db:wire-mr-calls": "tsx scripts/multithreaded_wire_mr_complete_call.ts",
-    "report:mr:agents": "tsx scripts/generate-mr-multiagent-report.ts"
+    "report:mr:agents": "tsx scripts/generate-mr-multiagent-report.ts",
+    "ui:wire-dropdowns": "tsx scripts/multithreaded_wire_searchable_dropdowns.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

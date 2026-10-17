@@ -20,6 +20,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 
 interface OrderItem {
   id: string;
@@ -266,15 +267,19 @@ export function AdminProfitIntelligence() {
             className="min-w-[180px] px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-slate-50/50"
           />
 
-          <select
-            value={filterPaid}
-            onChange={(e) => setFilterPaid(e.target.value as any)}
-            className="px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-slate-50/50"
-          >
-            <option value="">All Invoices</option>
-            <option value="true">Paid Invoices Only</option>
-            <option value="false">Unpaid Invoices Only</option>
-          </select>
+          <div className="w-52">
+            <SearchableSelect
+              value={filterPaid}
+              onChange={(e) => setFilterPaid(e.target.value as any)}
+              className="w-full text-sm border border-slate-200 rounded-xl bg-slate-50/50"
+              placeholder="All Invoices"
+              options={[
+                { value: "", label: "All Invoices" },
+                { value: "true", label: "Paid Invoices Only" },
+                { value: "false", label: "Unpaid Invoices Only" }
+              ]}
+            />
+          </div>
 
           {(searchQ || searchCustomer || filterPaid) && (
             <button

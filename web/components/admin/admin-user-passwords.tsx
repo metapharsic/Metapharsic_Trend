@@ -16,6 +16,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { SearchableSelect } from "@/components/searchable-select";
 
 interface UserItem {
   id: string;
@@ -162,21 +163,25 @@ export function AdminUserPasswords() {
           <Search size={16} className="absolute left-3 top-3 text-slate-400" />
         </div>
 
-        <select
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-slate-50/50"
-        >
-          <option value="ALL">All Roles ({users.length})</option>
-          <option value="MR">MR (Field Reps)</option>
-          <option value="ASM">ASM (Area Managers)</option>
-          <option value="MD">MD (Managing Director)</option>
-          <option value="FINANCE">Finance</option>
-          <option value="HR">HR</option>
-          <option value="ADMIN">Admin</option>
-          <option value="DISTRIBUTOR">Distributor</option>
-          <option value="DOCTOR">Doctor</option>
-        </select>
+        <div className="w-56">
+          <SearchableSelect
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="w-full text-sm border border-slate-200 rounded-xl bg-slate-50/50"
+            placeholder="Filter by role..."
+            options={[
+              { value: "ALL", label: `All Roles (${users.length})` },
+              { value: "MR", label: "MR (Field Reps)" },
+              { value: "ASM", label: "ASM (Area Managers)" },
+              { value: "MD", label: "MD (Managing Director)" },
+              { value: "FINANCE", label: "Finance" },
+              { value: "HR", label: "HR" },
+              { value: "ADMIN", label: "Admin" },
+              { value: "DISTRIBUTOR", label: "Distributor" },
+              { value: "DOCTOR", label: "Doctor" }
+            ]}
+          />
+        </div>
       </div>
 
       {/* Users Table */}
