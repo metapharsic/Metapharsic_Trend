@@ -3,6 +3,8 @@ setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 title Trend MR Pharma OS - Push to GitHub Wizard
 color 0B
+set GIT_PAGER=cat
+set PAGER=cat
 
 echo =======================================================================
 echo         TREND MR PHARMA OS - SECURE GITHUB PUSH WIZARD
@@ -79,11 +81,11 @@ git rev-parse --verify origin/%TARGET_BRANCH% >nul 2>&1
 if errorlevel 1 goto FIRSTPUSH
 
 echo --- COMMITS AHEAD OF origin/%TARGET_BRANCH% ^(about to be sent^) ---
-git log origin/%TARGET_BRANCH%..HEAD --pretty=format:" [%%h] %%ad ^| %%s ^(%%an^)" --date=short
+git --no-pager log origin/%TARGET_BRANCH%..HEAD --pretty=format:" [%%h] %%ad ^| %%s ^(%%an^)" --date=short
 echo.
 echo.
 echo --- FILES ENCLOSED IN THIS PUSH ^(full diff vs origin^) ---
-git diff --stat origin/%TARGET_BRANCH%..HEAD
+git --no-pager diff --stat origin/%TARGET_BRANCH%..HEAD
 echo.
 goto SHOWLATEST
 
@@ -92,7 +94,7 @@ color 0E
 echo  origin/%TARGET_BRANCH% does not exist yet on GitHub -- this looks like
 echo  the FIRST push of this branch. Showing local commit history instead:
 echo -----------------------------------------------------------------------
-git log -n 10 --pretty=format:" [%%h] %%ad ^| %%s ^(%%an^)" --date=short
+git --no-pager log -n 10 --pretty=format:" [%%h] %%ad ^| %%s ^(%%an^)" --date=short
 echo.
 echo.
 echo --- FILES IN THIS REPOSITORY ^(tracked, about to be sent^) ---
@@ -104,7 +106,7 @@ color 0B
 
 :SHOWLATEST
 echo --- LATEST COMMIT DETAILS ---
-git show --stat --oneline -n 1
+git --no-pager show --stat --oneline -n 1
 echo.
 echo =======================================================================
 echo.
