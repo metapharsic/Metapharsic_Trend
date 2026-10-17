@@ -107,5 +107,20 @@ async function createMR(req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(getMRs, ["ASM", "ADMIN", "MD"]);
-export const POST = withAuth(createMR, ["ASM", "ADMIN", "MD"]);
+export const GET = withAuth(getMRs, [
+  Role.ADMIN,
+  Role.MD,
+  Role.NSM,
+  Role.ZSM,
+  Role.RM,
+  Role.ASM,
+]);
+export const POST = withAuth(createMR, [
+  Role.ADMIN,
+  Role.MD,
+  Role.NSM,
+  Role.ZSM,
+  Role.RM,
+  Role.ASM,
+]);
+
