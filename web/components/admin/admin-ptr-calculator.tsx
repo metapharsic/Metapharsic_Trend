@@ -65,6 +65,7 @@ export function AdminPtrCalculator() {
   const [agents, setAgents] = useState<AgentHealthStatus[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [showAgentLogs, setShowAgentLogs] = useState<string | null>(null);
+  const [showAgentConsole, setShowAgentConsole] = useState<boolean>(false);
   const [isPending, startTransition] = useTransition();
 
   const fetchCommercialData = async (simInputs = inputs) => {
@@ -224,6 +225,18 @@ export function AdminPtrCalculator() {
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
+              onClick={() => setShowAgentConsole((prev) => !prev)}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+              title="Toggle Multi-Agent Intelligence System & Formula Execution Logs"
+            >
+              <Sparkles size={13} className="text-indigo-400" />
+              <span>{showAgentConsole ? "Hide Formula Logs" : "Formula Logs"}</span>
+              {agents.some((a) => a.status === "WARNING") && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              )}
+            </button>
+            <button
               onClick={() => fetchCommercialData()}
               disabled={loading}
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm"
@@ -269,81 +282,83 @@ export function AdminPtrCalculator() {
           </div>
         </div>
 
-        {/* Multi-Agent Status Console */}
-        <div className="mt-5 pt-4 border-t border-slate-800/80">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Sparkles size={14} className="text-indigo-400" />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Multi-Agent Intelligence System &amp; Formula Execution Logs
+        {/* Multi-Agent Status Console (Hidden by default, toggleable on demand) */}
+        {showAgentConsole && (
+          <div className="mt-5 pt-4 border-t border-slate-800/80">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-indigo-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Multi-Agent Intelligence System &amp; Formula Execution Logs
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-400 font-mono">
+                Last Sync: {new Date().toLocaleTimeString()}
               </span>
             </div>
-            <span className="text-[11px] text-slate-400 font-mono">
-              Last Sync: {new Date().toLocaleTimeString()}
-            </span>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {agents.map((agent) => {
-              const isOpen = showAgentLogs === agent.id;
-              const isWarning = agent.status === "WARNING";
-              return (
-                <div
-                  key={agent.id}
-                  className={`rounded-2xl p-3 border transition-all cursor-pointer ${
-                    isWarning
-                      ? "bg-amber-950/30 border-amber-500/40 hover:bg-amber-950/50"
-                      : "bg-slate-800/60 border-slate-700/60 hover:bg-slate-800"
-                  }`}
-                  onClick={() => setShowAgentLogs(isOpen ? null : agent.id)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{agent.avatar}</span>
-                      <div>
-                        <h4 className="text-xs font-bold text-white leading-tight">{agent.name}</h4>
-                        <p className="text-[10px] text-slate-400">{agent.role}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {agents.map((agent) => {
+                const isOpen = showAgentLogs === agent.id;
+                const isWarning = agent.status === "WARNING";
+                return (
+                  <div
+                    key={agent.id}
+                    className={`rounded-2xl p-3 border transition-all cursor-pointer ${
+                      isWarning
+                        ? "bg-amber-950/30 border-amber-500/40 hover:bg-amber-950/50"
+                        : "bg-slate-800/60 border-slate-700/60 hover:bg-slate-800"
+                    }`}
+                    onClick={() => setShowAgentLogs(isOpen ? null : agent.id)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{agent.avatar}</span>
+                        <div>
+                          <h4 className="text-xs font-bold text-white leading-tight">{agent.name}</h4>
+                          <p className="text-[10px] text-slate-400">{agent.role}</p>
+                        </div>
                       </div>
+                      <span
+                        className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                          agent.status === "AUDITED"
+                            ? "bg-indigo-500/30 text-indigo-300 border border-indigo-500/40"
+                            : agent.status === "SYNCED"
+                            ? "bg-emerald-500/30 text-emerald-300 border border-emerald-500/40"
+                            : agent.status === "WARNING"
+                            ? "bg-amber-500/30 text-amber-300 border border-amber-500/40"
+                            : "bg-blue-500/30 text-blue-300 border border-blue-500/40"
+                        }`}
+                      >
+                        {agent.status}
+                      </span>
                     </div>
-                    <span
-                      className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                        agent.status === "AUDITED"
-                          ? "bg-indigo-500/30 text-indigo-300 border border-indigo-500/40"
-                          : agent.status === "SYNCED"
-                          ? "bg-emerald-500/30 text-emerald-300 border border-emerald-500/40"
-                          : agent.status === "WARNING"
-                          ? "bg-amber-500/30 text-amber-300 border border-amber-500/40"
-                          : "bg-blue-500/30 text-blue-300 border border-blue-500/40"
-                      }`}
-                    >
-                      {agent.status}
-                    </span>
-                  </div>
 
-                  <div className="mt-2.5 pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-1 text-[10px]">
-                    {Object.entries(agent.metrics).slice(0, 2).map(([key, val]) => (
-                      <div key={key}>
-                        <span className="text-slate-400 block truncate">{key}</span>
-                        <span className="font-semibold text-slate-200 truncate">{val}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {isOpen && (
-                    <div className="mt-3 pt-2 border-t border-slate-700 text-[10px] space-y-1 text-slate-300">
-                      <p className="font-semibold text-indigo-300 uppercase tracking-wider text-[9px]">Agent Logs:</p>
-                      {agent.logs.map((log, lIdx) => (
-                        <p key={lIdx} className="font-mono text-slate-400 leading-snug">
-                          › {log}
-                        </p>
+                    <div className="mt-2.5 pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-1 text-[10px]">
+                      {Object.entries(agent.metrics).slice(0, 2).map(([key, val]) => (
+                        <div key={key}>
+                          <span className="text-slate-400 block truncate">{key}</span>
+                          <span className="font-semibold text-slate-200 truncate">{val}</span>
+                        </div>
                       ))}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+
+                    {isOpen && (
+                      <div className="mt-3 pt-2 border-t border-slate-700 text-[10px] space-y-1 text-slate-300">
+                        <p className="font-semibold text-indigo-300 uppercase tracking-wider text-[9px]">Agent Logs:</p>
+                        {agent.logs.map((log, lIdx) => (
+                          <p key={lIdx} className="font-mono text-slate-400 leading-snug">
+                            › {log}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* 2. Live Database Facts Summary Cards */}

@@ -17,6 +17,7 @@ import {
   Search,
   Store,
   Check,
+  MapPin,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -32,7 +33,14 @@ interface Order {
   id: string;
   status: "PENDING" | "CONFIRMED" | "SHIPPED" | "DELIVERED" | "CANCELLED";
   createdAt: string;
-  chemist: { id: string; name: string } | null;
+  chemist: {
+    id: string;
+    name: string;
+    address?: string | null;
+    subArea?: string | null;
+    beatName?: string | null;
+    territory?: { id: string; name: string } | null;
+  } | null;
   distributor: { id: string; name: string } | null;
   items: OrderItem[];
   invoice: { invoiceNo: string; amount: string; paid: boolean } | null;
@@ -67,7 +75,15 @@ interface InvoiceRow {
   order: {
     id: string;
     status: string;
-    chemist: { id: string; name: string } | null;
+    chemist: {
+      id: string;
+      name: string;
+      address?: string | null;
+      subArea?: string | null;
+      beatName?: string | null;
+      territoryId?: string | null;
+      territory?: { id: string; name: string } | null;
+    } | null;
     distributor: { id: string; name: string } | null;
     items: OrderItem[];
   } | null;
@@ -411,7 +427,20 @@ export default function OrdersDashboard() {
                   </td>
                   <td className="px-6 py-4">
                     <p className="font-semibold text-slate-800">{order.distributor?.name ?? "—"}</p>
-                    <p className="text-xs text-slate-500">To: {order.chemist?.name ?? "—"}</p>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                      <span className="text-xs text-slate-500">To: {order.chemist?.name ?? "—"}</span>
+                      {order.chemist?.subArea && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200">
+                          <MapPin size={9} />
+                          {order.chemist.subArea}
+                        </span>
+                      )}
+                      {order.chemist?.beatName && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium text-[9px] border border-blue-200">
+                          Beat: {order.chemist.beatName}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     {order.invoice ? (
@@ -604,8 +633,26 @@ export default function OrdersDashboard() {
                         <Printer size={11} />
                       </Link>
                     </td>
-                    <td className="px-6 py-4 font-semibold text-slate-800">
-                      {inv.order?.chemist?.name || "Unknown Chemist"}
+                    <td className="px-6 py-4">
+                      <p className="font-semibold text-slate-800">{inv.order?.chemist?.name || "Unknown Chemist"}</p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        {inv.order?.chemist?.territory?.name && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-sky-50 text-sky-800 font-bold text-[10px] border border-sky-200">
+                            <MapPin size={9} />
+                            {inv.order.chemist.territory.name}
+                          </span>
+                        )}
+                        {inv.order?.chemist?.subArea && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200">
+                            {inv.order.chemist.subArea}
+                          </span>
+                        )}
+                        {inv.order?.chemist?.beatName && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium text-[9px] border border-blue-200">
+                            Beat: {inv.order.chemist.beatName}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-slate-600">
                       {inv.order?.distributor?.name || "Unknown Distributor"}

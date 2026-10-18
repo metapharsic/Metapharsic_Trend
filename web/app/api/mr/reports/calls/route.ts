@@ -46,6 +46,7 @@ async function handler(req: AuthedRequest) {
     const startDateParam = searchParams.get("startDate");
     const endDateParam = searchParams.get("endDate");
     const targetTypeFilter = searchParams.get("targetType"); // DOCTOR, CHEMIST, ALL
+    const subAreaFilter = searchParams.get("subArea") || searchParams.get("area");
 
     const anchor = dateParam ? new Date(`${dateParam}T00:00:00.000Z`) : new Date();
     if (Number.isNaN(anchor.getTime())) return badRequest("Invalid date");
@@ -98,27 +99,45 @@ async function handler(req: AuthedRequest) {
         createdAt: { gte: start, lt: end },
         ...(targetTypeFilter === "DOCTOR" ? { doctorId: { not: null } } : {}),
         ...(targetTypeFilter === "CHEMIST" ? { chemistId: { not: null } } : {}),
+        ...(subAreaFilter
+          ? {
+              OR: [
+                { doctor: { subArea: subAreaFilter } },
+                { chemist: { subArea: subAreaFilter } },
+              ],
+            }
+          : {}),
       },
       include: {
         doctor: {
           select: {
             fullName: true,
+            clinicAddress: true,
             primarySpecialty: true,
-            territory: { select: { name: true } },
+            subArea: true,
+            beatName: true,
+            territory: { select: { name: true, region: true, zone: true } },
           },
         },
         chemist: {
           select: {
             name: true,
+            address: true,
             type: true,
-            territory: { select: { name: true } },
+            licenseNo: true,
+            dlCopyUrl: true,
+            dlStatus: true,
+            subArea: true,
+            beatName: true,
+            territory: { select: { name: true, region: true, zone: true } },
           },
         },
         hospital: {
           select: {
             name: true,
+            address: true,
             type: true,
-            territory: { select: { name: true } },
+            territory: { select: { name: true, region: true, zone: true } },
           },
         },
         employee: {
@@ -394,6 +413,69 @@ async function handler(req: AuthedRequest) {
       limit: 50,
     });
 
+    const areaBreakdownMap = new Map<
+      string,
+      {
+        area: string;
+        territory: string;
+        totalCalls: number;
+        doctorCalls: number;
+        chemistCalls: number;
+        hospitalCalls: number;
+        boxesPlaced: number;
+        samplesCount: number;
+        cqsScores: number[];
+      }
+    >();
+
+    for (const v of visits) {
+      const areaName = v.doctor?.subArea ?? v.chemist?.subArea ?? "General Area";
+      const terrName =
+        v.doctor?.territory?.name ??
+        v.chemist?.territory?.name ??
+        v.hospital?.territory?.name ??
+        v.employee.territories?.[0]?.name ??
+        "General Territory";
+
+      const curr = areaBreakdownMap.get(areaName) || {
+        area: areaName,
+        territory: terrName,
+        totalCalls: 0,
+        doctorCalls: 0,
+        chemistCalls: 0,
+        hospitalCalls: 0,
+        boxesPlaced: 0,
+        samplesCount: 0,
+        cqsScores: [],
+      };
+
+      curr.totalCalls += 1;
+      if (v.doctorId) curr.doctorCalls += 1;
+      if (v.chemistId) curr.chemistCalls += 1;
+      if (v.hospitalId) curr.hospitalCalls += 1;
+      curr.boxesPlaced += v.boxesPlaced || 0;
+      curr.samplesCount += v.samples.reduce((sAcc, s) => sAcc + (s.quantity || 0), 0);
+      if (v.cqsScore !== null && v.cqsScore !== undefined) curr.cqsScores.push(v.cqsScore);
+
+      areaBreakdownMap.set(areaName, curr);
+    }
+
+    const areaBreakdown = Array.from(areaBreakdownMap.values())
+      .map((a) => ({
+        area: a.area,
+        territory: a.territory,
+        totalCalls: a.totalCalls,
+        doctorCalls: a.doctorCalls,
+        chemistCalls: a.chemistCalls,
+        hospitalCalls: a.hospitalCalls,
+        boxesPlaced: a.boxesPlaced,
+        samplesCount: a.samplesCount,
+        avgCqsScore: a.cqsScores.length
+          ? Math.round((a.cqsScores.reduce((x, y) => x + y, 0) / a.cqsScores.length) * 10) / 10
+          : null,
+      }))
+      .sort((a, b) => b.totalCalls - a.totalCalls);
+
     return ok({
       period,
       range: { start: start.toISOString(), end: end.toISOString() },
@@ -442,12 +524,16 @@ async function handler(req: AuthedRequest) {
         ],
       },
       mrBreakdown,
+      areaBreakdown,
       byDay,
       dealClosureSummary,
       calls: visits.map((v) => {
         const targetType = v.doctorId ? "DOCTOR" : v.chemistId ? "CHEMIST" : v.hospitalId ? "HOSPITAL" : "OTHER";
         const targetName = v.doctor?.fullName ?? v.chemist?.name ?? v.hospital?.name ?? "Unknown Entity";
         const specialty = v.doctor?.primarySpecialty ?? v.chemist?.type ?? null;
+        const subArea = v.doctor?.subArea ?? v.chemist?.subArea ?? null;
+        const beatName = v.doctor?.beatName ?? v.chemist?.beatName ?? null;
+        const address = v.doctor?.clinicAddress ?? v.chemist?.address ?? null;
         const territory =
           v.doctor?.territory?.name ??
           v.chemist?.territory?.name ??
@@ -462,6 +548,10 @@ async function handler(req: AuthedRequest) {
           name: targetName,
           targetType,
           specialty,
+          area: subArea || territory,
+          subArea,
+          beatName,
+          address,
           purpose: v.purpose,
           createdAt: v.createdAt.toISOString(),
           durationMinutes: v.durationMinutes,
@@ -482,6 +572,9 @@ async function handler(req: AuthedRequest) {
           employeeName: `${v.employee.firstName} ${v.employee.lastName}`,
           employeePhone: v.employee.phone,
           territory,
+          licenseNo: v.chemist?.licenseNo || null,
+          dlCopyUrl: v.chemist?.dlCopyUrl || null,
+          dlStatus: v.chemist?.dlStatus || (v.chemist?.dlCopyUrl ? "VERIFIED" : null),
         };
       }),
     });

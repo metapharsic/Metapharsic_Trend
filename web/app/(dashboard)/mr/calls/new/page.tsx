@@ -2,7 +2,7 @@
 
 import React, { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MapPin, Search, X, Camera, Plus, AlertTriangle, Phone, Store, Building, CheckCircle2, RefreshCw, Sparkles } from "lucide-react";
+import { MapPin, Search, X, Camera, Plus, AlertTriangle, Phone, Store, Building, CheckCircle2, RefreshCw, Sparkles, FileText, FileCheck, Eye, Upload } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { SearchableSelect } from "@/components/searchable-select";
 
@@ -11,9 +11,16 @@ interface Entity {
   name: string;
   type: "DOCTOR" | "CHEMIST";
   address: string | null;
+  territoryId?: string | null;
+  territoryName?: string | null;
+  subArea?: string | null;
+  beatName?: string | null;
   phone?: string | null;
   latitude?: number;
   longitude?: number;
+  licenseNo?: string | null;
+  dlCopyUrl?: string | null;
+  dlStatus?: string | null;
 }
 
 interface Territory {
@@ -50,13 +57,26 @@ function NewCallForm() {
   const searchParams = useSearchParams();
   const presetDoctorId = searchParams.get("doctorId");
   const presetName = searchParams.get("name");
+  const presetTerritory = searchParams.get("territory");
+  const presetSubArea = searchParams.get("subArea");
+  const presetBeat = searchParams.get("beat");
 
   const [entityType, setEntityType] = useState<"DOCTOR" | "CHEMIST">("DOCTOR");
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Entity[]>([]);
   const [searched, setSearched] = useState(false);
   const [selected, setSelected] = useState<Entity | null>(
-    presetDoctorId ? { id: presetDoctorId, name: presetName ?? "Planned doctor", type: "DOCTOR", address: null } : null
+    presetDoctorId
+      ? {
+          id: presetDoctorId,
+          name: presetName ?? "Planned doctor",
+          type: "DOCTOR",
+          address: null,
+          territoryName: presetTerritory ?? null,
+          subArea: presetSubArea ?? null,
+          beatName: presetBeat ?? null,
+        }
+      : null
   );
   const [contactPhone, setContactPhone] = useState("");
 
@@ -68,9 +88,18 @@ function NewCallForm() {
   const [newAddress, setNewAddress] = useState("");
   const [newMobile, setNewMobile] = useState("");
   const [newTerritoryId, setNewTerritoryId] = useState("");
+  const [newLicenseNo, setNewLicenseNo] = useState("");
+  const [newDlCopyFile, setNewDlCopyFile] = useState<File | null>(null);
+  const [newDlCopyPreview, setNewDlCopyPreview] = useState<string | null>(null);
   const [addingEntity, setAddingEntity] = useState(false);
   const [addEntityError, setAddEntityError] = useState<string | null>(null);
   const [duplicateMatch, setDuplicateMatch] = useState<{ id: string; name: string } | null>(null);
+
+  // Chemist Drug License (DL) state on selected call
+  const [chemistDlNumber, setChemistDlNumber] = useState("");
+  const [chemistDlFile, setChemistDlFile] = useState<File | null>(null);
+  const [chemistDlPreview, setChemistDlPreview] = useState<string | null>(null);
+  const [chemistDlUrl, setChemistDlUrl] = useState<string | null>(null);
 
   const [gps, setGps] = useState<GpsState>({ status: "idle" });
   const [callStart, setCallStart] = useState<{ startedAt: string; lat: number; lon: number } | null>(null);
@@ -205,6 +234,21 @@ function NewCallForm() {
     }
   }, [selected]);
 
+  // Sync Drug License info if selected entity is a chemist
+  useEffect(() => {
+    if (selected && selected.type === "CHEMIST") {
+      setChemistDlNumber(selected.licenseNo || "");
+      setChemistDlUrl(selected.dlCopyUrl || null);
+      setChemistDlFile(null);
+      setChemistDlPreview(null);
+    } else {
+      setChemistDlNumber("");
+      setChemistDlUrl(null);
+      setChemistDlFile(null);
+      setChemistDlPreview(null);
+    }
+  }, [selected]);
+
   // Call "start" is the moment an entity is selected — auto-capture GPS + timestamp.
   useEffect(() => {
     if (!selected || callStart) return;
@@ -249,6 +293,17 @@ function NewCallForm() {
 
     setAddingEntity(true);
     try {
+      let uploadedDlUrl: string | null = null;
+      if (entityType === "CHEMIST" && newDlCopyFile) {
+        const uploadForm = new FormData();
+        uploadForm.append("file", newDlCopyFile);
+        if (newLicenseNo.trim()) uploadForm.append("licenseNo", newLicenseNo.trim());
+        const dlRes = await apiClient.post("/api/mr/chemists/upload-dl", uploadForm, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        uploadedDlUrl = dlRes.data.data.dlCopyUrl;
+      }
+
       const res = await apiClient.post("/api/manager/entities", {
         name: newName.trim(),
         type: entityType,
@@ -257,12 +312,31 @@ function NewCallForm() {
         longitude: 0,
         territoryId: newTerritoryId,
         ...(entityType === "DOCTOR" ? { primarySpecialty: newSpecialty.trim() } : {}),
-        ...(entityType === "CHEMIST" ? { contactPerson: newContactPerson.trim() || undefined } : {}),
+        ...(entityType === "CHEMIST"
+          ? {
+              contactPerson: newContactPerson.trim() || undefined,
+              licenseNo: newLicenseNo.trim() || undefined,
+              dlCopyUrl: uploadedDlUrl || undefined,
+            }
+          : {}),
         ...(newMobile.trim() ? { whatsApp: newMobile.trim() } : {}),
         ...(confirmDuplicate ? { confirmDuplicate: true } : {}),
       });
       const created = res.data.data.entity;
-      setSelected({ id: created.id, name: created.name, type: entityType, address: created.address });
+      const matchedTerritory = territories.find((t) => t.id === newTerritoryId)?.name || null;
+      setSelected({
+        id: created.id,
+        name: created.name,
+        type: entityType,
+        address: created.address,
+        territoryId: newTerritoryId,
+        territoryName: matchedTerritory,
+        subArea: created.subArea || null,
+        beatName: created.beatName || null,
+        licenseNo: newLicenseNo.trim() || created.licenseNo || null,
+        dlCopyUrl: uploadedDlUrl || created.dlCopyUrl || null,
+        dlStatus: uploadedDlUrl ? "VERIFIED" : (created.dlStatus || "PENDING_VERIFICATION"),
+      });
       setShowAddEntity(false);
       setSearch("");
       setResults([]);
@@ -271,6 +345,9 @@ function NewCallForm() {
       setNewContactPerson("");
       setNewAddress("");
       setNewMobile("");
+      setNewLicenseNo("");
+      setNewDlCopyFile(null);
+      setNewDlCopyPreview(null);
     } catch (err: unknown) {
       const errResponse = (
         err as { response?: { status?: number; data?: { error?: { code?: string; message?: string; details?: { id?: string; name?: string } } } } }
@@ -344,11 +421,17 @@ function NewCallForm() {
       formData.append("startLongitude", String(finalLon));
     }
     formData.append("durationMinutes", durationMinutes || "15");
-    formData.append("boxesPlaced", boxesPlaced || "5");
     if (photo) formData.append("photo", photo);
 
-    const samplesPayload = Object.entries(samplesGiven).map(([productId, quantity]) => ({ productId, quantity }));
+    const samplesPayload = Object.entries(samplesGiven)
+      .filter(([_, quantity]) => Number(quantity) > 0)
+      .map(([productId, quantity]) => ({ productId, quantity: Number(quantity) }));
     if (samplesPayload.length > 0) formData.append("samples", JSON.stringify(samplesPayload));
+
+    // Calculate actual boxes: explicit boxesPlaced or sum of product samples (never default to 5)
+    const totalSampleQty = samplesPayload.reduce((sum, s) => sum + s.quantity, 0);
+    const finalBoxesPlaced = boxesPlaced !== "" ? boxesPlaced : (totalSampleQty > 0 ? String(totalSampleQty) : "0");
+    formData.append("boxesPlaced", finalBoxesPlaced);
 
     if (leadGenerated) {
       formData.append(
@@ -360,6 +443,15 @@ function NewCallForm() {
           followUpDate: leadFollowUpDate || undefined,
         })
       );
+    }
+
+    if (selected.type === "CHEMIST") {
+      if (chemistDlFile) {
+        formData.append("dlCopy", chemistDlFile);
+      }
+      if (chemistDlNumber.trim()) {
+        formData.append("dlNumber", chemistDlNumber.trim());
+      }
     }
 
     if (selected.type === "DOCTOR" && nearbyPlacementType !== "NONE") {
@@ -412,9 +504,32 @@ function NewCallForm() {
           {selected ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between border border-emerald-200 bg-emerald-50 rounded-xl px-4 py-3">
-                <div>
-                  <p className="font-bold text-slate-900 text-sm">{selected.name}</p>
-                  <p className="text-xs text-slate-500">{selected.type === "DOCTOR" ? "Doctor" : "Chemist"}{selected.address ? ` · ${selected.address}` : ""}</p>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-bold text-slate-900 text-sm">{selected.name}</p>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase">
+                      {selected.type === "DOCTOR" ? "Doctor" : "Chemist"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                    {selected.territoryName && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-sky-100 text-sky-800 border border-sky-300 px-2 py-0.5 rounded-md">
+                        <MapPin size={11} className="text-sky-600" />
+                        Field Visit Territory: {selected.territoryName}
+                      </span>
+                    )}
+                    {selected.subArea && (
+                      <span className="text-[11px] font-semibold bg-white text-slate-700 border border-slate-300 px-2 py-0.5 rounded-md">
+                        Locality: {selected.subArea}
+                      </span>
+                    )}
+                    {selected.beatName && (
+                      <span className="text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md">
+                        Beat: {selected.beatName}
+                      </span>
+                    )}
+                  </div>
+                  {selected.address && <p className="text-xs text-slate-500">{selected.address}</p>}
                 </div>
                 <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-red-500 p-2 -m-2">
                   <X size={18} />
@@ -582,6 +697,136 @@ function NewCallForm() {
                   )}
                 </div>
               )}
+
+              {/* ── CHEMIST DRUG LICENSE (DL) COMPLIANCE & COPY UPLOAD ── */}
+              {selected.type === "CHEMIST" && (
+                <div className="pt-3 border-t border-slate-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <FileCheck size={14} className="text-purple-600" />
+                      <span>Chemist Drug License (DL) & Compliance</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Sparkles size={10} /> D&amp;C Act Compliance
+                    </span>
+                  </div>
+
+                  <div className="bg-purple-50/40 p-3.5 rounded-xl border border-purple-200/80 space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                        <span>Drug License Number (Form 20-B / 21-B)</span>
+                        {chemistDlNumber ? (
+                          <span className="text-[10px] font-mono text-purple-700 font-semibold">{chemistDlNumber}</span>
+                        ) : (
+                          <span className="text-[10px] text-amber-600 font-semibold">Missing License No.</span>
+                        )}
+                      </label>
+                      <input
+                        type="text"
+                        value={chemistDlNumber}
+                        onChange={(e) => setChemistDlNumber(e.target.value)}
+                        placeholder="e.g. DL-20B-TG-2024-8849"
+                        className="w-full border border-purple-200 rounded-xl px-3 py-2 text-xs bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-purple-400 outline-none font-mono"
+                      />
+                    </div>
+
+                    {/* DL Copy Status & Upload */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                          <FileText size={12} className="text-purple-600" />
+                          <span>DL Certificate Copy (Uploaded Document)</span>
+                        </span>
+                        {chemistDlUrl || selected.dlCopyUrl ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            <CheckCircle2 size={10} /> Verified on File
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+                            <AlertTriangle size={10} /> Missing DL Copy
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Existing DL link if present */}
+                      {(chemistDlUrl || selected.dlCopyUrl) && (
+                        <div className="flex items-center justify-between bg-white border border-purple-100 rounded-lg p-2 text-xs">
+                          <div className="flex items-center gap-2 truncate">
+                            <FileCheck size={15} className="text-emerald-600 shrink-0" />
+                            <span className="truncate text-slate-700 font-medium">
+                              {(chemistDlUrl || selected.dlCopyUrl)?.split("/").pop()}
+                            </span>
+                          </div>
+                          <a
+                            href={chemistDlUrl || selected.dlCopyUrl || "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:text-purple-900 hover:underline shrink-0 ml-2"
+                          >
+                            <Eye size={12} /> View Certificate
+                          </a>
+                        </div>
+                      )}
+
+                      {/* Dropzone for Upload or Replace */}
+                      <div className="border-2 border-dashed border-purple-200 hover:border-purple-400 rounded-xl p-3 text-center bg-white transition-colors cursor-pointer relative">
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setChemistDlFile(file);
+                              if (file.type.startsWith("image/")) {
+                                setChemistDlPreview(URL.createObjectURL(file));
+                              } else {
+                                setChemistDlPreview(null);
+                              }
+                            }
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        {chemistDlFile ? (
+                          <div className="flex items-center justify-center gap-2 text-xs font-semibold text-purple-800">
+                            <FileCheck size={16} className="text-emerald-600" />
+                            <span className="truncate max-w-[200px]">{chemistDlFile.name}</span>
+                            <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                              Ready to attach with call
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setChemistDlFile(null);
+                                setChemistDlPreview(null);
+                              }}
+                              className="text-slate-400 hover:text-red-500 ml-1"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <Upload size={16} className="mx-auto text-purple-600" />
+                            <p className="text-xs font-semibold text-purple-900">
+                              {chemistDlUrl || selected.dlCopyUrl ? "Upload New / Replace DL Copy" : "Upload Drug License Copy (PDF / Scan / Photo)"}
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                              Attaching the DL copy automatically verifies this Chemist and synchronizes MR reporting.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {chemistDlPreview && (
+                        <div className="relative rounded-lg overflow-hidden border border-purple-200 max-h-32 mt-2">
+                          <img src={chemistDlPreview} alt="DL Copy Preview" className="w-full h-32 object-cover" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : showAddEntity ? (
             <div className="space-y-3 border border-emerald-200 rounded-xl p-4 bg-emerald-50/40">
@@ -646,6 +891,70 @@ function NewCallForm() {
                   </option>
                 ))}
               </SearchableSelect>
+
+              {entityType === "CHEMIST" && (
+                <div className="space-y-2.5 p-3 bg-purple-50/70 border border-purple-200 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+                      <FileCheck size={14} className="text-purple-700" />
+                      <span>Drug License (DL) Details * (Chemist Only)</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-purple-700 bg-purple-100 border border-purple-300 px-1.5 py-0.5 rounded">Form 20-B / 21-B</span>
+                  </div>
+                  <input
+                    value={newLicenseNo}
+                    onChange={(e) => setNewLicenseNo(e.target.value)}
+                    placeholder="Drug License No. (e.g. DL-20B-TG-2024-8849) *"
+                    className="w-full border border-purple-200 rounded-lg px-3 py-2 text-sm bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-purple-400 outline-none font-mono"
+                  />
+                  <div className="border-2 border-dashed border-purple-200 hover:border-purple-400 rounded-xl p-3 text-center bg-white transition-colors cursor-pointer relative">
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setNewDlCopyFile(file);
+                          if (file.type.startsWith("image/")) {
+                            setNewDlCopyPreview(URL.createObjectURL(file));
+                          } else {
+                            setNewDlCopyPreview(null);
+                          }
+                        }
+                      }}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    {newDlCopyFile ? (
+                      <div className="flex items-center justify-center gap-2 text-xs font-semibold text-purple-800">
+                        <FileCheck size={16} className="text-purple-600" />
+                        <span className="truncate max-w-[200px]">{newDlCopyFile.name}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setNewDlCopyFile(null);
+                            setNewDlCopyPreview(null);
+                          }}
+                          className="text-slate-400 hover:text-red-500 ml-1"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <Upload size={18} className="mx-auto text-purple-600" />
+                        <p className="text-xs font-semibold text-purple-900">Upload Drug License Certificate (PDF or Image)</p>
+                        <p className="text-[10px] text-slate-500">Attach Form 20-B/21-B certificate scan or camera photo</p>
+                      </div>
+                    )}
+                  </div>
+                  {newDlCopyPreview && (
+                    <div className="relative rounded-lg overflow-hidden border border-purple-200 max-h-32">
+                      <img src={newDlCopyPreview} alt="DL Copy Preview" className="w-full h-32 object-cover" />
+                    </div>
+                  )}
+                </div>
+              )}
 
               <p className="text-xs text-slate-500 flex items-center gap-1.5">
                 <MapPin size={12} />
@@ -717,10 +1026,30 @@ function NewCallForm() {
                         setResults([]);
                         setSearch("");
                       }}
-                      className="w-full text-left px-3 py-2.5 text-sm hover:bg-slate-50"
+                      className="w-full text-left px-3 py-2.5 text-sm hover:bg-slate-50 transition-colors"
                     >
-                      <p className="font-semibold text-slate-800">{e.name}</p>
-                      {e.address && <p className="text-xs text-slate-400">{e.address}</p>}
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-semibold text-slate-800">{e.name}</p>
+                        {e.territoryName && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200 px-1.5 py-0.5 rounded shrink-0">
+                            <MapPin size={9} className="text-sky-600" />
+                            {e.territoryName}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                        {e.subArea && (
+                          <span className="text-[10px] font-medium bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200">
+                            {e.subArea}
+                          </span>
+                        )}
+                        {e.beatName && (
+                          <span className="text-[10px] font-medium bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded border border-blue-200">
+                            Beat: {e.beatName}
+                          </span>
+                        )}
+                        {e.address && <span className="text-xs text-slate-400 truncate block max-w-xs">{e.address}</span>}
+                      </div>
                     </button>
                   ))}
                 </div>

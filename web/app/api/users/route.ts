@@ -47,6 +47,7 @@ async function getUsers(req: AuthedRequest) {
         role: true,
         isActive: true,
         deviceUuid: true,
+        assignedTasks: true,
         createdAt: true,
         employee: {
           select: {
@@ -55,6 +56,7 @@ async function getUsers(req: AuthedRequest) {
             lastName: true,
             phone: true,
             managerId: true,
+            assignedTasks: true,
             manager: { select: { id: true, firstName: true, lastName: true, user: { select: { role: true } } } },
             territories: { select: { id: true, name: true, region: true, zone: true } },
           },

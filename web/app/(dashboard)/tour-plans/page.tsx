@@ -772,11 +772,14 @@ export default function TourPlansDashboard() {
                 )}
                 {plans.map((plan) => {
                   const evalData = evaluations.find((e) => e.id === plan.id);
-                  const terrName =
-                    evalData?.territoryName ||
-                    plan.employee?.territories?.map((t: any) => t.name).join(", ") ||
-                    plan.days?.[0]?.territory?.name ||
-                    "General Territory";
+                  const planTerritories: string[] = Array.from(
+                    new Set(
+                      (evalData?.territories?.length ? evalData.territories : plan.days?.map((d: any) => d.territory?.name).filter(Boolean)) ?? []
+                    )
+                  );
+                  const displayTerritories = planTerritories.length > 0 ? planTerritories : [
+                    evalData?.territoryName || plan.employee?.territories?.map((t: any) => t.name).join(", ") || plan.days?.[0]?.territory?.name || "General Territory"
+                  ];
                   const workingDaysCount = evalData?.days.length ?? plan.days.length;
 
                   return (
@@ -790,11 +793,21 @@ export default function TourPlansDashboard() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5">
-                          <MapPin size={14} className="text-sky-500 shrink-0" />
-                          <span className="font-semibold text-slate-800 text-xs">
-                            {terrName}
-                          </span>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex flex-wrap items-center gap-1">
+                            {displayTerritories.slice(0, 2).map((t) => (
+                              <span key={t} className="inline-flex items-center gap-1 font-semibold text-slate-800 text-xs bg-sky-50 text-sky-800 border border-sky-200 px-2 py-0.5 rounded-md">
+                                <MapPin size={11} className="text-sky-500 shrink-0" />
+                                {t}
+                              </span>
+                            ))}
+                            {displayTerritories.length > 2 && (
+                              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200" title={displayTerritories.slice(2).join(", ")}>
+                                +{displayTerritories.length - 2} more
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-medium">Field Visit Territories</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 font-medium text-slate-700">
@@ -1006,11 +1019,19 @@ export default function TourPlansDashboard() {
                   </div>
                 )}
 
-                {selectedEvaluation.territoryName && (
+                {selectedEvaluation.territories && selectedEvaluation.territories.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {selectedEvaluation.territories.map((t) => (
+                      <span key={t} className="inline-flex items-center gap-1 bg-sky-100 text-sky-800 text-xs px-2.5 py-1 rounded-lg font-bold border border-sky-200">
+                        <MapPin size={13} className="text-sky-600" /> {t}
+                      </span>
+                    ))}
+                  </div>
+                ) : selectedEvaluation.territoryName ? (
                   <span className="inline-flex items-center gap-1 bg-sky-100 text-sky-800 text-xs px-2.5 py-1 rounded-lg font-bold border border-sky-200">
                     <MapPin size={13} className="text-sky-600" /> {selectedEvaluation.territoryName}
                   </span>
-                )}
+                ) : null}
                 {/* Real-time Visit Execution Badge */}
                 <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 text-xs px-2.5 py-1 rounded-lg font-bold border border-emerald-200">
                   <CheckCircle2 size={13} className="text-emerald-600" />
@@ -1018,7 +1039,7 @@ export default function TourPlansDashboard() {
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-500 mt-1">
-                <span>Territory: <strong className="text-slate-800">{selectedEvaluation.territoryName || "General"}</strong></span>
+                <span>Field Visit Territories: <strong className="text-slate-800">{selectedEvaluation.territories?.join(", ") || selectedEvaluation.territoryName || "General"}</strong></span>
                 <span>Days Scheduled: <strong>{new Set(selectedEvaluation.days.map((d) => d.date)).size}</strong></span>
                 <span>Doctor Calls: <strong>{selectedEvaluation.summary.totalDoctorCalls}</strong></span>
                 <span>Chemist Calls: <strong className="text-purple-700">{selectedEvaluation.summary.totalChemistCalls || 0}</strong></span>
@@ -1255,20 +1276,24 @@ export default function TourPlansDashboard() {
                         {/* Territory & Beat Details */}
                         <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                           <div className="flex items-center gap-2">
-                            <MapPin size={14} className="text-sky-500" />
+                            <MapPin size={14} className="text-sky-500 shrink-0" />
                             <div>
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-[10px] uppercase font-bold text-slate-400">Territory & Beat</span>
+                                <span className="text-[10px] uppercase font-bold text-sky-800 bg-sky-100 px-1.5 py-0.5 rounded border border-sky-300">
+                                  Field Visit Territory
+                                </span>
                                 {day.beatName && (
                                   <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
                                     {day.beatName}
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-1 mt-0.5">
-                                <span className="font-semibold text-slate-800">{day.territoryName}</span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="font-bold text-slate-900">{day.territoryName}</span>
                                 {day.subArea && (
-                                  <span className="text-slate-500 text-[11px] font-normal">({day.subArea})</span>
+                                  <span className="text-slate-600 text-[11px] font-semibold bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                                    {day.subArea}
+                                  </span>
                                 )}
                               </div>
                             </div>

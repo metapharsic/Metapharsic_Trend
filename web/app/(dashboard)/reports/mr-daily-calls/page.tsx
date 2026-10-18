@@ -33,6 +33,7 @@ import {
   CheckSquare,
   MessageCircle,
   ExternalLink,
+  MapPin,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -89,6 +90,11 @@ export interface GranularCallRow {
   orderConverted: boolean;
   orderValuePtr: number;
   orderItemsCount: number;
+  area?: string | null;
+  subArea?: string | null;
+  beatName?: string | null;
+  territory?: string | null;
+  address?: string | null;
 }
 
 export interface DayGroup {
@@ -195,6 +201,9 @@ async function exportProfessionalExcel(mrs: MrGroup[], startDate: string, endDat
     "Customer / Account Name",
     "Customer Type",
     "Specialty",
+    "Territory",
+    "Visited Locality / Area",
+    "Beat / Route",
     "Call Purpose",
     "Doctor Detailing Comments & Feedback",
     "Receptiveness",
@@ -240,6 +249,9 @@ async function exportProfessionalExcel(mrs: MrGroup[], startDate: string, endDat
           c.entityName,
           c.entityType,
           c.specialty || "—",
+          c.territory || "—",
+          c.subArea || c.area || "—",
+          c.beatName || "—",
           c.purpose,
           c.comments || c.feedback || "Standard detailing conducted",
           c.receptiveness || "STANDARD",
@@ -536,7 +548,7 @@ export default function MrDailyCallsReportPage() {
   const [activeTab, setActiveTab] = useState<"logs" | "coverage" | "quality" | "commercial" | "council">("logs");
   const [expandedMrs, setExpandedMrs] = useState<Record<string, boolean>>({});
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
-  const [showAgentPanel, setShowAgentPanel] = useState(true);
+  const [showAgentPanel, setShowAgentPanel] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const fetchReport = useCallback(() => {
@@ -1008,11 +1020,24 @@ export default function MrDailyCallsReportPage() {
                                         <td className="px-5 py-3 font-bold text-slate-900">
                                           <div>
                                             <span>{c.entityName}</span>
-                                            {c.specialty && (
-                                              <span className="block text-[10px] text-slate-400 font-normal">
-                                                {c.specialty}
-                                              </span>
-                                            )}
+                                            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                              {(c.subArea || c.area) && (
+                                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[9px] border border-emerald-200">
+                                                  <MapPin size={9} />
+                                                  {c.subArea || c.area}
+                                                </span>
+                                              )}
+                                              {c.beatName && (
+                                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium text-[9px] border border-blue-200">
+                                                  Beat: {c.beatName}
+                                                </span>
+                                              )}
+                                              {c.specialty && (
+                                                <span className="text-[10px] text-slate-400 font-normal">
+                                                  {c.specialty}
+                                                </span>
+                                              )}
+                                            </div>
                                           </div>
                                         </td>
                                         <td className="px-4 py-3">

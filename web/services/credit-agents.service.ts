@@ -23,6 +23,8 @@ export interface ChemistAgingBreakdown {
   chemistName: string;
   billingName: string | null;
   address: string | null;
+  subArea?: string | null;
+  beatName?: string | null;
   phone: string | null;
   territoryName: string;
   mrName: string;
@@ -375,6 +377,8 @@ export class CreditAgentsService {
         chemistName: c.name,
         billingName: c.billingName,
         address: c.address,
+        subArea: c.subArea,
+        beatName: c.beatName,
         phone: c.mobile,
         territoryName,
         mrName,

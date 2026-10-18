@@ -19,7 +19,18 @@ async function getCollections(req: AuthedRequest) {
     const [collections, total] = await Promise.all([
       db.collection.findMany({
         where: { employeeId: employee.id },
-        include: { chemist: { select: { id: true, name: true } } },
+        include: {
+          chemist: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              subArea: true,
+              beatName: true,
+              territory: { select: { id: true, name: true } },
+            },
+          },
+        },
         orderBy: { createdAt: "desc" },
         take: 100,
       }),

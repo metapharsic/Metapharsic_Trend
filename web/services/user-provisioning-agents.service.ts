@@ -35,6 +35,7 @@ export interface ProvisionUserPayload {
   territoryIds?: string[];
   isActive?: boolean;
   resetDeviceUuid?: boolean;
+  assignedTasks?: string[] | string | null;
 }
 
 /**
@@ -196,6 +197,7 @@ export class UserProvisioningAgentsService {
       territoryIds?: string[];
       isActive?: boolean;
       resetDeviceUuid?: boolean;
+      assignedTasks?: string[] | string | null;
     }
   ) {
     if (payload.password !== undefined && payload.password.trim() !== "") {
@@ -251,19 +253,32 @@ export class UserProvisioningAgentsService {
         userUpdates.passwordHash = await bcrypt.hash(payload.password.trim(), 12);
       }
 
-      // 6. Apply user updates
+      // 6. Assigned operational task roles
+      if (payload.assignedTasks !== undefined) {
+        const tasksStr = Array.isArray(payload.assignedTasks)
+          ? JSON.stringify(payload.assignedTasks)
+          : payload.assignedTasks;
+        userUpdates.assignedTasks = tasksStr;
+      }
+
+      // 7. Apply user updates
       const updatedUser = await tx.user.update({
         where: { id: userId },
         data: userUpdates,
       });
 
-      // 7. Update Employee profile & link territories
+      // 8. Update Employee profile & link territories
       let employee = existingUser.employee;
       if (employee) {
         const employeeUpdates: Prisma.EmployeeUpdateInput = {};
         if (payload.firstName !== undefined) employeeUpdates.firstName = payload.firstName.trim();
         if (payload.lastName !== undefined) employeeUpdates.lastName = payload.lastName.trim();
         if (payload.phone !== undefined) employeeUpdates.phone = payload.phone.trim();
+        if (payload.assignedTasks !== undefined) {
+          employeeUpdates.assignedTasks = Array.isArray(payload.assignedTasks)
+            ? JSON.stringify(payload.assignedTasks)
+            : payload.assignedTasks;
+        }
         if (payload.managerId !== undefined) {
           employeeUpdates.manager = payload.managerId ? { connect: { id: payload.managerId } } : { disconnect: true };
         }

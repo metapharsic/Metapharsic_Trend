@@ -98,6 +98,22 @@ interface CallItem {
   employeeName: string;
   employeePhone: string | null;
   territory: string;
+  area?: string | null;
+  subArea?: string | null;
+  beatName?: string | null;
+  address?: string | null;
+}
+
+export interface AreaBreakdownItem {
+  area: string;
+  territory: string;
+  totalCalls: number;
+  doctorCalls: number;
+  chemistCalls: number;
+  hospitalCalls: number;
+  boxesPlaced: number;
+  samplesCount: number;
+  avgCqsScore: number | null;
 }
 
 export interface DealOpportunity {
@@ -197,6 +213,7 @@ interface CallReport {
     recommendations: string[];
   };
   mrBreakdown?: MrBreakdownItem[];
+  areaBreakdown?: AreaBreakdownItem[];
   byDay: Record<string, number>;
   dealClosureSummary?: DealClosureSummary;
   calls: CallItem[];
@@ -230,8 +247,10 @@ export default function MrReportsPage() {
   const [selectedRep, setSelectedRep] = useState<string>("");
 
   // Filters for Calls Log Tab
+  const [showAuditSuiteTelemetry, setShowAuditSuiteTelemetry] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [targetTypeFilter, setTargetTypeFilter] = useState<"ALL" | "DOCTOR" | "CHEMIST" | "HOSPITAL">("ALL");
+  const [areaFilter, setAreaFilter] = useState<string>("ALL");
 
   // Filters for Deal Closure Tab
   const [closureTierFilter, setClosureTierFilter] = useState<"ALL" | "HIGH" | "MEDIUM" | "LOW">("ALL");
@@ -288,18 +307,21 @@ export default function MrReportsPage() {
     if (!report?.calls) return [];
     return report.calls.filter((c) => {
       if (targetTypeFilter !== "ALL" && c.targetType !== targetTypeFilter) return false;
+      if (areaFilter !== "ALL" && c.area !== areaFilter && c.subArea !== areaFilter && c.territory !== areaFilter) return false;
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchesName = c.name.toLowerCase().includes(query);
         const matchesMR = c.employeeName.toLowerCase().includes(query);
         const matchesTerritory = c.territory.toLowerCase().includes(query);
+        const matchesArea = (c.area || c.subArea || "").toLowerCase().includes(query);
+        const matchesBeat = (c.beatName || "").toLowerCase().includes(query);
         const matchesPurpose = c.purpose.toLowerCase().includes(query);
         const matchesComments = (c.comments || c.feedback || "").toLowerCase().includes(query);
-        return matchesName || matchesMR || matchesTerritory || matchesPurpose || matchesComments;
+        return matchesName || matchesMR || matchesTerritory || matchesArea || matchesBeat || matchesPurpose || matchesComments;
       }
       return true;
     });
-  }, [report, targetTypeFilter, searchQuery]);
+  }, [report, targetTypeFilter, areaFilter, searchQuery]);
 
   // Filtered Deal Opportunities for Tab 2
   const filteredOpportunities = useMemo(() => {
@@ -455,6 +477,8 @@ export default function MrReportsPage() {
       "Target Type",
       "Specialty / Category",
       "Territory",
+      "Visited Locality / Area",
+      "Beat / Route",
       "Field Representative",
       "Purpose of Visit",
       "MR Field Comments & Response",
@@ -473,6 +497,8 @@ export default function MrReportsPage() {
       c.targetType,
       c.specialty || "—",
       c.territory,
+      c.subArea || c.area || "—",
+      c.beatName || "—",
       c.employeeName,
       c.purpose,
       c.comments || c.feedback || "Standard detailing conducted",
@@ -555,10 +581,12 @@ export default function MrReportsPage() {
       <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6 md:p-8 text-white shadow-xl border border-indigo-900/50">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold border border-indigo-500/30">
-              <Cpu className="h-3.5 w-3.5 text-indigo-400" />
-              <span>Multi-Agent Field Force Intelligence &amp; DCR Audit Suite</span>
-            </div>
+            {showAuditSuiteTelemetry && (
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold border border-indigo-500/30">
+                <Cpu className="h-3.5 w-3.5 text-indigo-400" />
+                <span>Multi-Agent Field Force Intelligence &amp; DCR Audit Suite</span>
+              </div>
+            )}
             <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white flex items-center gap-2.5">
               <span>All MRs — Call Reports &amp; Deal Closures</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold uppercase tracking-wider">
@@ -566,11 +594,26 @@ export default function MrReportsPage() {
               </span>
             </h1>
             <p className="text-xs md:text-sm text-slate-300 max-w-3xl leading-relaxed">
-              Exhaustive field detailing audit, MR visit comments, CQS scores, and multi-agent deal closure intelligence guiding top priority follow-ups.
+              Exhaustive field detailing audit, MR visit comments, CQS scores, and deal closure intelligence guiding top priority follow-ups.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            {report?.multiAgentEvaluation && (
+              <button
+                type="button"
+                onClick={() => setShowAuditSuiteTelemetry((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 px-3.5 py-2.5 text-xs font-semibold border border-slate-700 transition"
+                title="Toggle Multi-Agent Field Force Intelligence & DCR Audit Suite Telemetry"
+              >
+                <Cpu className="h-3.5 w-3.5 text-indigo-400" />
+                <span>{showAuditSuiteTelemetry ? "Hide Audit Suite" : "Audit Suite"}</span>
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-500/40">
+                  {report.multiAgentEvaluation.overallGrade}
+                </span>
+              </button>
+            )}
+
             <button
               onClick={fetchReport}
               disabled={loading}
@@ -601,8 +644,8 @@ export default function MrReportsPage() {
           </div>
         </div>
 
-        {/* Multi-Agent Council Aggregate Score Ribbon */}
-        {report?.multiAgentEvaluation && (
+        {/* Multi-Agent Council Aggregate Score Ribbon (Hidden by default, toggleable on demand) */}
+        {showAuditSuiteTelemetry && report?.multiAgentEvaluation && (
           <div className="mt-6 pt-5 border-t border-indigo-800/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div
@@ -798,6 +841,28 @@ export default function MrReportsPage() {
                       </button>
                     ))}
                   </div>
+
+                  {/* Visited Area Filter */}
+                  {report?.areaBreakdown && report.areaBreakdown.length > 0 && (
+                    <div className="flex items-center gap-2 w-full lg:w-auto">
+                      <div className="flex items-center gap-1 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                        <MapPin className="h-3.5 w-3.5 text-emerald-500" />
+                        <span>Visited Area:</span>
+                      </div>
+                      <select
+                        value={areaFilter}
+                        onChange={(e) => setAreaFilter(e.target.value)}
+                        className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs px-3 py-1.5 font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 max-w-[260px] truncate"
+                      >
+                        <option value="ALL">All Visited Areas ({report.areaBreakdown.length} Localities)</option>
+                        {report.areaBreakdown.map((ab) => (
+                          <option key={ab.area} value={ab.area}>
+                            {ab.area} ({ab.territory}) — {ab.totalCalls} calls
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 {/* Search Bar */}
@@ -867,6 +932,64 @@ export default function MrReportsPage() {
                   tone="teal"
                 />
               </div>
+
+              {/* ── VISITED LOCALITIES & AREAS SEGREGATION BREAKDOWN ─────── */}
+              {report.areaBreakdown && report.areaBreakdown.length > 0 && (
+                <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden space-y-3 p-4 md:p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                        Visited Localities &amp; Beat Coverage Breakdown ({report.areaBreakdown.length} Active Localities):
+                      </h3>
+                    </div>
+                    {areaFilter !== "ALL" && (
+                      <button
+                        onClick={() => setAreaFilter("ALL")}
+                        className="text-xs text-emerald-600 dark:text-emerald-400 font-bold hover:underline self-start sm:self-auto cursor-pointer"
+                      >
+                        Reset Filter (Selected: {areaFilter})
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-72 overflow-y-auto pr-1">
+                    {report.areaBreakdown.map((ab) => {
+                      const isSelected = areaFilter === ab.area;
+                      return (
+                        <button
+                          key={ab.area}
+                          type="button"
+                          onClick={() => setAreaFilter(isSelected ? "ALL" : ab.area)}
+                          className={`text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                            isSelected
+                              ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 shadow-sm ring-1 ring-emerald-500"
+                              : "bg-slate-50/70 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700/60"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-1 mb-1">
+                            <span className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                              {ab.area}
+                            </span>
+                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 shrink-0">
+                              {ab.totalCalls}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate mb-1.5">
+                            📍 {ab.territory}
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] text-slate-600 dark:text-slate-300">
+                            <span>🩺 {ab.doctorCalls} Dr</span>
+                            <span>🏬 {ab.chemistCalls} Ch</span>
+                            {ab.boxesPlaced > 0 && <span>📦 {ab.boxesPlaced}</span>}
+                            {ab.avgCqsScore && <span className="ml-auto font-bold text-emerald-600">★ {ab.avgCqsScore.toFixed(1)}</span>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* ── FLEET MR BREAKDOWN ROSTER (WHEN VIEWING ALL MRS) ─────── */}
               {!selectedRep && report.mrBreakdown && report.mrBreakdown.length > 0 && (
@@ -1013,10 +1136,23 @@ export default function MrReportsPage() {
                             </td>
                             <td className="px-4 py-3">
                               <span className="font-bold text-slate-900 dark:text-white block">{c.name}</span>
-                              <span className="text-[10px] text-slate-400">
-                                {c.specialty ? `${c.specialty} • ` : ""}
-                                {c.territory}
-                              </span>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                {(c.subArea || c.area) && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold text-[10px] border border-emerald-200 dark:border-emerald-800/50">
+                                    <MapPin className="h-2.5 w-2.5" />
+                                    {c.subArea || c.area}
+                                  </span>
+                                )}
+                                {c.beatName && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-medium text-[9px] border border-blue-200 dark:border-blue-800/50">
+                                    Beat: {c.beatName}
+                                  </span>
+                                )}
+                                <span className="text-[10px] text-slate-400">
+                                  {c.specialty ? `${c.specialty} • ` : ""}
+                                  {c.territory}
+                                </span>
+                              </div>
                             </td>
                             {!selectedRep && reps.length > 0 && (
                               <td className="px-4 py-3">

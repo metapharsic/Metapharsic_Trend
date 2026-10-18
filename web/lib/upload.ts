@@ -133,3 +133,43 @@ export function dmsUrl(relativePath: string): string {
   return relativePath;
 }
 
+const DRUG_LICENSE_ROOT = path.join(process.cwd(), "public", "uploads", "drug_licenses");
+
+type DrugLicenseUploadResult =
+  | { ok: true; result: { relativePath: string; fileName: string } }
+  | { ok: false; error: { message: string } };
+
+export async function saveDrugLicenseFile(file: File, chemistId: string): Promise<DrugLicenseUploadResult> {
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    return { ok: false, error: { message: "Drug License file exceeds maximum allowed size of 10MB" } };
+  }
+
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+  if (!allowedTypes.includes(file.type)) {
+    return { ok: false, error: { message: "Unsupported format. Use JPEG, PNG, WebP, or PDF for Drug License Copy" } };
+  }
+
+  const ext = file.type === "application/pdf" ? "pdf" : file.type.split("/")[1] === "jpeg" ? "jpg" : file.type.split("/")[1];
+  const storedFileName = `dl_${chemistId}_${Date.now()}.${ext}`;
+  const destination = path.join(DRUG_LICENSE_ROOT, storedFileName);
+
+  await mkdir(DRUG_LICENSE_ROOT, { recursive: true });
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await writeFile(destination, buffer);
+
+  return {
+    ok: true,
+    result: {
+      relativePath: `/uploads/drug_licenses/${storedFileName}`,
+      fileName: storedFileName,
+    },
+  };
+}
+
+export function drugLicenseUrl(relativePath?: string | null): string | null {
+  if (!relativePath) return null;
+  if (relativePath.startsWith("/") || relativePath.startsWith("http") || relativePath.startsWith("data:")) {
+    return relativePath;
+  }
+  return `/uploads/drug_licenses/${relativePath.split(path.sep).join("/")}`;
+}

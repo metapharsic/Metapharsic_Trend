@@ -80,6 +80,7 @@ model User {
   lockedAt       DateTime?
   lockedReason   String?
   anomalyReviews AnomalyReview[]
+  assignedTasks  String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   employee       Employee?
@@ -95,6 +96,7 @@ model Employee {
   lastName          String
   phone             String
   managerId         String?
+  assignedTasks     String?
   manager           Employee?         @relation("ManagerToSubordinates", fields: [managerId], references: [id])
   subordinates      Employee[]        @relation("ManagerToSubordinates")
   territories       Territory[]
@@ -249,6 +251,9 @@ model Chemist {
   territoryId   String
   territory     Territory    @relation(fields: [territoryId], references: [id])
   licenseNo     String?
+  dlCopyUrl     String?
+  dlExpiryDate  DateTime?
+  dlStatus      String?      @default("VERIFIED")
   type          String       @default("RETAIL")
   mobile        String?
   email         String?

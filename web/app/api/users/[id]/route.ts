@@ -23,6 +23,7 @@ const UpdateUserSchema = z.object({
     .pipe(z.string().min(6).optional()),
   managerId: z.string().uuid().nullable().optional(),
   territoryIds: z.array(z.string().uuid()).optional(),
+  assignedTasks: z.union([z.array(z.string()), z.string()]).nullable().optional(),
 });
 
 async function getUser(req: AuthedRequest, context: { params: Record<string, string | string[] | undefined> }) {
@@ -38,6 +39,7 @@ async function getUser(req: AuthedRequest, context: { params: Record<string, str
             lastName: true,
             phone: true,
             managerId: true,
+            assignedTasks: true,
             manager: {
               select: {
                 firstName: true,
@@ -88,6 +90,7 @@ async function updateUser(req: AuthedRequest, context: { params: Record<string, 
       delete updateData.isActive;
       delete updateData.managerId;
       delete updateData.territoryIds;
+      delete updateData.assignedTasks;
     }
 
     const user = await UserProvisioningAgentsService.updateUserDetails(id, updateData);

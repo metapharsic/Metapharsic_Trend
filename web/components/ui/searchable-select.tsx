@@ -473,7 +473,9 @@ export function SearchableSelect({
             {filteredOptions.length === 0 ? (
               <div className="py-6 px-4 text-center">
                 <p className="text-xs text-slate-500 font-medium">
-                  No matches for &ldquo;{searchTerm}&rdquo;
+                  {allOptions.length === 0
+                    ? "No options available"
+                    : `No matches for "${searchTerm}"`}
                 </p>
                 {searchTerm && (
                   <button

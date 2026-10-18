@@ -205,7 +205,17 @@ async function getInvoices(req: AuthedRequest) {
             select: {
               id: true,
               status: true,
-              chemist: { select: { id: true, name: true } },
+              chemist: {
+                select: {
+                  id: true,
+                  name: true,
+                  address: true,
+                  subArea: true,
+                  beatName: true,
+                  territoryId: true,
+                  territory: { select: { id: true, name: true } },
+                },
+              },
               distributor: { select: { id: true, name: true } },
               items: { select: PROFIT_ITEM_SELECT },
             },

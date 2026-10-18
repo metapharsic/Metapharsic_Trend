@@ -30,10 +30,17 @@ import {
   Layers,
   Activity,
   UserCheck,
+  Navigation,
+  FileText,
+  FileCheck,
+  Upload,
+  Download,
+  ExternalLink,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { LicenseAutoFill } from "@/components/entities/license-autofill";
 import { SearchableSelect } from "@/components/searchable-select";
+import { MrClientDlUploadModal } from "@/components/mr/mr-client-dl-upload-modal";
 
 type EntityType = "DOCTOR" | "CHEMIST" | "DISTRIBUTOR" | "HOSPITAL" | "EMPLOYEE";
 
@@ -44,6 +51,10 @@ interface Row {
   address: string | null;
   territoryId: string | null;
   territoryName?: string;
+  subArea?: string | null;
+  beatName?: string | null;
+  visitsCount?: number;
+  ordersCount?: number;
   primarySpecialty?: string;
   secondarySpecialty?: string | null;
   qualification?: string | null;
@@ -61,6 +72,9 @@ interface Row {
   billingName?: string | null;
   gstNo?: string | null;
   licenseNo?: string | null;
+  dlCopyUrl?: string | null;
+  dlExpiryDate?: string | null;
+  dlStatus?: string | null;
   dpsScore?: number;
   dpsTier?: string;
   subType?: string;
@@ -97,6 +111,12 @@ interface MultiAgentAudit {
     governanceStatus: string;
     userRole: string;
     summary: string;
+  };
+  chemistDlCompliance?: {
+    totalChemists: number;
+    chemistsWithDl: number;
+    complianceRate: string;
+    missingDlCount: number;
   };
 }
 
@@ -142,6 +162,18 @@ const SPECIALTY_OPTIONS = [
 
 const EMPLOYEE_ROLE_OPTIONS = ["MR", "ASM", "RM", "ZSM", "NSM", "ADMIN"];
 const CHEMIST_TYPE_OPTIONS = ["RETAIL", "WHOLESALE", "HOSPITAL_PHARMACY"];
+const OFFICIAL_BEATS = [
+  "HYD-BEAT-1",
+  "HYD-BEAT-2",
+  "HYD-BEAT-3",
+  "HYD-BEAT-4",
+  "HYD-BEAT-5",
+  "HYD-BEAT-6",
+  "HYD-BEAT-7",
+  "HYD-BEAT-8",
+  "HYD-BEAT-9",
+  "HYD-BEAT-10",
+];
 
 export default function MasterProfiles() {
   const [activeTab, setActiveTab] = useState<EntityType>("DOCTOR");
@@ -149,6 +181,7 @@ export default function MasterProfiles() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedTerritory, setSelectedTerritory] = useState("");
+  const [selectedBeat, setSelectedBeat] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("");
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [multiAgentAudit, setMultiAgentAudit] = useState<MultiAgentAudit | null>(null);
@@ -163,6 +196,8 @@ export default function MasterProfiles() {
   const [deleteRow, setDeleteRow] = useState<Row | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [previewDlRow, setPreviewDlRow] = useState<Row | null>(null);
+  const [quickUploadChemist, setQuickUploadChemist] = useState<Row | null>(null);
 
   useEffect(() => {
     setRole(decodeRole());
@@ -192,6 +227,7 @@ export default function MasterProfiles() {
           type: activeTab,
           search: search || undefined,
           territoryId: selectedTerritory || undefined,
+          beatName: selectedBeat || undefined,
           filter: selectedFilter || undefined,
           limit: 100,
         },
@@ -211,7 +247,7 @@ export default function MasterProfiles() {
       loadEntities();
     }, 200);
     return () => clearTimeout(timer);
-  }, [activeTab, search, selectedTerritory, selectedFilter]);
+  }, [activeTab, search, selectedTerritory, selectedBeat, selectedFilter]);
 
   // View full 360 dossier
   const handleView = async (row: Row) => {
@@ -254,10 +290,11 @@ export default function MasterProfiles() {
   const clearFilters = () => {
     setSearch("");
     setSelectedTerritory("");
+    setSelectedBeat("");
     setSelectedFilter("");
   };
 
-  const hasActiveFilters = Boolean(search || selectedTerritory || selectedFilter);
+  const hasActiveFilters = Boolean(search || selectedTerritory || selectedBeat || selectedFilter);
 
   return (
     <div className="space-y-6">
@@ -339,13 +376,19 @@ export default function MasterProfiles() {
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-slate-700">FINANCE_ACCOUNTS_AGENT</span>
+              <span className="text-xs font-bold text-slate-700">
+                {activeTab === "CHEMIST" ? "DRUG_LICENSE_COMPLIANCE" : "FINANCE_ACCOUNTS_AGENT"}
+              </span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">
-                {multiAgentAudit?.financeAccountsAgent.complianceRate ?? "97.2%"}
+                {activeTab === "CHEMIST" && multiAgentAudit?.chemistDlCompliance
+                  ? multiAgentAudit.chemistDlCompliance.complianceRate
+                  : (multiAgentAudit?.financeAccountsAgent.complianceRate ?? "97.2%")}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              {multiAgentAudit?.financeAccountsAgent.summary ?? "GSTIN & credit limit boundaries enforced"}
+              {activeTab === "CHEMIST" && multiAgentAudit?.chemistDlCompliance
+                ? `${multiAgentAudit.chemistDlCompliance.chemistsWithDl} of ${multiAgentAudit.chemistDlCompliance.totalChemists} Chemists DL verified (${multiAgentAudit.chemistDlCompliance.missingDlCount} missing)`
+                : (multiAgentAudit?.financeAccountsAgent.summary ?? "GSTIN & credit limit boundaries enforced")}
             </p>
           </div>
         </div>
@@ -409,7 +452,7 @@ export default function MasterProfiles() {
           </div>
 
           {/* Territory Filter */}
-          <div className="min-w-[180px]">
+          <div className="min-w-[170px]">
             <SearchableSelect
               value={selectedTerritory}
               onChange={(e) => setSelectedTerritory(e.target.value)}
@@ -422,16 +465,32 @@ export default function MasterProfiles() {
             />
           </div>
 
+          {/* Beat Territory Filter */}
+          <div className="min-w-[160px]">
+            <SearchableSelect
+              value={selectedBeat}
+              onChange={(e) => setSelectedBeat(e.target.value)}
+              className="w-full text-sm border border-slate-200 rounded-xl bg-white shadow-sm text-slate-700"
+              placeholder="All 10 Beats"
+              options={[
+                { value: "", label: "All 10 Beats" },
+                ...OFFICIAL_BEATS.map((b) => ({ value: b, label: b }))
+              ]}
+            />
+          </div>
+
           {/* Dynamic Tab-Specific Filter */}
           {activeTab === "DOCTOR" && (
-            <div className="min-w-[170px]">
+            <div className="min-w-[190px]">
               <SearchableSelect
                 value={selectedFilter}
                 onChange={(e) => setSelectedFilter(e.target.value)}
                 className="w-full text-sm border border-slate-200 rounded-xl bg-white shadow-sm text-slate-700"
-                placeholder="All Specialties"
+                placeholder="All Specialties / Gaps"
                 options={[
                   { value: "", label: "All Specialties" },
+                  { value: "UNVISITED", label: "⚠️ Unvisited Doctors (Gap)" },
+                  { value: "NO_ORDERS", label: "⚠️ Zero Orders Prescribers" },
                   ...SPECIALTY_OPTIONS.map((spec) => ({ value: spec, label: spec }))
                 ]}
               />
@@ -439,14 +498,18 @@ export default function MasterProfiles() {
           )}
 
           {activeTab === "CHEMIST" && (
-            <div className="min-w-[160px]">
+            <div className="min-w-[190px]">
               <SearchableSelect
                 value={selectedFilter}
                 onChange={(e) => setSelectedFilter(e.target.value)}
                 className="w-full text-sm border border-slate-200 rounded-xl bg-white shadow-sm text-slate-700"
-                placeholder="All Chemist Types"
+                placeholder="All Types / Gaps"
                 options={[
-                  { value: "", label: "All Chemist Types" },
+                  { value: "", label: "All Chemist Types / Compliance" },
+                  { value: "DL_UPLOADED", label: "📄 With DL Copy (Verified)" },
+                  { value: "DL_MISSING", label: "⚠️ Missing DL Copy (Action Required)" },
+                  { value: "UNVISITED", label: "⚠️ Unvisited Chemists (Gap)" },
+                  { value: "NO_ORDERS", label: "⚠️ Zero Orders Booked (Gap)" },
                   ...CHEMIST_TYPE_OPTIONS.map((t) => ({ value: t, label: t }))
                 ]}
               />
@@ -511,7 +574,7 @@ export default function MasterProfiles() {
                   <th className="px-6 py-3 font-semibold">Contact & Channel</th>
                   <th className="px-6 py-3 font-semibold">Territory & Address</th>
                   {activeTab === "DOCTOR" && <th className="px-6 py-3 font-semibold">DPS Score / Tier</th>}
-                  {activeTab === "CHEMIST" && <th className="px-6 py-3 font-semibold">License / GSTIN</th>}
+                  {activeTab === "CHEMIST" && <th className="px-6 py-3 font-semibold">Drug License & DL Copy</th>}
                   {activeTab === "DISTRIBUTOR" && <th className="px-6 py-3 font-semibold">GSTIN / License</th>}
                   {activeTab === "HOSPITAL" && <th className="px-6 py-3 font-semibold">Beds / Depts</th>}
                   {activeTab === "EMPLOYEE" && <th className="px-6 py-3 font-semibold">Role / Status</th>}
@@ -571,8 +634,17 @@ export default function MasterProfiles() {
 
                     {/* Territory & Address */}
                     <td className="px-6 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <MapPin size={13} className="text-teal-600 shrink-0" />
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {row.beatName && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200/60 flex items-center gap-1">
+                            <Navigation size={9} /> {row.beatName}
+                          </span>
+                        )}
+                        {row.subArea && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 flex items-center gap-1">
+                            <MapPin size={9} /> {row.subArea}
+                          </span>
+                        )}
                         <span className="text-xs font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md">
                           {row.territoryName || "General Territory"}
                         </span>
@@ -580,6 +652,13 @@ export default function MasterProfiles() {
                       <p className="text-xs text-slate-500 truncate max-w-xs mt-1" title={row.address ?? ""}>
                         {row.address || "—"}
                       </p>
+                      {(row.visitsCount != null || row.ordersCount != null) && (
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-1 font-medium">
+                          <span>{row.visitsCount ?? 0} visits</span>
+                          <span>·</span>
+                          <span>{row.ordersCount ?? 0} orders</span>
+                        </div>
+                      )}
                     </td>
 
                     {/* Dynamic Metrics Columns */}
@@ -596,8 +675,31 @@ export default function MasterProfiles() {
 
                     {activeTab === "CHEMIST" && (
                       <td className="px-6 py-3.5">
-                        <p className="text-xs font-mono text-slate-800 font-semibold">{row.licenseNo || "No DL"}</p>
-                        <p className="text-[11px] font-mono text-slate-400 mt-0.5">{row.gstNo || "No GSTIN"}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-mono text-slate-800 font-bold">{row.licenseNo || "No DL No"}</span>
+                          {row.dlCopyUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewDlRow(row)}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer"
+                              title="Click to view verified Drug License copy"
+                            >
+                              <FileCheck size={11} className="text-emerald-600" />
+                              <span>DL Verified</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setQuickUploadChemist(row)}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+                              title="Drug license copy missing. Click to upload now."
+                            >
+                              <Upload size={10} className="text-amber-600" />
+                              <span>Upload DL</span>
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-[11px] font-mono text-slate-400 mt-1">{row.gstNo ? `GST: ${row.gstNo}` : "No GSTIN"}</p>
                       </td>
                     )}
 
@@ -780,6 +882,30 @@ export default function MasterProfiles() {
           </div>
         </div>
       )}
+
+      {/* 5. Chemist DL Copy Preview Modal */}
+      {previewDlRow && (
+        <DlCopyPreviewModal
+          row={previewDlRow}
+          onClose={() => setPreviewDlRow(null)}
+          onReplace={() => {
+            const target = previewDlRow;
+            setPreviewDlRow(null);
+            setQuickUploadChemist(target);
+          }}
+        />
+      )}
+
+      {/* 6. Chemist Multi-Agent DL Upload & Autonomous Council Certification Modal */}
+      <MrClientDlUploadModal
+        isOpen={Boolean(quickUploadChemist)}
+        preselectedChemistId={quickUploadChemist?.id}
+        onClose={() => setQuickUploadChemist(null)}
+        onSuccess={() => {
+          setQuickUploadChemist(null);
+          loadEntities();
+        }}
+      />
     </div>
   );
 }
@@ -824,10 +950,22 @@ function ViewDossierModal({
                   {row.type}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
-                <MapPin size={12} className="text-teal-600" />
-                Territory: <span className="font-semibold text-slate-700">{data.territory?.name || data.territoryName || "Assigned Territory"}</span>
-              </p>
+              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                {(data.beatName || row.beatName) && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200/60 flex items-center gap-1">
+                    <Navigation size={9} /> {data.beatName || row.beatName}
+                  </span>
+                )}
+                {(data.subArea || row.subArea) && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 flex items-center gap-1">
+                    <MapPin size={9} /> {data.subArea || row.subArea}
+                  </span>
+                )}
+                <span className="text-xs text-slate-500 font-semibold flex items-center gap-1">
+                  <MapPin size={11} className="text-teal-600" />
+                  {data.territory?.name || data.territoryName || "Assigned Territory"}
+                </span>
+              </div>
             </div>
           </div>
           <button
@@ -947,10 +1085,36 @@ function ViewDossierModal({
 
                     {row.type === "CHEMIST" && (
                       <>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between items-center">
                           <span className="text-slate-400">Drug License (DL):</span>
                           <span className="font-mono text-slate-800 font-semibold">{data.licenseNo || "No DL recorded"}</span>
                         </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400">DL Certificate Copy:</span>
+                          {data.dlCopyUrl ? (
+                            <a
+                              href={data.dlCopyUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 hover:bg-emerald-100 transition-colors"
+                            >
+                              <FileCheck size={12} className="text-emerald-600" />
+                              <span>DL Verified (View Copy)</span>
+                            </a>
+                          ) : (
+                            <span className="text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px] font-semibold flex items-center gap-1">
+                              <AlertTriangle size={12} className="text-amber-600" /> Missing Copy
+                            </span>
+                          )}
+                        </div>
+                        {data.dlExpiryDate && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400">DL Expiry Date:</span>
+                            <span className="text-slate-700 text-xs font-medium">
+                              {new Date(data.dlExpiryDate).toLocaleDateString("en-IN")}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex justify-between">
                           <span className="text-slate-400">Contact Person:</span>
                           <span className="font-semibold text-slate-800">{data.contactPerson || "Owner"}</span>
@@ -1154,6 +1318,9 @@ function AppendEntityModal({
   const [departments, setDepartments] = useState("");
   const [bedStrength, setBedStrength] = useState("");
   const [purchaseManager, setPurchaseManager] = useState("");
+  // Chemist DL Copy upload
+  const [dlCopyFile, setDlCopyFile] = useState<File | null>(null);
+  const [dlCopyPreview, setDlCopyPreview] = useState<string | null>(null);
   // Employee fields
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -1181,6 +1348,17 @@ function AppendEntityModal({
 
     setSubmitting(true);
     try {
+      let uploadedDlUrl: string | undefined = undefined;
+      if (type === "CHEMIST" && dlCopyFile) {
+        const form = new FormData();
+        form.append("file", dlCopyFile);
+        if (licenseNo.trim()) form.append("licenseNo", licenseNo.trim());
+        const upRes = await apiClient.post("/api/mr/chemists/upload-dl", form, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        uploadedDlUrl = upRes.data.data.dlCopyUrl;
+      }
+
       await apiClient.post("/api/manager/entities", {
         name: type === "EMPLOYEE" ? `${firstName.trim()} ${lastName.trim()}` : name.trim(),
         type,
@@ -1204,6 +1382,7 @@ function AppendEntityModal({
               billingName: billingName.trim() || undefined,
               gstNo: gstNo.trim() || undefined,
               licenseNo: licenseNo.trim() || undefined,
+              dlCopyUrl: uploadedDlUrl || undefined,
               creditLimit: creditLimit.trim() ? Number(creditLimit) : undefined,
               whatsApp: whatsApp.trim() || undefined,
             }
@@ -1543,6 +1722,65 @@ function AppendEntityModal({
                     </div>
                   </div>
 
+                  {/* Drug License Copy Upload (Chemist Only) */}
+                  <div className="space-y-1.5 p-3.5 bg-purple-50/50 border border-purple-200/80 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+                        <FileCheck size={14} className="text-purple-700" />
+                        <span>Drug License Copy * (Form 20-B / 21-B Certificate)</span>
+                      </label>
+                      <span className="text-[10px] font-bold text-purple-700 bg-purple-100 border border-purple-300 px-1.5 py-0.5 rounded">
+                        Mandatory for Chemist
+                      </span>
+                    </div>
+                    <div className="border-2 border-dashed border-purple-200 hover:border-purple-400 rounded-xl p-3 text-center bg-white transition-colors cursor-pointer relative">
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) {
+                            setDlCopyFile(f);
+                            if (f.type.startsWith("image/")) {
+                              setDlCopyPreview(URL.createObjectURL(f));
+                            } else {
+                              setDlCopyPreview(null);
+                            }
+                          }
+                        }}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      {dlCopyFile ? (
+                        <div className="flex items-center justify-center gap-2 text-xs font-semibold text-purple-900">
+                          <FileCheck size={16} className="text-emerald-600" />
+                          <span className="truncate max-w-[200px]">{dlCopyFile.name}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDlCopyFile(null);
+                              setDlCopyPreview(null);
+                            }}
+                            className="text-slate-400 hover:text-red-500 ml-1"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <Upload size={18} className="mx-auto text-purple-600" />
+                          <p className="text-xs font-semibold text-purple-900">Upload Drug License Certificate (PDF or Image)</p>
+                          <p className="text-[10px] text-slate-500">Form 20-B / 21-B scanned copy or photo</p>
+                        </div>
+                      )}
+                    </div>
+                    {dlCopyPreview && (
+                      <div className="mt-2 relative rounded-lg overflow-hidden border border-purple-200 max-h-32">
+                        <img src={dlCopyPreview} alt="DL Copy Preview" className="w-full h-32 object-cover" />
+                      </div>
+                    )}
+                  </div>
+
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                       Credit Limit (₹)
@@ -1690,6 +1928,9 @@ function EditEntityModal({
   const [billingName, setBillingName] = useState(row.billingName || "");
   const [gstNo, setGstNo] = useState(row.gstNo || "");
   const [licenseNo, setLicenseNo] = useState(row.licenseNo || "");
+  const [dlCopyUrl, setDlCopyUrl] = useState<string | null>(row.dlCopyUrl || null);
+  const [dlCopyFile, setDlCopyFile] = useState<File | null>(null);
+  const [dlCopyPreview, setDlCopyPreview] = useState<string | null>(null);
   const [creditLimit, setCreditLimit] = useState(
     row.creditLimit !== null && row.creditLimit !== undefined ? String(row.creditLimit) : ""
   );
@@ -1713,6 +1954,18 @@ function EditEntityModal({
 
     setSubmitting(true);
     try {
+      let updatedDlUrl = dlCopyUrl;
+      if (type === "CHEMIST" && dlCopyFile) {
+        const form = new FormData();
+        form.append("file", dlCopyFile);
+        form.append("chemistId", row.id);
+        if (licenseNo.trim()) form.append("licenseNo", licenseNo.trim());
+        const upRes = await apiClient.post("/api/mr/chemists/upload-dl", form, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        updatedDlUrl = upRes.data.data.dlCopyUrl;
+      }
+
       await apiClient.put(`/api/manager/entities/${row.id}`, {
         type,
         name: name.trim(),
@@ -1736,6 +1989,7 @@ function EditEntityModal({
               billingName: billingName.trim() || undefined,
               gstNo: gstNo.trim() || undefined,
               licenseNo: licenseNo.trim() || undefined,
+              dlCopyUrl: updatedDlUrl || undefined,
               creditLimit: creditLimit.trim() ? Number(creditLimit) : null,
               whatsApp: whatsApp.trim() || undefined,
             }
@@ -1952,6 +2206,97 @@ function EditEntityModal({
                 </div>
               </div>
 
+              {/* Drug License Copy Upload & Replace (Chemist Only) */}
+              <div className="space-y-2 p-3.5 bg-purple-50/50 border border-purple-200/80 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <FileCheck size={14} className="text-purple-700" />
+                    <span>Drug License Copy (Certificate Document)</span>
+                  </label>
+                  {dlCopyUrl ? (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded flex items-center gap-1">
+                      <CheckCircle2 size={10} /> Verified on File
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded flex items-center gap-1">
+                      <AlertTriangle size={10} /> Missing Copy
+                    </span>
+                  )}
+                </div>
+
+                {dlCopyUrl && (
+                  <div className="flex items-center justify-between bg-white border border-purple-100 rounded-lg p-2 text-xs">
+                    <div className="flex items-center gap-2 truncate">
+                      <FileText size={15} className="text-purple-600 shrink-0" />
+                      <span className="truncate text-slate-700 font-medium">
+                        {dlCopyUrl.split("/").pop()}
+                      </span>
+                    </div>
+                    <a
+                      href={dlCopyUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:text-purple-900 shrink-0 ml-2"
+                    >
+                      <Eye size={12} /> View Certificate
+                    </a>
+                  </div>
+                )}
+
+                <div className="border-2 border-dashed border-purple-200 hover:border-purple-400 rounded-xl p-3 text-center bg-white transition-colors cursor-pointer relative">
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        setDlCopyFile(f);
+                        if (f.type.startsWith("image/")) {
+                          setDlCopyPreview(URL.createObjectURL(f));
+                        } else {
+                          setDlCopyPreview(null);
+                        }
+                      }
+                    }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  {dlCopyFile ? (
+                    <div className="flex items-center justify-center gap-2 text-xs font-semibold text-purple-900">
+                      <FileCheck size={16} className="text-emerald-600" />
+                      <span className="truncate max-w-[200px]">{dlCopyFile.name}</span>
+                      <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                        Ready to replace
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDlCopyFile(null);
+                          setDlCopyPreview(null);
+                        }}
+                        className="text-slate-400 hover:text-red-500 ml-1"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <Upload size={16} className="mx-auto text-purple-600" />
+                      <p className="text-xs font-semibold text-purple-900">
+                        {dlCopyUrl ? "Replace Drug License Copy" : "Upload Drug License Certificate (PDF or Image)"}
+                      </p>
+                      <p className="text-[10px] text-slate-500">Attach Form 20-B / 21-B certificate scan or camera photo</p>
+                    </div>
+                  )}
+                </div>
+
+                {dlCopyPreview && (
+                  <div className="mt-2 relative rounded-lg overflow-hidden border border-purple-200 max-h-32">
+                    <img src={dlCopyPreview} alt="DL Copy Preview" className="w-full h-32 object-cover" />
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                   Credit Limit (₹)
@@ -2086,6 +2431,290 @@ function EditEntityModal({
               </>
             ) : (
               "Save Changes"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------------------------------------
+// Chemist Drug License Copy Preview Modal
+// ------------------------------------------------------------------------------------------------
+function DlCopyPreviewModal({
+  row,
+  onClose,
+  onReplace,
+}: {
+  row: Row;
+  onClose: () => void;
+  onReplace: () => void;
+}) {
+  const isPdf = row.dlCopyUrl?.toLowerCase().endsWith(".pdf");
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col border border-slate-200">
+        {/* Header */}
+        <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-emerald-50 via-white to-purple-50 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-xs">
+              <FileCheck size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900">{row.name}</h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  {row.dlStatus || "VERIFIED"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-mono">
+                Drug License No: <span className="font-bold text-purple-700">{row.licenseNo || "Form 20-B / 21-B"}</span>
+                {row.dlExpiryDate && (
+                  <span className="ml-2 text-slate-400">
+                    · Valid Thru: {new Date(row.dlExpiryDate).toLocaleDateString("en-IN")}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Certificate Display Area */}
+        <div className="flex-1 overflow-y-auto p-4 bg-slate-100/60 flex items-center justify-center min-h-[350px]">
+          {row.dlCopyUrl ? (
+            isPdf ? (
+              <div className="w-full h-[450px] bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+                <iframe src={row.dlCopyUrl} title="Drug License Document" className="w-full h-full border-0" />
+              </div>
+            ) : (
+              <div className="max-w-full max-h-[500px] bg-white p-2 rounded-xl shadow-sm border border-slate-200">
+                <img
+                  src={row.dlCopyUrl}
+                  alt={`${row.name} Drug License`}
+                  className="max-w-full max-h-[480px] object-contain rounded-lg mx-auto"
+                />
+              </div>
+            )
+          ) : (
+            <div className="text-center py-12 text-slate-400 space-y-2">
+              <AlertTriangle size={32} className="mx-auto text-amber-500" />
+              <p className="text-sm font-semibold text-slate-700">No Drug License Copy Uploaded</p>
+              <p className="text-xs">Upload a scanned certificate copy or photo.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Actions Footer */}
+        <div className="p-3.5 border-t border-slate-200/80 bg-white flex items-center justify-between">
+          <div className="text-xs text-slate-500 flex items-center gap-1.5">
+            <ShieldCheck size={14} className="text-emerald-600" />
+            <span>State Drugs Control Administration Verified</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {row.dlCopyUrl && (
+              <a
+                href={row.dlCopyUrl}
+                download
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <Download size={13} />
+                <span>Download Copy</span>
+              </a>
+            )}
+            <button
+              onClick={onReplace}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold hover:bg-purple-100 transition-colors"
+            >
+              <Upload size={13} />
+              <span>Replace / Re-upload</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------------------------------------
+// Chemist Quick Upload DL Modal
+// ------------------------------------------------------------------------------------------------
+function QuickUploadDlModal({
+  chemist,
+  onClose,
+  onUploaded,
+}: {
+  chemist: Row;
+  onClose: () => void;
+  onUploaded: () => void;
+}) {
+  const [licenseNo, setLicenseNo] = useState(chemist.licenseNo || "");
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleUpload = async () => {
+    setError(null);
+    if (!file) {
+      return setError("Please select or capture a Drug License certificate file (PDF or Image).");
+    }
+
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("chemistId", chemist.id);
+      if (licenseNo.trim()) {
+        form.append("licenseNo", licenseNo.trim());
+      }
+
+      await apiClient.post("/api/mr/chemists/upload-dl", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      onUploaded();
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
+        "Failed to upload Drug License copy.";
+      setError(msg);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col border border-purple-100">
+        <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-purple-50 via-white to-emerald-50 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-purple-600 text-white rounded-xl shadow-xs">
+              <Upload size={18} />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Upload Drug License (DL)</h3>
+              <p className="text-xs text-slate-500 truncate max-w-[240px]">{chemist.name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4 text-sm">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
+              Drug License Number (Form 20-B / 21-B)
+            </label>
+            <input
+              type="text"
+              value={licenseNo}
+              onChange={(e) => setLicenseNo(e.target.value)}
+              placeholder="e.g. DL-20B-TG-2024-8849"
+              className="w-full border border-purple-200 rounded-xl px-3.5 py-2 text-sm font-mono text-slate-900 bg-purple-50/20 focus:ring-2 focus:ring-purple-500 outline-none"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
+              Certificate Document (PDF or Image) *
+            </label>
+            <div className="border-2 border-dashed border-purple-200 hover:border-purple-400 rounded-xl p-5 text-center bg-purple-50/10 transition-colors cursor-pointer relative">
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) {
+                    setFile(f);
+                    if (f.type.startsWith("image/")) {
+                      setPreview(URL.createObjectURL(f));
+                    } else {
+                      setPreview(null);
+                    }
+                  }
+                }}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+              {file ? (
+                <div className="flex items-center justify-center gap-2 text-xs font-semibold text-purple-900">
+                  <FileCheck size={18} className="text-emerald-600" />
+                  <span className="truncate max-w-[220px]">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFile(null);
+                      setPreview(null);
+                    }}
+                    className="text-slate-400 hover:text-red-500 ml-1"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Upload size={22} className="mx-auto text-purple-600" />
+                  <p className="text-xs font-bold text-purple-900">Click or Drag &amp; Drop DL Copy</p>
+                  <p className="text-[11px] text-slate-500">Supports PDF, PNG, JPG, JPEG, WebP (Max 15MB)</p>
+                </div>
+              )}
+            </div>
+            {preview && (
+              <div className="mt-2 relative rounded-lg overflow-hidden border border-purple-200 max-h-36">
+                <img src={preview} alt="DL Copy Preview" className="w-full h-36 object-cover" />
+              </div>
+            )}
+          </div>
+
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 flex items-start gap-2">
+            <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+            <p className="leading-relaxed">
+              Uploading the DL copy automatically verifies this Chemist on the master directory, unlocks full field force order placement, and updates compliance reporting.
+            </p>
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2.5">
+          <button
+            onClick={onClose}
+            disabled={uploading}
+            className="border border-slate-300 text-slate-700 px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-100 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleUpload}
+            disabled={uploading}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {uploading ? (
+              <>
+                <RefreshCw size={13} className="animate-spin" /> Uploading &amp; Verifying...
+              </>
+            ) : (
+              <>
+                <Upload size={13} /> Upload &amp; Verify DL
+              </>
             )}
           </button>
         </div>

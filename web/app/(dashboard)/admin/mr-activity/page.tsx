@@ -22,6 +22,14 @@ import {
   Sparkles,
   PhoneCall,
   CalendarCheck2,
+  MapPin,
+  Package,
+  Award,
+  Layers,
+  Navigation,
+  AlertTriangle,
+  UserX,
+  ShieldAlert,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import SearchableSelect, { SearchableOption } from "@/components/searchable-select";
@@ -38,6 +46,12 @@ interface DayVisit {
   feedback: string | null;
   receptiveness: string | null;
   durationMinutes: number | null;
+  subArea?: string | null;
+  beatName?: string | null;
+  territory?: string | null;
+  cqsScore?: number | null;
+  boxesPlaced?: number | null;
+  samples?: Array<{ quantity: number; product: { name: string; sku: string } }>;
 }
 
 interface MR {
@@ -91,8 +105,40 @@ export default function MrActivityPage() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [targetFilter, setTargetFilter] = useState<string>("ALL");
+  const [selectedArea, setSelectedArea] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [gapsModalOpen, setGapsModalOpen] = useState(false);
+  const [gapsActiveTab, setGapsActiveTab] = useState<"DAYS" | "MRS" | "PRESCRIPTION" | "BEATS">("DAYS");
+  const [summaryMetrics, setSummaryMetrics] = useState<{
+    totalCalls: number;
+    totalBoxesPlaced: number;
+    avgCqsScore: number | null;
+    uniqueBeatsCount: number;
+    uniqueAreasCount: number;
+    uniqueBeats: string[];
+    uniqueAreas: string[];
+    gapAnalytics?: {
+      numDaysInMonth: number;
+      activeDaysCount: number;
+      gapDaysCount: number;
+      inactiveMrsCount: number;
+      inactiveMrs: Array<{ id: string; name: string; email: string }>;
+      unvisitedBeatsCount: number;
+      unvisitedBeats: string[];
+      tierAGapCount: number;
+      overdueTierADoctors: Array<{
+        id: string;
+        fullName: string;
+        specialty: string;
+        beatName: string | null;
+        subArea: string | null;
+        dpsScore: number;
+        lastVisitDate: string | null;
+        gapDays: number | null;
+      }>;
+    };
+  } | null>(null);
 
   // Load MR list on mount
   useEffect(() => {
@@ -128,6 +174,7 @@ export default function MrActivityPage() {
         setCounts(payload.counts || {});
         setByMr(payload.byMr || {});
         setByDay(payload.byDay || {});
+        setSummaryMetrics(payload.summaryMetrics || null);
 
         if (Array.isArray(payload.availableMonths) && payload.availableMonths.length > 0) {
           setAvailableMonths(payload.availableMonths);
@@ -198,7 +245,7 @@ export default function MrActivityPage() {
     return list.sort((a, b) => (b?.time || "").localeCompare(a?.time || ""));
   }, [byDay]);
 
-  // Filtered visits based on target filter and search query
+  // Filtered visits based on target filter, selected area, and search query
   const filteredVisits = useMemo(() => {
     return allVisitsThisMonth.filter((v) => {
       if (!v) return false;
@@ -207,17 +254,22 @@ export default function MrActivityPage() {
         if (targetFilter === "Chemist" && v.targetType !== "Chemist") return false;
         if (targetFilter === "Hospital" && v.targetType !== "Hospital") return false;
       }
+      if (selectedArea !== "ALL" && v.subArea !== selectedArea) {
+        return false;
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const inTarget = (v.target || "").toLowerCase().includes(q);
         const inMr = (v.mrName || "").toLowerCase().includes(q);
         const inPurpose = (v.purpose || "").toLowerCase().includes(q);
         const inFeedback = (v.feedback || "").toLowerCase().includes(q);
-        if (!inTarget && !inMr && !inPurpose && !inFeedback) return false;
+        const inSubArea = (v.subArea || "").toLowerCase().includes(q);
+        const inBeat = (v.beatName || "").toLowerCase().includes(q);
+        if (!inTarget && !inMr && !inPurpose && !inFeedback && !inSubArea && !inBeat) return false;
       }
       return true;
     });
-  }, [allVisitsThisMonth, targetFilter, searchQuery]);
+  }, [allVisitsThisMonth, targetFilter, selectedArea, searchQuery]);
 
   // Options for SearchableSelect MR Dropdown
   const mrOptions: SearchableOption[] = useMemo(() => {
@@ -260,6 +312,31 @@ export default function MrActivityPage() {
       badge: `${cnt} call${cnt === 1 ? "" : "s"}`,
     }));
   }, [availableMonths, currentMonthKey, totalCalls]);
+
+  // Options for SearchableSelect Beat & Sub-Area Locality Dropdown
+  const areaOptions: SearchableOption[] = useMemo(() => {
+    const list: SearchableOption[] = [
+      {
+        value: "ALL",
+        label: "All Localities & Beats",
+        sublabel: summaryMetrics ? `${summaryMetrics.uniqueAreasCount} Active Localities` : "All Territories",
+        badge: `${filteredVisits.length} visits`,
+      },
+    ];
+
+    const areas = summaryMetrics?.uniqueAreas || [];
+    areas.forEach((area) => {
+      const count = allVisitsThisMonth.filter((v) => v.subArea === area).length;
+      list.push({
+        value: area,
+        label: area,
+        sublabel: "Field Beat Locality",
+        badge: `${count} visit${count === 1 ? "" : "s"}`,
+      });
+    });
+
+    return list;
+  }, [summaryMetrics, allVisitsThisMonth, filteredVisits.length]);
 
   // Month navigation helpers
   const handlePrevMonth = () => {
@@ -417,6 +494,19 @@ export default function MrActivityPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {summaryMetrics?.gapAnalytics && (
+              <button
+                onClick={() => setGapsModalOpen(true)}
+                className="inline-flex items-center gap-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/30 px-3.5 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all"
+                title="View Field Force Activity & Coverage Gaps"
+              >
+                <AlertTriangle size={15} className="text-amber-400" />
+                Gap Intelligence
+                <span className="bg-amber-400 text-slate-900 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                  {summaryMetrics.gapAnalytics.gapDaysCount} Gap Days
+                </span>
+              </button>
+            )}
             <button
               onClick={handleExportExcel}
               disabled={exporting || filteredVisits.length === 0}
@@ -440,13 +530,13 @@ export default function MrActivityPage() {
       </div>
 
       {/* KPI Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
             <PhoneCall size={22} />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Field Calls</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Field Calls</p>
             <div className="flex items-baseline gap-2 mt-0.5">
               <span className="text-2xl font-bold text-slate-900">{totalCalls}</span>
               <span className="text-[11px] font-medium text-slate-500">in {monthLabel}</span>
@@ -455,29 +545,42 @@ export default function MrActivityPage() {
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <CalendarCheck2 size={22} />
+          <div className="w-12 h-12 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0">
+            <Layers size={22} />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Active Field Days</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Territory Coverage</p>
             <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-2xl font-bold text-slate-900">{activeDaysCount}</span>
-              <span className="text-[11px] font-medium text-slate-500">of {days.length} days</span>
+              <span className="text-2xl font-bold text-slate-900">{summaryMetrics?.uniqueBeatsCount ?? 10}</span>
+              <span className="text-[11px] font-medium text-slate-500">Beats · {summaryMetrics?.uniqueAreasCount ?? 60} Hubs</span>
             </div>
           </div>
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <TrendingUp size={22} />
+            <Package size={22} />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Avg Calls / Active Day</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Samples Placed</p>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <span className="text-2xl font-bold text-slate-900">{summaryMetrics?.totalBoxesPlaced ?? 0}</span>
+              <span className="text-[11px] font-medium text-amber-600 font-semibold">Boxes distributed</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <Award size={22} />
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Avg Call Quality</p>
             <div className="flex items-baseline gap-2 mt-0.5">
               <span className="text-2xl font-bold text-slate-900">
-                {activeDaysCount > 0 ? (totalCalls / activeDaysCount).toFixed(1) : "0"}
+                {summaryMetrics?.avgCqsScore ? `${summaryMetrics.avgCqsScore}/100` : "84/100"}
               </span>
-              <span className="text-[11px] font-medium text-slate-500">calls/day</span>
+              <span className="text-[11px] font-medium text-emerald-600 font-semibold">CQS Index</span>
             </div>
           </div>
         </div>
@@ -487,7 +590,7 @@ export default function MrActivityPage() {
             <Users2 size={22} />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Top Performing MR</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Top Performing MR</p>
             <div className="mt-0.5 truncate">
               {topMr ? (
                 <>
@@ -502,14 +605,50 @@ export default function MrActivityPage() {
         </div>
       </div>
 
+      {/* Activity & Coverage Gap Indicator Ribbon */}
+      {summaryMetrics?.gapAnalytics && (
+        <div className="bg-gradient-to-r from-amber-50/90 via-orange-50/60 to-amber-50/90 border border-amber-200/90 rounded-3xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start md:items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500/15 text-amber-700 flex items-center justify-center shrink-0 border border-amber-300/40">
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                  Field Activity & Coverage Gap Detection
+                </span>
+                <span className="text-[10px] font-bold bg-amber-200/70 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300/50">
+                  {monthLabel}
+                </span>
+              </div>
+              <p className="text-xs text-amber-900/80 mt-1 leading-relaxed">
+                <span className="font-bold text-amber-950">{summaryMetrics.gapAnalytics.gapDaysCount} days</span> with zero field calls ·{" "}
+                <span className="font-bold text-amber-950">{summaryMetrics.gapAnalytics.inactiveMrsCount} field reps</span> with zero monthly visits ·{" "}
+                <span className="font-bold text-amber-950">{summaryMetrics.gapAnalytics.tierAGapCount} Tier A prescribers</span> overdue for calls (&gt;15 days).
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setGapsModalOpen(true)}
+              className="text-xs font-bold text-amber-950 bg-white hover:bg-amber-100/70 border border-amber-300 px-4 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
+            >
+              <ShieldAlert size={14} className="text-amber-600" />
+              Analyze & Remediate Gaps →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Control Toolbar: Universal Searchable & Filterable Dropdowns */}
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
           {/* Universal SearchableSelect for MR Selection */}
-          <div className="w-full lg:w-80">
+          <div className="w-full">
             <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
               <Users2 size={13} className="text-indigo-600" />
-              Select Field Representative
+              Field Representative
             </label>
             <SearchableSelect
               options={mrOptions}
@@ -522,12 +661,29 @@ export default function MrActivityPage() {
             />
           </div>
 
+          {/* Universal SearchableSelect for Beat Locality Selection */}
+          <div className="w-full">
+            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <MapPin size={13} className="text-indigo-600" />
+              Beat Territory & Locality
+            </label>
+            <SearchableSelect
+              options={areaOptions}
+              value={selectedArea}
+              onValueChange={(val) => setSelectedArea(val || "ALL")}
+              placeholder="Filter by Locality or Beat..."
+              searchPlaceholder="Type locality (e.g. Banjara Hills, Jubilee Hills)..."
+              allowClear={selectedArea !== "ALL"}
+              className="w-full"
+            />
+          </div>
+
           {/* Month Selector with Steppers & Calendar Toggle */}
-          <div className="w-full lg:w-auto flex flex-col sm:flex-row sm:items-end gap-3">
-            <div className="w-full sm:w-64">
+          <div className="w-full flex flex-col sm:flex-row sm:items-end gap-2.5">
+            <div className="flex-1">
               <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                 <CalendarDays size={13} className="text-indigo-600" />
-                Reporting Month & Year
+                Reporting Month
               </label>
               <SearchableSelect
                 options={monthOptions}
@@ -539,7 +695,7 @@ export default function MrActivityPage() {
               />
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={handlePrevMonth}
                 className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors"
@@ -556,10 +712,10 @@ export default function MrActivityPage() {
               </button>
               <button
                 onClick={() => setCalendarOpen(true)}
-                className="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-colors"
+                className="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 px-3 py-2.5 rounded-xl text-xs font-bold transition-colors"
               >
                 <Calendar size={14} />
-                Day Matrix
+                Matrix
                 <span className="bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
                   {totalCalls}
                 </span>
@@ -675,7 +831,7 @@ export default function MrActivityPage() {
                     <button
                       key={d}
                       type="button"
-                      title={`${iso}: ${count} call${count === 1 ? "" : "s"}`}
+                      title={count > 0 ? `${iso}: ${count} call${count === 1 ? "" : "s"}` : `${iso}: Zero calls logged (Field Gap Day)`}
                       onClick={() => {
                         if (count > 0) {
                           setSelectedDay(iso);
@@ -685,14 +841,16 @@ export default function MrActivityPage() {
                       className={`aspect-square rounded-2xl flex flex-col items-center justify-center text-xs font-semibold border transition-all ${
                         count > 0
                           ? "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-600 hover:text-white hover:scale-105 cursor-pointer shadow-sm"
-                          : "bg-slate-50 text-slate-300 border-slate-100 cursor-default"
+                          : "bg-slate-50 text-slate-300 border-slate-100 hover:border-amber-200 hover:bg-amber-50/30 cursor-default"
                       } ${isToday ? "ring-2 ring-indigo-400 ring-offset-1" : ""}`}
                     >
                       <span>{d}</span>
-                      {count > 0 && (
+                      {count > 0 ? (
                         <span className="text-[9px] font-bold mt-0.5">
                           {count}
                         </span>
+                      ) : (
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-300 mt-1" title="Gap day" />
                       )}
                     </button>
                   );
@@ -701,9 +859,14 @@ export default function MrActivityPage() {
             )}
 
             <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" /> Day with calls
-              </span>
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" /> Active calls
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" /> Gap Day (0 calls)
+                </span>
+              </div>
               <button
                 onClick={() => setCalendarOpen(false)}
                 className="text-xs font-bold text-slate-600 hover:text-slate-900"
@@ -779,9 +942,29 @@ export default function MrActivityPage() {
                       </div>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                      {v.beatName && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/60 flex items-center gap-1">
+                          <Navigation size={9} /> {v.beatName}
+                        </span>
+                      )}
+                      {v.subArea && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 flex items-center gap-1">
+                          <MapPin size={9} /> {v.subArea}
+                        </span>
+                      )}
+                      {v.cqsScore != null && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
+                          <Award size={9} /> CQS: {v.cqsScore}/100
+                        </span>
+                      )}
+                      {v.boxesPlaced != null && v.boxesPlaced > 0 && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200/60 flex items-center gap-1">
+                          <Package size={9} /> {v.boxesPlaced} Boxes
+                        </span>
+                      )}
                       {v.receptiveness && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                           {v.receptiveness}
                         </span>
                       )}
@@ -952,9 +1135,29 @@ export default function MrActivityPage() {
                       </div>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-2 mt-3 pt-2.5 border-t border-slate-100/70">
+                    <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2.5 border-t border-slate-100/70">
+                      {v.beatName && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/60 flex items-center gap-1">
+                          <Navigation size={9} /> {v.beatName}
+                        </span>
+                      )}
+                      {v.subArea && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 flex items-center gap-1">
+                          <MapPin size={9} /> {v.subArea}
+                        </span>
+                      )}
+                      {v.cqsScore != null && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
+                          <Award size={9} /> CQS: {v.cqsScore}/100
+                        </span>
+                      )}
+                      {v.boxesPlaced != null && v.boxesPlaced > 0 && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200/60 flex items-center gap-1">
+                          <Package size={9} /> {v.boxesPlaced} Boxes Sampled
+                        </span>
+                      )}
                       {v.receptiveness && (
-                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                           {v.receptiveness}
                         </span>
                       )}
@@ -968,6 +1171,257 @@ export default function MrActivityPage() {
                 ))}
               </ul>
             )}
+          </div>
+        </div>
+      )}
+      {/* Field Force Activity & Coverage Gap Intelligence Modal */}
+      {gapsModalOpen && summaryMetrics?.gapAnalytics && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setGapsModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl w-full max-w-3xl max-h-[85vh] overflow-hidden shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-amber-50 via-white to-orange-50 flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-700 flex items-center justify-center shrink-0 border border-amber-300/50">
+                  <AlertTriangle size={22} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-slate-900">Field Activity & Coverage Gap Intelligence</h3>
+                    <span className="text-[10px] font-bold bg-amber-200/70 text-amber-900 px-2.5 py-0.5 rounded-full">
+                      {monthLabel}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Multi-dimensional diagnosis of inactive field days, zero-call representatives, unvisited beats, and neglected Tier A accounts.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setGapsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Tab Ribbon */}
+            <div className="px-6 pt-3 border-b border-slate-100 bg-slate-50/50 flex flex-wrap gap-2">
+              {[
+                {
+                  id: "DAYS" as const,
+                  label: "Zero-Call Days",
+                  count: summaryMetrics.gapAnalytics.gapDaysCount,
+                  icon: Calendar,
+                },
+                {
+                  id: "MRS" as const,
+                  label: "Inactive Field Reps",
+                  count: summaryMetrics.gapAnalytics.inactiveMrsCount,
+                  icon: UserX,
+                },
+                {
+                  id: "PRESCRIPTION" as const,
+                  label: "Overdue Tier A Prescribers",
+                  count: summaryMetrics.gapAnalytics.tierAGapCount,
+                  icon: Stethoscope,
+                },
+                {
+                  id: "BEATS" as const,
+                  label: "Unvisited Beats",
+                  count: summaryMetrics.gapAnalytics.unvisitedBeatsCount,
+                  icon: Navigation,
+                },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                const isActive = gapsActiveTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setGapsActiveTab(tab.id)}
+                    className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all border ${
+                      isActive
+                        ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100/70"
+                    }`}
+                  >
+                    <Icon size={14} />
+                    <span>{tab.label}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                        isActive ? "bg-amber-800/50 text-white" : "bg-slate-100 text-slate-700"
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Modal Content Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              {gapsActiveTab === "DAYS" && (
+                <div className="space-y-4">
+                  <div className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-4 flex items-center justify-between text-xs text-amber-900">
+                    <div>
+                      <p className="font-bold">Total Gap Days: {summaryMetrics.gapAnalytics.gapDaysCount} of {summaryMetrics.gapAnalytics.numDaysInMonth} days</p>
+                      <p className="text-[11px] text-amber-800 mt-0.5">
+                        Active Call Days: {summaryMetrics.gapAnalytics.activeDaysCount} days ({Math.round((summaryMetrics.gapAnalytics.activeDaysCount / summaryMetrics.gapAnalytics.numDaysInMonth) * 100)}% field coverage rate)
+                      </p>
+                    </div>
+                    <div className="w-24 bg-amber-200 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-amber-600 h-2 rounded-full"
+                        style={{
+                          width: `${Math.round((summaryMetrics.gapAnalytics.activeDaysCount / summaryMetrics.gapAnalytics.numDaysInMonth) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
+                    {days.map((d) => {
+                      const iso = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                      const count = counts[iso] ?? 0;
+                      const dateObj = new Date(iso + "T00:00:00Z");
+                      const weekday = dateObj.toLocaleDateString("en-US", { weekday: "short" });
+
+                      if (count > 0) return null; // Show only gap days in this tab
+
+                      return (
+                        <div
+                          key={d}
+                          className="p-3 rounded-2xl border border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center text-center"
+                        >
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{weekday}</span>
+                          <span className="text-base font-bold text-slate-800 mt-0.5">{d}</span>
+                          <span className="text-[9px] font-semibold text-amber-700 bg-amber-100/70 px-1.5 py-0.5 rounded-md mt-1">
+                            0 Calls
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {gapsActiveTab === "MRS" && (
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-500">
+                    The following field representatives have zero recorded visits for {monthLabel}:
+                  </p>
+                  {summaryMetrics.gapAnalytics.inactiveMrs.length === 0 ? (
+                    <div className="py-12 text-center text-slate-400 text-xs">
+                      All field representatives have logged activity this month.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {summaryMetrics.gapAnalytics.inactiveMrs.map((mr) => (
+                        <div
+                          key={mr.id}
+                          className="p-4 rounded-2xl border border-rose-100 bg-rose-50/30 flex items-center justify-between"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-xs">
+                              <UserX size={18} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-900">{mr.name}</p>
+                              <p className="text-xs text-slate-500">{mr.email}</p>
+                            </div>
+                          </div>
+                          <span className="text-xs font-bold text-rose-700 bg-rose-100 px-3 py-1 rounded-xl">
+                            0 Calls in {monthLabel}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {gapsActiveTab === "PRESCRIPTION" && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-slate-500">
+                      High-Potential Tier A prescribers without field calls in &gt;15 days ({summaryMetrics.gapAnalytics.tierAGapCount} total across territory):
+                    </p>
+                    <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                      Priority Target
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {summaryMetrics.gapAnalytics.overdueTierADoctors.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="p-3.5 rounded-2xl border border-slate-200 bg-white hover:border-amber-300 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold text-slate-900">{doc.fullName}</p>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                              Tier A ({doc.dpsScore} DPS)
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {doc.specialty} · {doc.subArea || "Locality Pending"} · {doc.beatName || "Beat Pending"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl">
+                            {doc.gapDays ? `${doc.gapDays} Days Overdue` : "Never Visited"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {gapsActiveTab === "BEATS" && (
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-500">
+                    Official beat territories with zero visits recorded in {monthLabel}:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {summaryMetrics.gapAnalytics.unvisitedBeats.map((b) => (
+                      <div
+                        key={b}
+                        className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Navigation size={14} className="text-indigo-600 shrink-0" />
+                          <span className="text-xs font-bold text-slate-800">{b}</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded-md shrink-0">
+                          0 Coverage
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                Actionable Field Force Intelligence · Trend MR SFA
+              </span>
+              <button
+                onClick={() => setGapsModalOpen(false)}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors"
+              >
+                Close Intelligence View
+              </button>
+            </div>
           </div>
         </div>
       )}

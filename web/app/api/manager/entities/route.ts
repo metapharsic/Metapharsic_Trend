@@ -24,6 +24,9 @@ const CreateEntityBodySchema = z.object({
   // Chemist specific fields
   contactPerson: z.string().optional(),
   licenseNo: z.string().optional(),
+  dlCopyUrl: z.string().optional(),
+  dlExpiryDate: z.string().optional(),
+  dlStatus: z.string().optional(),
   billingName: z.string().optional(),
   creditLimit: z.number().min(0).optional(),
   // Distributor specific fields
@@ -65,11 +68,22 @@ async function getEntities(req: AuthedRequest) {
     let entities: any[] = [];
     let total = 0;
 
+    const beatName = searchParams.get("beatName") ?? undefined;
+    const subArea = searchParams.get("subArea") ?? undefined;
+
     if (type === "DOCTOR") {
       const where: any = {
         ...(search ? { fullName: { contains: search, mode: "insensitive" as const } } : {}),
         ...(territoryId ? { territoryId } : {}),
-        ...(filterValue ? { primarySpecialty: { contains: filterValue, mode: "insensitive" as const } } : {}),
+        ...(beatName ? { beatName: { contains: beatName, mode: "insensitive" as const } } : {}),
+        ...(subArea ? { subArea: { contains: subArea, mode: "insensitive" as const } } : {}),
+        ...(filterValue === "UNVISITED"
+          ? { visits: { none: {} } }
+          : filterValue === "NO_ORDERS"
+          ? { orders: { none: {} } }
+          : filterValue
+          ? { primarySpecialty: { contains: filterValue, mode: "insensitive" as const } }
+          : {}),
       };
       const [doctors, count] = await Promise.all([
         db.doctor.findMany({
@@ -77,7 +91,11 @@ async function getEntities(req: AuthedRequest) {
           skip: (page - 1) * limit,
           take: limit,
           orderBy: { fullName: "asc" },
-          include: { territory: { select: { id: true, name: true } } },
+          include: {
+            territory: { select: { id: true, name: true } },
+            visits: { select: { id: true } },
+            orders: { select: { id: true } },
+          },
         }),
         db.doctor.count({ where }),
       ]);
@@ -86,6 +104,8 @@ async function getEntities(req: AuthedRequest) {
         name: d.fullName,
         type: "DOCTOR",
         address: d.clinicAddress,
+        subArea: d.subArea,
+        beatName: d.beatName,
         territoryId: d.territoryId,
         territoryName: d.territory?.name ?? "—",
         primarySpecialty: d.primarySpecialty,
@@ -97,13 +117,27 @@ async function getEntities(req: AuthedRequest) {
         email: d.email,
         dpsScore: d.dpsScore,
         dpsTier: d.dpsTier,
+        visitsCount: d.visits.length,
+        ordersCount: d.orders.length,
       }));
       total = count;
     } else if (type === "CHEMIST") {
       const where: any = {
         ...(search ? { name: { contains: search, mode: "insensitive" as const } } : {}),
         ...(territoryId ? { territoryId } : {}),
-        ...(filterValue ? { type: filterValue } : {}),
+        ...(beatName ? { beatName: { contains: beatName, mode: "insensitive" as const } } : {}),
+        ...(subArea ? { subArea: { contains: subArea, mode: "insensitive" as const } } : {}),
+        ...(filterValue === "UNVISITED"
+          ? { visits: { none: {} } }
+          : filterValue === "NO_ORDERS"
+          ? { orders: { none: {} } }
+          : filterValue === "DL_UPLOADED"
+          ? { dlCopyUrl: { not: null } }
+          : filterValue === "DL_MISSING"
+          ? { dlCopyUrl: null }
+          : filterValue
+          ? { type: filterValue }
+          : {}),
       };
       const [chemists, count] = await Promise.all([
         db.chemist.findMany({
@@ -111,7 +145,11 @@ async function getEntities(req: AuthedRequest) {
           skip: (page - 1) * limit,
           take: limit,
           orderBy: { name: "asc" },
-          include: { territory: { select: { id: true, name: true } } },
+          include: {
+            territory: { select: { id: true, name: true } },
+            visits: { select: { id: true } },
+            orders: { select: { id: true } },
+          },
         }),
         db.chemist.count({ where }),
       ]);
@@ -120,16 +158,23 @@ async function getEntities(req: AuthedRequest) {
         name: c.name,
         type: "CHEMIST",
         address: c.address,
+        subArea: c.subArea,
+        beatName: c.beatName,
         territoryId: c.territoryId,
         territoryName: c.territory?.name ?? "—",
         contactPerson: c.contactPerson,
         licenseNo: c.licenseNo,
+        dlCopyUrl: c.dlCopyUrl,
+        dlExpiryDate: c.dlExpiryDate,
+        dlStatus: c.dlStatus || (c.dlCopyUrl ? "VERIFIED" : "MISSING"),
         creditLimit: c.creditLimit !== null ? Number(c.creditLimit) : null,
         billingName: c.billingName,
         gstNo: c.gstNo,
         mobile: c.mobile,
         email: c.email,
         subType: c.type,
+        visitsCount: c.visits.length,
+        ordersCount: c.orders.length,
       }));
       total = count;
     } else if (type === "DISTRIBUTOR") {
@@ -243,13 +288,14 @@ async function getEntities(req: AuthedRequest) {
     }
 
     // Compute Multi-Agent Audit Council Metrics
-    const [docCount, chemCount, distCount, hospCount, empCount, unmappedTerritoryCount] = await Promise.all([
+    const [docCount, chemCount, distCount, hospCount, empCount, unmappedTerritoryCount, chemWithDlCount] = await Promise.all([
       db.doctor.count(),
       db.chemist.count(),
       db.distributor.count(),
       db.hospital.count(),
       db.employee.count(),
       db.territory.count({ where: { employeeId: null } }),
+      db.chemist.count({ where: { dlCopyUrl: { not: null } } }),
     ]);
 
     const grandTotal = docCount + chemCount + distCount + hospCount + empCount;
@@ -277,8 +323,14 @@ async function getEntities(req: AuthedRequest) {
       roleAuthAgent: {
         agent: "ROLE_AUTH_AGENT",
         governanceStatus: "ENFORCED",
-        userRole: req.user.role,
+        userRole: req.user?.role ?? "MR",
         summary: "Field MR boundaries and management permissions active",
+      },
+      chemistDlCompliance: {
+        totalChemists: chemCount,
+        chemistsWithDl: chemWithDlCount,
+        complianceRate: `${Math.round((chemWithDlCount / Math.max(chemCount, 1)) * 100)}%`,
+        missingDlCount: chemCount - chemWithDlCount,
       },
     };
 
@@ -287,7 +339,7 @@ async function getEntities(req: AuthedRequest) {
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
       multiAgentAudit,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("[GET /api/manager/entities]", err);
     return apiError("INTERNAL_SERVER_ERROR", "Failed to fetch entities", 500);
   }
@@ -508,6 +560,10 @@ async function createEntity(req: AuthedRequest) {
         },
       });
     } else if (type === "CHEMIST") {
+      const dlCopyUrl = (body as any).dlCopyUrl || null;
+      const dlExpiryDate = (body as any).dlExpiryDate ? new Date((body as any).dlExpiryDate) : null;
+      const dlStatus = (body as any).dlStatus || (dlCopyUrl ? "VERIFIED" : "PENDING_VERIFICATION");
+
       const chemist = await db.chemist.create({
         data: {
           name,
@@ -517,6 +573,9 @@ async function createEntity(req: AuthedRequest) {
           longitude,
           territoryId,
           licenseNo: licenseNo || null,
+          dlCopyUrl,
+          dlExpiryDate,
+          dlStatus,
           billingName: billingName || null,
           gstNo: gstNo || null,
           creditLimit: creditLimit !== undefined ? creditLimit : null,
@@ -533,6 +592,8 @@ async function createEntity(req: AuthedRequest) {
           territoryId: chemist.territoryId,
           contactPerson: chemist.contactPerson,
           licenseNo: chemist.licenseNo,
+          dlCopyUrl: chemist.dlCopyUrl,
+          dlStatus: chemist.dlStatus,
           billingName: chemist.billingName,
           gstNo: chemist.gstNo,
           creditLimit: chemist.creditLimit !== null ? Number(chemist.creditLimit) : null,

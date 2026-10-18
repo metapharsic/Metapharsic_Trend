@@ -23,6 +23,8 @@ async function getCreditSummary(req: AuthedRequest) {
       chemistId: c.chemistId,
       name: c.chemistName,
       address: c.address,
+      subArea: c.subArea,
+      beatName: c.beatName,
       territory: c.territoryName,
       mr: c.mrName,
       creditLimit: c.creditLimit,

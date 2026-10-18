@@ -51,7 +51,17 @@ async function getOrders(req: AuthedRequest) {
         take: limit,
         orderBy: { createdAt: "desc" },
         include: {
-          chemist: { select: { id: true, name: true, creditLimit: true } },
+          chemist: {
+            select: {
+              id: true,
+              name: true,
+              creditLimit: true,
+              address: true,
+              subArea: true,
+              beatName: true,
+              territory: { select: { id: true, name: true } },
+            },
+          },
           distributor: { select: { id: true, name: true } },
           items: { include: { product: { select: { id: true, name: true, sku: true } } } },
           invoice: { select: { invoiceNo: true, amount: true, paid: true } },

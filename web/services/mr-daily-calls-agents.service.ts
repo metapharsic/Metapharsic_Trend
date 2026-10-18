@@ -52,6 +52,11 @@ export interface GranularCallRow {
   comments?: string | null;
   feedback?: string | null;
   receptiveness?: string | null;
+  area?: string | null;
+  subArea?: string | null;
+  beatName?: string | null;
+  territory?: string | null;
+  address?: string | null;
 }
 
 export interface DayGroup {
@@ -120,8 +125,9 @@ export class FieldCoverageAgent {
 
     const uniqueDoctors = new Set(visits.map((v) => v.doctorId).filter(Boolean)).size;
     const uniqueChemists = new Set(visits.map((v) => v.chemistId).filter(Boolean)).size;
+    const uniqueLocalities = new Set(visits.map((v) => v.doctor?.subArea || v.chemist?.subArea).filter(Boolean)).size;
 
-    findings.push(`Analyzed ${visits.length} call logs (${doctorVisits.length} Doctors, ${chemistVisits.length} Chemists, ${hospitalVisits.length} Hospitals).`);
+    findings.push(`Analyzed ${visits.length} call logs (${doctorVisits.length} Doctors, ${chemistVisits.length} Chemists, ${hospitalVisits.length} Hospitals) across ${uniqueLocalities} segregated localities.`);
     findings.push(`Unique reach: ${uniqueDoctors} distinct doctors & ${uniqueChemists} distinct chemists covered.`);
 
     if (visits.length === 0) {
@@ -521,9 +527,9 @@ export class MrDailyCallsAgentsService {
         feedback: true,
         receptiveness: true,
         createdAt: true,
-        doctor: { select: { fullName: true, primarySpecialty: true } },
-        chemist: { select: { name: true } },
-        hospital: { select: { name: true } },
+        doctor: { select: { fullName: true, primarySpecialty: true, clinicAddress: true, subArea: true, beatName: true, territory: { select: { name: true } } } },
+        chemist: { select: { name: true, address: true, subArea: true, beatName: true, territory: { select: { name: true } } } },
+        hospital: { select: { name: true, address: true, territory: { select: { name: true } } } },
         employee: { select: { id: true, firstName: true, lastName: true } },
       },
       orderBy: [{ employeeId: "asc" }, { createdAt: "asc" }],
@@ -683,6 +689,11 @@ export class MrDailyCallsAgentsService {
       const orderValuePtr = orderConverted ? Math.round(orderInfo.value) : 0;
       const orderItemsCount = orderConverted ? orderInfo.count : 0;
 
+      const area = v.doctor?.subArea ?? v.chemist?.subArea ?? null;
+      const beatName = v.doctor?.beatName ?? v.chemist?.beatName ?? null;
+      const territory = v.doctor?.territory?.name ?? v.chemist?.territory?.name ?? v.hospital?.territory?.name ?? "General Territory";
+      const address = v.doctor?.clinicAddress ?? v.chemist?.address ?? v.hospital?.address ?? null;
+
       const callRow: GranularCallRow = {
         id: v.id,
         mrId: mrKey,
@@ -705,6 +716,11 @@ export class MrDailyCallsAgentsService {
         comments: v.feedback || null,
         feedback: v.feedback || null,
         receptiveness: v.receptiveness || null,
+        area,
+        subArea: area,
+        beatName,
+        territory,
+        address,
       };
 
       if (!byMr.has(mrKey)) {

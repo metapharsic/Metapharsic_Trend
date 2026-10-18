@@ -4,7 +4,7 @@ import { Role } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { CreateVisitSchema, PaginationSchema } from "@/lib/validators";
-import { saveVisitPhoto, photoUrl } from "@/lib/upload";
+import { saveVisitPhoto, photoUrl, saveDrugLicenseFile } from "@/lib/upload";
 import { checkVisitAnomaly, haversineDistanceKm } from "@/lib/gps";
 import { calculateCqs } from "@/lib/cqs";
 import { ok, badRequest, unauthorized, forbidden, notFound, apiError } from "@/lib/api-response";
@@ -55,10 +55,18 @@ async function getVisits(req: AuthedRequest) {
     const { page, limit } = parsed.data;
     const skip = (page - 1) * limit;
     const territoryId = url.searchParams.get("territoryId") ?? undefined;
+    const subAreaFilter = url.searchParams.get("subArea") ?? undefined;
 
     const where = {
       ...(scopeEmployeeId ? { employeeId: scopeEmployeeId } : {}),
-      ...(territoryId
+      ...(subAreaFilter
+        ? {
+            OR: [
+              { doctor: { subArea: subAreaFilter } },
+              { chemist: { subArea: subAreaFilter } },
+            ],
+          }
+        : territoryId
         ? {
             OR: [
               { doctor: { territoryId } },
@@ -68,17 +76,57 @@ async function getVisits(req: AuthedRequest) {
         : {}),
     };
 
-    const [visits, total, areaCounts] = await Promise.all([
+    const [visits, total, rawEntityAreas] = await Promise.all([
       db.visit.findMany({
         where,
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
         include: {
-          doctor: { select: { id: true, fullName: true, clinicAddress: true, mobile: true, whatsApp: true, territory: { select: { id: true, name: true } } } },
-          chemist: { select: { id: true, name: true, address: true, mobile: true, territory: { select: { id: true, name: true } } } },
+          doctor: {
+            select: {
+              id: true,
+              fullName: true,
+              clinicAddress: true,
+              mobile: true,
+              whatsApp: true,
+              subArea: true,
+              beatName: true,
+              territory: { select: { id: true, name: true, region: true, zone: true } },
+            },
+          },
+          chemist: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              mobile: true,
+              licenseNo: true,
+              dlCopyUrl: true,
+              dlStatus: true,
+              subArea: true,
+              beatName: true,
+              territory: { select: { id: true, name: true, region: true, zone: true } },
+            },
+          },
           lead: true,
-          samples: { include: { product: { select: { id: true, name: true } } } },
+          samples: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  sku: true,
+                  therapySegment: true,
+                  mrp: true,
+                  ptr: true,
+                  packSize: true,
+                  currentBatchNo: true,
+                  currentExpDate: true,
+                },
+              },
+            },
+          },
           employee: { select: { firstName: true, lastName: true } },
         },
       }),
@@ -86,32 +134,80 @@ async function getVisits(req: AuthedRequest) {
       db.visit.findMany({
         where: scopeEmployeeId ? { employeeId: scopeEmployeeId } : {},
         select: {
-          doctor: { select: { territory: { select: { id: true, name: true } } } },
-          chemist: { select: { territory: { select: { id: true, name: true } } } },
+          doctor: {
+            select: {
+              subArea: true,
+              beatName: true,
+              territory: { select: { id: true, name: true } },
+            },
+          },
+          chemist: {
+            select: {
+              subArea: true,
+              beatName: true,
+              territory: { select: { id: true, name: true } },
+            },
+          },
         },
       }),
     ]);
 
-    const areaCountMap: Record<string, { id: string; name: string; count: number }> = {};
-    for (const v of areaCounts) {
+    // SubArea counts map
+    const subAreaCountMap: Record<string, { id: string; name: string; count: number; territoryName: string }> = {};
+    // Territory counts map
+    const territoryCountMap: Record<string, { id: string; name: string; count: number }> = {};
+
+    for (const v of rawEntityAreas) {
+      const subArea = v.doctor?.subArea ?? v.chemist?.subArea;
       const territory = v.doctor?.territory ?? v.chemist?.territory;
-      if (!territory) continue;
-      if (!areaCountMap[territory.id]) areaCountMap[territory.id] = { id: territory.id, name: territory.name, count: 0 };
-      areaCountMap[territory.id].count += 1;
+
+      if (subArea) {
+        if (!subAreaCountMap[subArea]) {
+          subAreaCountMap[subArea] = {
+            id: subArea,
+            name: subArea,
+            count: 0,
+            territoryName: territory?.name || "General Territory",
+          };
+        }
+        subAreaCountMap[subArea].count += 1;
+      }
+
+      if (territory) {
+        if (!territoryCountMap[territory.id]) {
+          territoryCountMap[territory.id] = { id: territory.id, name: territory.name, count: 0 };
+        }
+        territoryCountMap[territory.id].count += 1;
+      }
     }
 
     const purifiedVisits = VisitDeduplicationAgentsService.purifyVisitList(visits);
 
     return ok({
-      visits: purifiedVisits.map((v) => ({
-        ...v,
-        photoUrl: v.photoPath ? photoUrl(v.photoPath) : null,
-        employeeName: v.employee ? `${v.employee.firstName} ${v.employee.lastName}` : null,
-      })),
+      visits: purifiedVisits.map((v) => {
+        const entity = v.doctor ?? v.chemist;
+        const subArea = v.doctor?.subArea ?? v.chemist?.subArea ?? null;
+        const beatName = v.doctor?.beatName ?? v.chemist?.beatName ?? null;
+        const territory = v.doctor?.territory ?? v.chemist?.territory ?? null;
+        const address = v.doctor?.clinicAddress ?? v.chemist?.address ?? null;
+
+        return {
+          ...v,
+          area: subArea || territory?.name || "General Area",
+          subArea,
+          beatName,
+          territory,
+          address,
+          photoUrl: v.photoPath ? photoUrl(v.photoPath) : null,
+          employeeName: v.employee ? `${v.employee.firstName} ${v.employee.lastName}` : null,
+        };
+      }),
       total: purifiedVisits.length === visits.length ? total : total - (visits.length - purifiedVisits.length),
       page,
       limit,
-      areaCounts: Object.values(areaCountMap).sort((a, b) => b.count - a.count),
+      areaCounts: Object.values(subAreaCountMap).sort((a, b) => b.count - a.count),
+      subAreaCounts: Object.values(subAreaCountMap).sort((a, b) => b.count - a.count),
+      territoryCounts: Object.values(territoryCountMap).sort((a, b) => b.count - a.count),
     });
   } catch (err) {
     console.error("[GET /api/mr/visits]", err);
@@ -352,7 +448,7 @@ async function createVisit(req: AuthedRequest) {
           startLongitude: (startLongitude && Number(startLongitude) !== 0) ? Number(startLongitude) : (targetLon || 78.4747),
           endedAt: new Date(),
           durationMinutes: durationMinutes ?? 15,
-          boxesPlaced: boxesPlaced ?? 5,
+          boxesPlaced: boxesPlaced !== undefined ? boxesPlaced : (samples.length > 0 ? samples.reduce((sum, s) => sum + s.quantity, 0) : null),
           cqsScore: cqsScore ?? 8.8,
           anomalyFlag: visitAnomalyFlag,
           anomalyDetails: visitAnomalyDetails,
@@ -465,10 +561,41 @@ async function createVisit(req: AuthedRequest) {
           nearbyChemistName,
           placementType: (nearbyChemistType as any) || "NEAREST_CHEMIST",
           notes: nearbyChemistNotes || feedback || "Completed call with nearby chemist tagged",
-          boxesPlaced: boxesPlaced ? Number(boxesPlaced) : 5,
+          boxesPlaced: boxesPlaced ? Number(boxesPlaced) : (samples.length > 0 ? samples.reduce((sum, s) => sum + s.quantity, 0) : 0),
         });
       } catch (e) {
         console.error("[POST /api/mr/visits] Nearby chemist agent processing error:", e);
+      }
+    }
+
+    // Chemist Drug License (DL) Copy Capture Agent
+    let dlCopyResult: any = null;
+    if (chemistId) {
+      const dlCopyFile = formData.get("dlCopy") as File | null;
+      const dlNumberInput = formData.get("dlNumber") || formData.get("licenseNo");
+      let dlUrl: string | null = null;
+
+      if (dlCopyFile && dlCopyFile.size > 0) {
+        const uploadRes = await saveDrugLicenseFile(dlCopyFile, chemistId);
+        if (uploadRes.ok) {
+          dlUrl = uploadRes.result.relativePath;
+        }
+      }
+
+      if (dlUrl || dlNumberInput) {
+        try {
+          const updatedChemist = await db.chemist.update({
+            where: { id: chemistId },
+            data: {
+              ...(dlUrl ? { dlCopyUrl: dlUrl, dlStatus: "VERIFIED" } : {}),
+              ...(dlNumberInput ? { licenseNo: String(dlNumberInput).trim() } : {}),
+            },
+            select: { id: true, name: true, licenseNo: true, dlCopyUrl: true, dlStatus: true },
+          });
+          dlCopyResult = updatedChemist;
+        } catch (e) {
+          console.error("[POST /api/mr/visits] Chemist DL update error:", e);
+        }
       }
     }
 
@@ -476,6 +603,7 @@ async function createVisit(req: AuthedRequest) {
       visitId: visit.id,
       success: true,
       nearbyChemistSync: nearbyChemistSyncResult,
+      chemistDl: dlCopyResult,
     });
   } catch (err) {
     if (err instanceof Error && (err.message.startsWith("Insufficient sample stock") || err.message.startsWith("Insufficient gift stock"))) {

@@ -76,8 +76,23 @@ interface OrderDetail {
   id: string;
   status: string;
   createdAt: string;
-  chemist: { name: string; address: string; mobile: string | null; gstNo: string | null } | null;
-  doctor: { fullName: string; clinicAddress: string; mobile: string | null } | null;
+  chemist: {
+    name: string;
+    address: string;
+    mobile: string | null;
+    gstNo: string | null;
+    subArea?: string | null;
+    beatName?: string | null;
+    territory?: { id: string; name: string } | null;
+  } | null;
+  doctor: {
+    fullName: string;
+    clinicAddress: string;
+    mobile: string | null;
+    subArea?: string | null;
+    beatName?: string | null;
+    territory?: { id: string; name: string } | null;
+  } | null;
   distributor: { name: string; address: string; gstNo: string | null };
   employee: { firstName: string; lastName: string } | null;
   items: OrderItem[];
@@ -177,6 +192,9 @@ interface SingleInvoiceProps {
   buyerGstin: string | null;
   buyerName: string;
   buyerAddress: string;
+  buyerTerritory?: string | null;
+  buyerSubArea?: string | null;
+  buyerBeat?: string | null;
   variant?: "single" | "dual";
 }
 
@@ -194,6 +212,9 @@ function SingleInvoiceCard({
   buyerGstin,
   buyerName,
   buyerAddress,
+  buyerTerritory,
+  buyerSubArea,
+  buyerBeat,
   variant = "single",
 }: SingleInvoiceProps) {
   const inv = order.invoice;
@@ -343,6 +364,25 @@ function SingleInvoiceCard({
               M/S {buyerName}
             </p>
             <p className="text-slate-700 leading-tight text-[8px] line-clamp-1">{buyerAddress}</p>
+            {(buyerTerritory || buyerSubArea || buyerBeat) && (
+              <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                {buyerTerritory && (
+                  <span className="font-mono text-[7px] font-bold bg-sky-100 text-sky-950 border border-sky-300 px-1 py-0.2 rounded">
+                    📍 Territory: {buyerTerritory}
+                  </span>
+                )}
+                {buyerBeat && (
+                  <span className="font-mono text-[7px] font-semibold bg-slate-100 text-slate-800 border border-slate-300 px-1 py-0.2 rounded">
+                    Beat: {buyerBeat}
+                  </span>
+                )}
+                {buyerSubArea && (
+                  <span className="font-mono text-[7px] text-slate-600 font-medium">
+                    ({buyerSubArea})
+                  </span>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-x-1 pt-0.2 text-[8px] font-mono border-t border-slate-200">
               <div><span className="text-slate-500 font-sans">GSTIN:</span> <b>{buyerGstin || "UNREGISTERED"}</b></div>
               <div><span className="text-slate-500 font-sans">State:</span> <b>{buyerState.name} ({buyerState.code})</b></div>
@@ -755,6 +795,9 @@ export default function InvoicePage() {
   const buyerGstin = inv?.partyGstNo ?? order.chemist?.gstNo ?? null;
   const buyerName = inv?.partyName ?? order.chemist?.name ?? order.doctor?.fullName ?? "—";
   const buyerAddress = inv?.partyAddress ?? order.chemist?.address ?? order.doctor?.clinicAddress ?? "—";
+  const buyerTerritory = order.chemist?.territory?.name ?? order.doctor?.territory?.name ?? null;
+  const buyerSubArea = order.chemist?.subArea ?? order.doctor?.subArea ?? null;
+  const buyerBeat = order.chemist?.beatName ?? order.doctor?.beatName ?? null;
   const taxSplit = determineTaxSplit(company?.gstin, buyerGstin);
   const classSummary = taxClassSummaryWithSplit(gstLines, taxSplit);
   const freeStripsValue = computeFreeStripsValue(
@@ -1175,6 +1218,9 @@ export default function InvoicePage() {
               buyerGstin={buyerGstin}
               buyerName={buyerName}
               buyerAddress={buyerAddress}
+              buyerTerritory={buyerTerritory}
+              buyerSubArea={buyerSubArea}
+              buyerBeat={buyerBeat}
               variant="dual"
             />
           </div>
@@ -1205,6 +1251,9 @@ export default function InvoicePage() {
               buyerGstin={buyerGstin}
               buyerName={buyerName}
               buyerAddress={buyerAddress}
+              buyerTerritory={buyerTerritory}
+              buyerSubArea={buyerSubArea}
+              buyerBeat={buyerBeat}
               variant="dual"
             />
           </div>
@@ -1225,6 +1274,9 @@ export default function InvoicePage() {
             buyerGstin={buyerGstin}
             buyerName={buyerName}
             buyerAddress={buyerAddress}
+            buyerTerritory={buyerTerritory}
+            buyerSubArea={buyerSubArea}
+            buyerBeat={buyerBeat}
             variant="single"
           />
         </div>

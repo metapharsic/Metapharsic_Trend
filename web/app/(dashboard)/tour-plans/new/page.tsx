@@ -24,13 +24,17 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
-import { SearchableSelect } from "@/components/searchable-select";
+import { SearchableSelect, type SearchableOption } from "@/components/searchable-select";
 
 interface Territory {
   id: string;
   name: string;
   region?: string;
   zone?: string;
+  _count?: {
+    doctors?: number;
+    chemists?: number;
+  };
 }
 
 interface Doctor {
@@ -49,8 +53,8 @@ interface DayBlock {
   doctorIds: string[];
 }
 
-function emptyBlock(): DayBlock {
-  return { date: "", territoryId: "", doctorIds: [] };
+function defaultInitialDay(monthStr: string): DayBlock {
+  return { date: `${monthStr}-01`, territoryId: "", doctorIds: [] };
 }
 
 function getRoleFromToken(): string | null {
@@ -90,11 +94,13 @@ function NewTourPlanForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [role, setRole] = useState<string | null>(null);
-  const [month, setMonth] = useState(() => searchParams.get("month") ?? new Date().toISOString().slice(0, 7));
+  const initialMonth = searchParams.get("month") ?? new Date().toISOString().slice(0, 7);
+  const [month, setMonth] = useState(initialMonth);
   const [territories, setTerritories] = useState<Territory[]>([]);
+  const [loadingTerritories, setLoadingTerritories] = useState(true);
   const [doctorsByTerritory, setDoctorsByTerritory] = useState<Record<string, Doctor[]>>({});
   const [loadingDoctorsFor, setLoadingDoctorsFor] = useState<Record<string, boolean>>({});
-  const [days, setDays] = useState<DayBlock[]>([emptyBlock()]);
+  const [days, setDays] = useState<DayBlock[]>([defaultInitialDay(initialMonth)]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,11 +115,25 @@ function NewTourPlanForm() {
   const isAdmin = role === "ADMIN" || role === "MD";
 
   useEffect(() => {
+    setLoadingTerritories(true);
     apiClient
       .get("/api/mr/territories")
-      .then((res) => setTerritories(res.data.data.territories))
-      .catch((err) => console.error("Failed to load territories:", err));
+      .then((res) => {
+        const list = res.data?.data?.territories || res.data?.territories || [];
+        setTerritories(list);
+      })
+      .catch((err) => console.error("Failed to load territories:", err))
+      .finally(() => setLoadingTerritories(false));
   }, []);
+
+  const territoryOptions: SearchableOption[] = useMemo(() => {
+    return territories.map((t) => ({
+      value: t.id,
+      label: t.name,
+      sublabel: [t.zone, t.region].filter(Boolean).join(" • "),
+      badge: t._count?.doctors !== undefined ? `${t._count.doctors} Doctors` : undefined,
+    }));
+  }, [territories]);
 
   const loadDoctors = async (territoryId: string) => {
     if (!territoryId || doctorsByTerritory[territoryId]) return;
@@ -122,7 +142,8 @@ function NewTourPlanForm() {
       const res = await apiClient.get("/api/mr/entities", {
         params: { type: "DOCTOR", territoryId, limit: 300 },
       });
-      const doctors: Doctor[] = (res.data.data.entities || []).map((e: any) => ({
+      const rawEntities = res.data?.data?.entities || res.data?.entities || [];
+      const doctors: Doctor[] = rawEntities.map((e: any) => ({
         id: e.id,
         name: e.fullName || e.name,
         beatName: e.beatName,
@@ -190,6 +211,53 @@ function NewTourPlanForm() {
     });
     if (prevDay.territoryId) {
       loadDoctors(prevDay.territoryId);
+    }
+  };
+
+  const handleMonthChange = (newMonth: string) => {
+    setMonth(newMonth);
+    // If only 1 day configured and no doctors selected yet, keep Day 1 aligned with the new month
+    setDays((prev) => {
+      if (prev.length === 1 && prev[0].doctorIds.length === 0) {
+        return [{ ...prev[0], date: `${newMonth}-01` }];
+      }
+      return prev;
+    });
+  };
+
+  const autoFillWorkingDays = () => {
+    if (!month) return;
+    if (days.some((d) => d.doctorIds.length > 0)) {
+      const confirmReplace = window.confirm(
+        "Auto-filling working days will regenerate all Mon–Sat days for this month. Proceed?"
+      );
+      if (!confirmReplace) return;
+    }
+
+    const [yearStr, monthNumStr] = month.split("-");
+    const year = parseInt(yearStr, 10);
+    const monthIndex = parseInt(monthNumStr, 10) - 1;
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+    const newDays: DayBlock[] = [];
+    const defaultTerritoryId = days[0]?.territoryId || "";
+
+    for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
+      const dateObj = new Date(year, monthIndex, dayNum);
+      // Skip Sundays (0 = Sunday)
+      if (dateObj.getDay() === 0) continue;
+      const dateStr = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+      newDays.push({
+        date: dateStr,
+        territoryId: defaultTerritoryId,
+        doctorIds: [],
+      });
+    }
+
+    if (newDays.length > 0) {
+      setDays(newDays);
+      if (defaultTerritoryId) {
+        loadDoctors(defaultTerritoryId);
+      }
     }
   };
 
@@ -292,7 +360,7 @@ function NewTourPlanForm() {
           <input
             type="month"
             value={month}
-            onChange={(e) => setMonth(e.target.value)}
+            onChange={(e) => handleMonthChange(e.target.value)}
             className="bg-transparent font-bold text-slate-900 text-sm focus:outline-hidden"
           />
         </div>
@@ -400,12 +468,13 @@ function NewTourPlanForm() {
           return (
             <div
               key={index}
-              className={`bg-white border rounded-2xl shadow-sm transition-all overflow-hidden ${
+              style={{ zIndex: Math.max(1, 40 - index) }}
+              className={`relative overflow-visible bg-white border rounded-2xl shadow-sm transition-all ${
                 day.doctorIds.length > 0 ? "border-slate-300 ring-1 ring-slate-100" : "border-slate-200"
               }`}
             >
               {/* Card Header Bar */}
-              <div className="bg-slate-50/80 px-6 py-3.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+              <div className="bg-slate-50/80 px-6 py-3.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 rounded-t-2xl">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-xl bg-slate-900 text-white font-bold text-sm flex items-center justify-center">
                     {index + 1}
@@ -447,7 +516,7 @@ function NewTourPlanForm() {
                     <button
                       type="button"
                       onClick={() => copyCallsFromPreviousDay(index)}
-                      className="inline-flex items-center gap-1 text-xs text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 px-2.5 py-1 rounded-lg font-semibold transition-colors"
+                      className="inline-flex items-center gap-1 text-xs text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer"
                       title="Copy territory and calls from previous day"
                     >
                       <Copy size={12} /> Copy Day {index}
@@ -458,7 +527,7 @@ function NewTourPlanForm() {
                     <button
                       type="button"
                       onClick={() => removeDay(index)}
-                      className="text-slate-400 hover:text-red-600 p-1 rounded-lg transition-colors"
+                      className="text-slate-400 hover:text-red-600 p-1 rounded-lg transition-colors cursor-pointer"
                       title="Remove day"
                     >
                       <Trash2 size={16} />
@@ -468,7 +537,7 @@ function NewTourPlanForm() {
               </div>
 
               {/* Card Body */}
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-4 rounded-b-2xl">
                 {/* Inputs: Date & Territory */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -490,16 +559,13 @@ function NewTourPlanForm() {
                     <SearchableSelect
                       value={day.territoryId}
                       onChange={(e) => handleTerritoryChange(index, e.target.value)}
-                      placeholder="Select Territory..."
+                      onValueChange={(val) => handleTerritoryChange(index, val)}
+                      options={territoryOptions}
+                      placeholder={loadingTerritories ? "Loading territories..." : "Select Territory..."}
                       searchPlaceholder="Search territory..."
-                    >
-                      <option value="">Select Territory...</option>
-                      {territories.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name} {t.zone ? `(${t.zone})` : ""}
-                        </option>
-                      ))}
-                    </SearchableSelect>
+                      disabled={loadingTerritories}
+                      allowClear
+                    />
                   </div>
                 </div>
 
@@ -681,14 +747,23 @@ function NewTourPlanForm() {
         })}
       </div>
 
-      {/* Add Day Button */}
-      <div className="flex justify-start">
+      {/* Action Buttons: Add Day & Auto-Provision Month */}
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={addDay}
-          className="flex items-center gap-2 text-sky-700 bg-sky-50 hover:bg-sky-100 px-4 py-2.5 rounded-xl text-sm font-bold border border-sky-200 transition-colors shadow-2xs"
+          className="flex items-center gap-2 text-sky-700 bg-sky-50 hover:bg-sky-100 px-4 py-2.5 rounded-xl text-sm font-bold border border-sky-200 transition-colors shadow-2xs cursor-pointer"
         >
           <Plus size={16} /> Add Day {days.length + 1}
+        </button>
+
+        <button
+          type="button"
+          onClick={autoFillWorkingDays}
+          className="flex items-center gap-2 text-slate-700 bg-white hover:bg-slate-50 px-4 py-2.5 rounded-xl text-sm font-bold border border-slate-300 transition-colors shadow-2xs cursor-pointer"
+          title="Auto-generate Monday to Saturday dates for this month"
+        >
+          <Sparkles size={16} className="text-amber-500" /> Auto-Fill Working Days (Mon–Sat)
         </button>
       </div>
 

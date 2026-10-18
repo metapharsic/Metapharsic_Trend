@@ -37,6 +37,7 @@ import {
   ArrowUp,
   ArrowDown,
   ExternalLink,
+  MapPin,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { downloadExcelReportWithDashboard } from "@/lib/excel-export";
@@ -78,6 +79,8 @@ interface ChemistCreditRow {
   chemistId: string;
   name: string;
   address?: string;
+  subArea?: string;
+  beatName?: string;
   territory?: string;
   mr?: string;
   creditLimit: number | null;
@@ -201,6 +204,8 @@ function EnterpriseCreditDashboard({ role }: { role: string | null }) {
         c.name.toLowerCase().includes(q) ||
         (c.mr && c.mr.toLowerCase().includes(q)) ||
         (c.territory && c.territory.toLowerCase().includes(q)) ||
+        (c.subArea && c.subArea.toLowerCase().includes(q)) ||
+        (c.beatName && c.beatName.toLowerCase().includes(q)) ||
         (c.address && c.address.toLowerCase().includes(q));
 
       const matchesStatus = statusFilter === "ALL" || c.status === statusFilter;
@@ -888,6 +893,19 @@ function EnterpriseCreditDashboard({ role }: { role: string | null }) {
                     <tr className="hover:bg-slate-50/70 transition">
                       <td className="py-3.5 px-4">
                         <span className="font-bold text-slate-900 block text-sm">{c.name}</span>
+                        <div className="flex flex-wrap items-center gap-1 mt-0.5 mb-1">
+                          {c.subArea && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 font-bold text-[9px] border border-emerald-200">
+                              <MapPin size={9} />
+                              {c.subArea}
+                            </span>
+                          )}
+                          {c.beatName && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 font-medium text-[9px] border border-blue-200">
+                              Beat: {c.beatName}
+                            </span>
+                          )}
+                        </div>
                         {c.address && (
                           <span className="text-[10px] text-slate-400 block truncate max-w-[180px]">
                             {c.address}

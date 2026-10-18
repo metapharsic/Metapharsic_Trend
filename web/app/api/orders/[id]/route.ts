@@ -28,8 +28,8 @@ async function getOrder(
     const order = await db.order.findUnique({
       where: { id },
       include: {
-        chemist: { select: { name: true, address: true, mobile: true, gstNo: true, territoryId: true } },
-        doctor: { select: { fullName: true, clinicAddress: true, mobile: true, territoryId: true } },
+        chemist: { select: { id: true, name: true, address: true, mobile: true, gstNo: true, territoryId: true, subArea: true, beatName: true, territory: { select: { id: true, name: true } } } },
+        doctor: { select: { id: true, fullName: true, clinicAddress: true, mobile: true, territoryId: true, subArea: true, beatName: true, territory: { select: { id: true, name: true } } } },
         distributor: { select: { name: true, address: true, gstNo: true } },
         employee: { select: { id: true, firstName: true, lastName: true } },
         items: { include: { product: { select: { id: true, name: true, sku: true, pts: true, ptr: true, price: true } } } },

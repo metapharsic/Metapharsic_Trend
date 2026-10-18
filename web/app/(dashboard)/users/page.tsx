@@ -39,6 +39,12 @@ import {
   RoleDefinition,
   getEligibleManagerRoles,
 } from "@/lib/roles-responsibilities";
+import { MrTaskRolesModal } from "@/components/admin/mr-task-roles-modal";
+import {
+  MR_TASK_ROLES_CATALOG,
+  ALL_MR_TASK_CODES,
+  parseAssignedTasks,
+} from "@/lib/mr-task-roles";
 
 interface Territory {
   id: string;
@@ -84,12 +90,14 @@ interface UserRecord {
   isActive: boolean;
   lockedAt?: string | null;
   deviceUuid?: string | null;
+  assignedTasks?: string | string[] | null;
   createdAt: string;
   employee?: {
     id: string;
     firstName: string;
     lastName: string;
     phone: string;
+    assignedTasks?: string | string[] | null;
     managerId?: string | null;
     manager?: { id: string; firstName: string; lastName: string; user?: { role: Role } } | null;
     territories?: Territory[];
@@ -108,6 +116,7 @@ export default function UserManagementPage() {
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editUser, setEditUser] = useState<UserRecord | null>(null);
+  const [managingTasksUser, setManagingTasksUser] = useState<UserRecord | null>(null);
   const [selectedRoleDetail, setSelectedRoleDetail] = useState<RoleDefinition | null>(null);
   const [myRole, setMyRole] = useState<string | null>(null);
 
@@ -296,6 +305,11 @@ export default function UserManagementPage() {
 
   const activeCount = users.filter((u) => u.isActive).length;
   const inactiveCount = users.length - activeCount;
+  const mrUsers = users.filter((u) => u.role === Role.MR);
+  const dlAuthorizedCount = mrUsers.filter((u) => {
+    const tasks = parseAssignedTasks(u.assignedTasks || u.employee?.assignedTasks);
+    return tasks.includes("TASK_DL_COLLECTION");
+  }).length;
 
   return (
     <div className="space-y-6">
@@ -335,7 +349,7 @@ export default function UserManagementPage() {
       </div>
 
       {/* ── KPI Overview Cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
             <UserCheck size={20} />
@@ -375,6 +389,18 @@ export default function UserManagementPage() {
           <div>
             <p className="text-xs font-medium text-gray-400">System Roles</p>
             <p className="text-lg font-bold text-gray-900">{Object.keys(ROLES_RESPONSIBILITIES_CATALOG).length}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-purple-100 shadow-sm flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
+            <Sparkles size={20} />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-400">MR DL Task Authority</p>
+            <p className="text-lg font-bold text-purple-950">
+              {dlAuthorizedCount} / {mrUsers.length} MRs
+            </p>
           </div>
         </div>
       </div>
@@ -559,6 +585,7 @@ export default function UserManagementPage() {
                   <tr>
                     <th className="py-3.5 px-4 sm:px-6">Employee / User</th>
                     <th className="py-3.5 px-4">Role & Duties</th>
+                    <th className="py-3.5 px-4">Assigned MR Tasks</th>
                     <th className="py-3.5 px-4">Reporting Manager</th>
                     <th className="py-3.5 px-4">Territory</th>
                     <th className="py-3.5 px-4">Status & Device</th>
@@ -568,13 +595,13 @@ export default function UserManagementPage() {
                 <tbody className="divide-y divide-gray-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-gray-400">
+                      <td colSpan={7} className="py-12 text-center text-gray-400">
                         Loading users directory...
                       </td>
                     </tr>
                   ) : users.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-gray-400">
+                      <td colSpan={7} className="py-12 text-center text-gray-400">
                         No users found matching current filters.
                       </td>
                     </tr>
@@ -616,6 +643,55 @@ export default function UserManagementPage() {
                               </span>
                               <p className="text-[11px] text-gray-400 mt-0.5">{def.department}</p>
                             </div>
+                          </td>
+
+                          {/* Assigned MR Tasks & Roles */}
+                          <td className="py-3.5 px-4">
+                            {u.role === Role.MR ? (
+                              (() => {
+                                const tasks = parseAssignedTasks(u.assignedTasks || u.employee?.assignedTasks);
+                                const isFull = tasks.length === ALL_MR_TASK_CODES.length;
+                                return (
+                                  <div className="space-y-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setManagingTasksUser(u)}
+                                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-colors cursor-pointer ${
+                                        isFull
+                                          ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                                          : tasks.length > 0
+                                          ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                                          : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                                      }`}
+                                      title="Click to configure MR task roles"
+                                    >
+                                      <ShieldCheck size={12} className="text-purple-600" />
+                                      <span>{tasks.length}/{ALL_MR_TASK_CODES.length} Tasks Active</span>
+                                    </button>
+                                    <div className="flex flex-wrap gap-1">
+                                      {tasks.slice(0, 2).map((tCode) => {
+                                        const tDef = MR_TASK_ROLES_CATALOG.find((t) => t.code === tCode);
+                                        return (
+                                          <span
+                                            key={tCode}
+                                            className="text-[10px] font-medium bg-gray-50 border border-gray-200 text-gray-600 px-1.5 py-0.2 rounded truncate max-w-[120px]"
+                                          >
+                                            {tDef ? tDef.name.split(" ")[0] : tCode}
+                                          </span>
+                                        );
+                                      })}
+                                      {tasks.length > 2 && (
+                                        <span className="text-[10px] text-gray-400 font-semibold self-center">
+                                          +{tasks.length - 2} more
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })()
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">All System Duties</span>
+                            )}
                           </td>
 
                           {/* Reporting Manager */}
@@ -680,6 +756,15 @@ export default function UserManagementPage() {
                             <div className="flex items-center justify-end gap-2">
                               {myRole === Role.ADMIN && (
                                 <>
+                                  {u.role === Role.MR && (
+                                    <button
+                                      onClick={() => setManagingTasksUser(u)}
+                                      className="p-1.5 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors"
+                                      title="Manage MR Task Roles & Capabilities"
+                                    >
+                                      <ShieldCheck size={16} />
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => openEditModal(u)}
                                     className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
@@ -1050,6 +1135,14 @@ export default function UserManagementPage() {
           </div>
         </div>
       )}
+
+      {/* ── MR Task Roles Delegation Modal ── */}
+      <MrTaskRolesModal
+        user={managingTasksUser}
+        isOpen={Boolean(managingTasksUser)}
+        onClose={() => setManagingTasksUser(null)}
+        onSuccess={fetchUsers}
+      />
     </div>
   );
 }
