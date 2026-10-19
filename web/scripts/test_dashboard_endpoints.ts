@@ -72,13 +72,45 @@ async function main() {
   }
   const fridayAttMap = new Map(attendanceFriday.map((a) => [a.employeeId, a]));
 
-  console.log(`\n--- FRIDAY (OCT 16) MR ACTIVITY & LOGOUT ---`);
+  // 3. Tuesday Oct 20 (Today) Verification
+  const oct20 = startOfUtcDay(new Date("2026-10-20T12:00:00Z"));
+  const oct20End = addUtcDays(oct20, 1);
+  const [attendance20, visits20, orders20] = await Promise.all([
+    db.attendance.findMany({
+      where: { employeeId: { in: employeeIds }, date: oct20 },
+      orderBy: { checkIn: "asc" },
+    }),
+    db.visit.findMany({
+      where: { employeeId: { in: employeeIds }, createdAt: { gte: oct20, lt: oct20End } },
+      select: { employeeId: true },
+    }),
+    db.order.findMany({
+      where: { employeeId: { in: employeeIds }, createdAt: { gte: oct20, lt: oct20End } },
+      include: { items: true },
+    }),
+  ]);
+
+  const v20Map = new Map<string, number>();
+  for (const v of visits20) v20Map.set(v.employeeId, (v20Map.get(v.employeeId) ?? 0) + 1);
+  const o20Map = new Map<string, number>();
+  const s20Map = new Map<string, number>();
+  for (const o of orders20) {
+    if (!o.employeeId) continue;
+    o20Map.set(o.employeeId, (o20Map.get(o.employeeId) ?? 0) + 1);
+    const sum = o.items.reduce((acc, it) => acc + Number(it.price) * it.quantity, 0);
+    s20Map.set(o.employeeId, (s20Map.get(o.employeeId) ?? 0) + sum);
+  }
+  const att20Map = new Map(attendance20.map((a) => [a.employeeId, a]));
+
+  console.log(`\n--- TODAY DASHBOARD (${oct20.toISOString().slice(0, 10)}) ---`);
   for (const emp of employees) {
-    const att = fridayAttMap.get(emp.id);
-    const calls = fridayVisitCounts.get(emp.id) ?? 0;
+    const att = att20Map.get(emp.id);
+    const calls = v20Map.get(emp.id) ?? 0;
+    const ords = o20Map.get(emp.id) ?? 0;
+    const sales = s20Map.get(emp.id) ?? 0;
     const inTime = att?.checkIn ? att.checkIn.toLocaleTimeString("en-IN") : "NONE";
     const outTime = att?.checkOut ? att.checkOut.toLocaleTimeString("en-IN") : "NONE";
-    console.log(`  ${(emp.firstName + " " + emp.lastName).padEnd(25)} | Calls: ${String(calls).padEnd(2)} | Login: ${inTime.padEnd(11)} | Logout: ${outTime.padEnd(11)} | Status: ${att ? "PRESENT" : "ABSENT"}`);
+    console.log(`  ${(emp.firstName + " " + emp.lastName).padEnd(25)} | Calls: ${String(calls).padEnd(2)} | Orders: ${ords} (Rs ${sales.toFixed(2)}) | Login: ${inTime.padEnd(11)} | Logout: ${outTime.padEnd(11)} | Status: ${att ? "PRESENT" : "ABSENT"}`);
   }
 }
 
