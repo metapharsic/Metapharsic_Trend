@@ -184,6 +184,25 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Pre-Field Schedule Reminder for MRs upon logging in
+  const [fieldReadinessReminder, setFieldReadinessReminder] = useState<any | null>(null);
+  const [reminderDismissed, setReminderDismissed] = useState(false);
+
+  useEffect(() => {
+    if (userRole !== "MR") return;
+    const isDismissed = sessionStorage.getItem("dismissed_field_schedule_reminder");
+    if (isDismissed) return;
+
+    apiClient
+      .get("/api/sfa/tour-plan/readiness")
+      .then((res) => {
+        if (res.data?.success && res.data.data && !res.data.data.isReady && !res.data.data.isSunday) {
+          setFieldReadinessReminder(res.data.data);
+        }
+      })
+      .catch(() => {});
+  }, [userRole]);
+
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
     router.push("/login");
@@ -594,6 +613,45 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
         </header>
+
+        {/* Pre-Field Daily Schedule Reminder Banner for MRs */}
+        {fieldReadinessReminder && !reminderDismissed && (
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white px-4 py-3 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative z-30">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                <CalendarDays size={18} className="text-white" />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-100">
+                  Pre-Field Schedule Reminder — Action Required
+                </p>
+                <p className="text-xs sm:text-sm font-semibold">
+                  {fieldReadinessReminder.reminderMessage ||
+                    "You do not have a schedule created for today. Create your 1-day Doctor & Chemist visit schedule before heading out on field!"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+              <Link
+                href={fieldReadinessReminder.actionUrl || "/tour-plans?tab=DAILY_SCHEDULE"}
+                className="inline-flex items-center gap-1.5 bg-white text-slate-900 px-3.5 py-1.5 rounded-xl font-bold text-xs hover:bg-amber-50 shadow-sm transition-colors"
+              >
+                <Sparkles size={13} className="text-amber-600" />
+                <span>Create Today's Schedule</span>
+              </Link>
+              <button
+                onClick={() => {
+                  setReminderDismissed(true);
+                  sessionStorage.setItem("dismissed_field_schedule_reminder", "true");
+                }}
+                className="p-1.5 rounded-lg hover:bg-white/20 text-white transition-colors"
+                title="Dismiss reminder"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Global Floating Toast for Excel Export */}
         {exportToast && (

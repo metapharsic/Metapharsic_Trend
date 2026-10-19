@@ -348,6 +348,29 @@ export default function MrDashboardPage() {
         </div>
       )}
 
+      {/* ─── Missing Daily Schedule Notice ─────────────────────────────────── */}
+      {data.todaysVisits.planned === 0 && data.employee.isSelf && (
+        <div className="bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 border border-sky-200 rounded-2xl px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center flex-shrink-0">
+              <CalendarCheck size={20} className="text-sky-600" />
+            </div>
+            <div>
+              <p className="font-bold text-sky-950 text-sm">No Daily Schedule Created For Today</p>
+              <p className="text-xs text-sky-700 mt-0.5">
+                Plan your 1-day field schedule (clubbing your Doctors and Chemists) before heading out on field calls.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/tour-plans?tab=DAILY_SCHEDULE"
+            className="flex-shrink-0 inline-flex items-center gap-2 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
+          >
+            <CalendarCheck size={16} /> Create Today's Schedule
+          </Link>
+        </div>
+      )}
+
       {/* ─── Check-In Banner (when not checked in) ─────────────────────────── */}
       {!data.attendance.checkedIn && data.employee.isSelf && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

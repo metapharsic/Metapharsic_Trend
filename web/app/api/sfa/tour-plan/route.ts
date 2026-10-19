@@ -54,8 +54,8 @@ async function getTourPlans(req: AuthedRequest) {
       orderBy: { month: "desc" },
     });
 
-    // Auto-provision if empty or requested
-    if ((tourPlans.length === 0 || autoProvision) && (employeeId || isManager)) {
+    // Only auto-provision if explicitly requested by manager (do NOT default to 27-day plan on empty)
+    if (autoProvision && (employeeId || isManager)) {
       const targetEmpId = employeeId ?? (await db.employee.findFirst({ select: { id: true } }))?.id;
       if (targetEmpId) {
         const targetMonth = monthParam ? new Date(`${monthParam}-01`) : new Date();

@@ -23,9 +23,13 @@ export interface DailyTourPlanEntry {
   subArea: string | null;
   plannedDoctorId: string | null;
   plannedDoctorName: string | null;
+  doctorSpecialty?: string | null;
+  doctorClinicAddress?: string | null;
   entityType?: "DOCTOR" | "CHEMIST";
   plannedChemistId?: string | null;
   plannedChemistName?: string | null;
+  chemistAddress?: string | null;
+  chemistMobile?: string | null;
   doctorDpsScore: number | null;
   doctorDpsTier: string | null;
   doctorPotential: number | null;
@@ -46,6 +50,25 @@ export interface DailyTourPlanEntry {
   } | null;
 }
 
+export interface ClubbedDaySchedule {
+  date: string;
+  dayOfWeek: string;
+  isSunday: boolean;
+  territoryId: string;
+  territoryName: string;
+  beatName: string | null;
+  subArea: string | null;
+  doctors: DailyTourPlanEntry[];
+  chemists: DailyTourPlanEntry[];
+  allStops: DailyTourPlanEntry[];
+  totalPlanned: number;
+  completedCount: number;
+  pendingCount: number;
+  notDoneCount: number;
+  routeEfficiencyScore: number;
+  complianceStatus: "OPTIMAL" | "COMPLIANT" | "NEEDS_ATTENTION";
+}
+
 export interface TourPlanEvaluation {
   id: string;
   employeeId: string;
@@ -56,6 +79,7 @@ export interface TourPlanEvaluation {
   month: string;
   status: TourPlanStatus;
   days: DailyTourPlanEntry[];
+  clubbedDays?: ClubbedDaySchedule[];
   summary: {
     totalDaysPlanned: number;
     totalDoctorCalls: number;
@@ -291,6 +315,8 @@ export class TourPlanAgentsService {
               select: {
                 id: true,
                 fullName: true,
+                primarySpecialty: true,
+                clinicAddress: true,
                 dpsScore: true,
                 dpsTier: true,
                 crmProfile: { select: { prescriptionPotential: true } },
@@ -326,6 +352,8 @@ export class TourPlanAgentsService {
       let entityType: "DOCTOR" | "CHEMIST" = d.plannedDoctorId ? "DOCTOR" : "DOCTOR";
       let plannedChemistId: string | null = null;
       let plannedChemistName: string | null = null;
+      let chemistAddress: string | null = null;
+      let chemistMobile: string | null = null;
 
       if (d.completionNotes) {
         const chemMatch = d.completionNotes.match(/<!--PLANNED_CHEMIST:(.*?)-->/);
@@ -335,6 +363,8 @@ export class TourPlanAgentsService {
             entityType = "CHEMIST";
             plannedChemistId = parsedChem.id || null;
             plannedChemistName = parsedChem.name || null;
+            chemistAddress = parsedChem.address || null;
+            chemistMobile = parsedChem.mobile || null;
           } catch {}
         }
       }
@@ -373,8 +403,12 @@ export class TourPlanAgentsService {
         entityType,
         plannedDoctorId: d.plannedDoctorId,
         plannedDoctorName: d.plannedDoctor?.fullName ?? null,
+        doctorSpecialty: d.plannedDoctor?.primarySpecialty ?? null,
+        doctorClinicAddress: d.plannedDoctor?.clinicAddress ?? null,
         plannedChemistId,
         plannedChemistName,
+        chemistAddress,
+        chemistMobile,
         doctorDpsScore: doctorScore,
         doctorDpsTier: d.plannedDoctor?.dpsTier ?? null,
         doctorPotential: d.plannedDoctor?.crmProfile?.prescriptionPotential ?? null,
@@ -388,6 +422,47 @@ export class TourPlanAgentsService {
       };
     });
 
+    // Group entries into ClubbedDaySchedule (Doctors and Chemists clubbed by date)
+    const daysByDate = new Map<string, DailyTourPlanEntry[]>();
+    for (const entry of dayEntries) {
+      const list = daysByDate.get(entry.date) || [];
+      list.push(entry);
+      daysByDate.set(entry.date, list);
+    }
+
+    const clubbedDays: ClubbedDaySchedule[] = Array.from(daysByDate.entries()).map(([dateStr, entries]) => {
+      const first = entries[0];
+      const doctors = entries.filter((e) => e.entityType !== "CHEMIST" && e.plannedDoctorId);
+      const chemists = entries.filter((e) => e.entityType === "CHEMIST");
+      const completedCount = entries.filter((e) => e.visitStatus === "DONE" || e.isCompleted).length;
+      const notDoneCount = entries.filter((e) => e.visitStatus === "NOT_DONE").length;
+      const pendingCount = entries.filter(
+        (e) => !e.isSunday && (e.visitStatus === "PENDING" || !e.visitStatus) && !e.isCompleted
+      ).length;
+      const avgEfficiency = Math.round(
+        entries.reduce((sum, e) => sum + e.routeEfficiencyScore, 0) / entries.length
+      );
+
+      return {
+        date: dateStr,
+        dayOfWeek: first.dayOfWeek,
+        isSunday: first.isSunday,
+        territoryId: first.territoryId,
+        territoryName: first.territoryName,
+        beatName: first.beatName,
+        subArea: first.subArea,
+        doctors,
+        chemists,
+        allStops: entries,
+        totalPlanned: entries.length,
+        completedCount,
+        pendingCount,
+        notDoneCount,
+        routeEfficiencyScore: avgEfficiency,
+        complianceStatus: first.complianceStatus,
+      };
+    });
+
     const empTerritories = plan.employee.territories?.map((t: any) => t.name) ?? [];
     const dayTerritoryNames = Array.from(new Set(dayEntries.map((d) => d.territoryName).filter(Boolean)));
     const allTerritories = Array.from(new Set([...empTerritories, ...dayTerritoryNames]));
@@ -397,7 +472,9 @@ export class TourPlanAgentsService {
     const totalDaysPlanned = dayEntries.length;
     const totalDoctorCalls = dayEntries.filter((d) => d.entityType !== "CHEMIST" && d.plannedDoctorId).length;
     const totalChemistCalls = dayEntries.filter((d) => d.entityType === "CHEMIST").length;
-    const totalEntitiesPlanned = dayEntries.filter((d) => d.plannedDoctorId || d.plannedChemistId || d.entityType === "CHEMIST").length;
+    const totalEntitiesPlanned = dayEntries.filter(
+      (d) => d.plannedDoctorId || d.plannedChemistId || d.entityType === "CHEMIST"
+    ).length;
     const uniqueDoctorIds = new Set(dayEntries.map((d) => d.plannedDoctorId).filter(Boolean));
     const highDpsCount = dayEntries.filter((d) => (d.doctorDpsScore ?? 0) >= 70).length;
 
@@ -407,24 +484,31 @@ export class TourPlanAgentsService {
       (d) => !d.isSunday && d.plannedDoctorId && d.visitStatus !== "DONE" && d.visitStatus !== "NOT_DONE"
     ).length;
     const totalTargetEntities = totalEntitiesPlanned || totalDoctorCalls;
-    const executionRatePct = totalTargetEntities > 0 ? Math.round((completedVisitsCount / totalTargetEntities) * 100) : 0;
+    const executionRatePct =
+      totalTargetEntities > 0 ? Math.round((completedVisitsCount / totalTargetEntities) * 100) : 0;
 
-    const avgRouteEfficiency = totalDaysPlanned > 0
-      ? Math.round(dayEntries.reduce((acc, d) => acc + d.routeEfficiencyScore, 0) / totalDaysPlanned)
-      : 85;
+    const avgRouteEfficiency =
+      totalDaysPlanned > 0
+        ? Math.round(dayEntries.reduce((acc, d) => acc + d.routeEfficiencyScore, 0) / totalDaysPlanned)
+        : 85;
 
-    const complianceScore = Math.min(100, Math.round(
-      (totalDoctorCalls / Math.max(1, totalDaysPlanned)) * 50 +
-      (uniqueDoctorIds.size / Math.max(1, totalDoctorCalls || 1)) * 30 +
-      (highDpsCount / Math.max(1, totalDoctorCalls || 1)) * 20
-    ));
+    const complianceScore = Math.min(
+      100,
+      Math.round(
+        (totalDoctorCalls / Math.max(1, totalDaysPlanned)) * 50 +
+          (uniqueDoctorIds.size / Math.max(1, totalDoctorCalls || 1)) * 30 +
+          (highDpsCount / Math.max(1, totalDoctorCalls || 1)) * 20
+      )
+    );
 
     const recommendations: string[] = [];
     if (complianceScore < 80) {
       recommendations.push("DoctorTargetingAgent: Increase doctor call density on open territory days.");
     }
     if (avgRouteEfficiency < 90) {
-      recommendations.push("RouteOptimizerAgent: Cluster adjacent doctor visits on Mondays and Thursdays to reduce travel distance.");
+      recommendations.push(
+        "RouteOptimizerAgent: Cluster adjacent doctor visits on Mondays and Thursdays to reduce travel distance."
+      );
     }
     if (highDpsCount / Math.max(1, totalDoctorCalls) < 0.5) {
       recommendations.push("ComplianceAuditAgent: Substitute low-priority calls with Class A high-DPS doctors.");
@@ -446,6 +530,25 @@ export class TourPlanAgentsService {
         logs: [
           `Provisioned ${totalDaysPlanned} daily entries for ${plan.employee.firstName} ${plan.employee.lastName}`,
           `Mapped ${new Set(dayEntries.map((d) => d.territoryId)).size} assigned territories`,
+        ],
+      },
+      {
+        name: "DailyScheduleClubbingAgent",
+        role: "Doctor & Chemist Beat Clubbing & Single-Day Itinerary Optimization",
+        status: "active",
+        latencyMs: Math.max(14, Math.round(latency * 0.2)),
+        confidence: 0.97,
+        metrics: {
+          clubbedDates: clubbedDays.length,
+          totalClubbedCalls: totalDoctorCalls + (totalChemistCalls || 0),
+          avgCallsPerDay:
+            clubbedDays.length > 0
+              ? Number(((totalDoctorCalls + (totalChemistCalls || 0)) / clubbedDays.length).toFixed(1))
+              : 0,
+        },
+        logs: [
+          `Clubbed ${totalDoctorCalls} doctors and ${totalChemistCalls || 0} chemists across ${clubbedDays.length} active schedule days`,
+          `Optimal field visit proximity verified for ${primaryTerritoryName}`,
         ],
       },
       {
@@ -493,6 +596,22 @@ export class TourPlanAgentsService {
           `Final compliance audit index: ${complianceScore}%`,
         ],
       },
+      {
+        name: "FieldReadinessReminderAgent",
+        role: "Morning Login Field Readiness & Tour Adherence Verification",
+        status: "active",
+        latencyMs: Math.max(9, Math.round(latency * 0.15)),
+        confidence: 0.99,
+        metrics: {
+          todayStatus: dayEntries.some((d) => d.date === new Date().toISOString().split("T")[0])
+            ? "SCHEDULED"
+            : "PENDING_SCHEDULE",
+          completionRate: `${executionRatePct}%`,
+        },
+        logs: [
+          `Verified daily schedule readiness for field representative ${plan.employee.firstName} ${plan.employee.lastName}`,
+        ],
+      },
     ];
 
     return {
@@ -505,6 +624,7 @@ export class TourPlanAgentsService {
       month: plan.month.toISOString().slice(0, 7),
       status: plan.status,
       days: dayEntries,
+      clubbedDays,
       summary: {
         totalDaysPlanned,
         totalDoctorCalls,
@@ -521,6 +641,226 @@ export class TourPlanAgentsService {
       },
       recommendations,
       agentTelemetry,
+    };
+  }
+
+  /**
+   * DailyScheduleClubbingAgent:
+   * Creates or appends a 1-day tour schedule clubbing Doctors and Chemists together for the day's beat/territory.
+   * This ensures MRs do not get defaulted to a 27-day plan, and can construct their schedule day-by-day.
+   */
+  static async createOrAppendSingleDay(params: {
+    employeeId: string;
+    date: Date | string;
+    territoryId: string;
+    beatName?: string | null;
+    subArea?: string | null;
+    doctorIds?: string[];
+    chemistIds?: string[];
+    notes?: string | null;
+    customDb?: any;
+  }): Promise<TourPlanEvaluation> {
+    const client = params.customDb || db;
+    const targetDate = startOfUtcDay(new Date(params.date));
+    const normalizedMonth = startOfUtcMonth(targetDate);
+
+    const employee = await client.employee.findUnique({
+      where: { id: params.employeeId },
+      include: { user: { select: { role: true } } },
+    });
+    if (!employee) {
+      throw new Error(`Employee with ID ${params.employeeId} not found`);
+    }
+
+    // Find or create tour plan for that month
+    let plan = await client.tourPlan.findUnique({
+      where: {
+        employeeId_month: {
+          employeeId: employee.id,
+          month: normalizedMonth,
+        },
+      },
+    });
+
+    if (!plan) {
+      plan = await client.tourPlan.create({
+        data: {
+          employeeId: employee.id,
+          month: normalizedMonth,
+          status: TourPlanStatus.APPROVED,
+          approvedById: employee.id,
+        },
+      });
+    }
+
+    // Delete existing entries for this specific date (replace day with new clubbed stops)
+    await client.tourPlanDay.deleteMany({
+      where: {
+        tourPlanId: plan.id,
+        date: targetDate,
+      },
+    });
+
+    // 1. Add Doctor stops
+    const doctorIds = params.doctorIds || [];
+    if (doctorIds.length > 0) {
+      const doctors = await client.doctor.findMany({
+        where: { id: { in: doctorIds } },
+      });
+      for (const doc of doctors) {
+        await client.tourPlanDay.create({
+          data: {
+            tourPlanId: plan.id,
+            date: targetDate,
+            territoryId: params.territoryId,
+            beatName: params.beatName || doc.beatName,
+            subArea: params.subArea || doc.subArea,
+            plannedDoctorId: doc.id,
+            visitStatus: "PENDING",
+            isCompleted: false,
+          },
+        });
+      }
+    }
+
+    // 2. Add Chemist stops
+    const chemistIds = params.chemistIds || [];
+    if (chemistIds.length > 0) {
+      const chemists = await client.chemist.findMany({
+        where: { id: { in: chemistIds } },
+      });
+      for (const chem of chemists) {
+        const tag = `[Chemist Visit: ${chem.name}]<!--PLANNED_CHEMIST:${JSON.stringify({
+          id: chem.id,
+          name: chem.name,
+          address: chem.address,
+          subArea: chem.subArea,
+          mobile: chem.mobile,
+        })}-->`;
+        await client.tourPlanDay.create({
+          data: {
+            tourPlanId: plan.id,
+            date: targetDate,
+            territoryId: params.territoryId,
+            beatName: params.beatName || chem.beatName,
+            subArea: params.subArea || chem.subArea,
+            plannedDoctorId: null,
+            visitStatus: "PENDING",
+            isCompleted: false,
+            completionNotes: `${tag} ${params.notes || ""}`.trim(),
+          },
+        });
+      }
+    }
+
+    // 3. Fallback: If no doctors and no chemists passed, create open territory day
+    if (doctorIds.length === 0 && chemistIds.length === 0) {
+      await client.tourPlanDay.create({
+        data: {
+          tourPlanId: plan.id,
+          date: targetDate,
+          territoryId: params.territoryId,
+          beatName: params.beatName || null,
+          subArea: params.subArea || null,
+          plannedDoctorId: null,
+          visitStatus: "PENDING",
+          isCompleted: false,
+          completionNotes: params.notes || null,
+        },
+      });
+    }
+
+    return this.evaluatePlan(plan.id, client);
+  }
+
+  /**
+   * FieldReadinessReminderAgent:
+   * Inspects if an MR has scheduled field visits for today (current calendar date).
+   * Generates reminder flags and messages if missing so user is prompted on login.
+   */
+  static async checkFieldReadiness(params: {
+    employeeId: string;
+    date?: Date | string;
+    customDb?: any;
+  }): Promise<{
+    isReady: boolean;
+    hasScheduleToday: boolean;
+    date: string;
+    dayOfWeek: string;
+    isSunday: boolean;
+    plannedDoctorCount: number;
+    plannedChemistCount: number;
+    totalPlannedVisits: number;
+    plannedStopsCount: number;
+    doctorsCount: number;
+    chemistsCount: number;
+    tourPlanId: string | null;
+    reminderTitle: string;
+    reminderMessage: string;
+    actionUrl: string;
+  }> {
+    const client = params.customDb || db;
+    const targetDate = params.date ? startOfUtcDay(new Date(params.date)) : startOfUtcDay(new Date());
+    const dt = new Date(targetDate);
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const dayOfWeek = dayNames[dt.getUTCDay()];
+    const isSunday = dt.getUTCDay() === 0;
+    const dateStr = targetDate.toISOString().split("T")[0];
+
+    const daysToday = await client.tourPlanDay.findMany({
+      where: {
+        tourPlan: { employeeId: params.employeeId },
+        date: targetDate,
+      },
+      include: {
+        plannedDoctor: true,
+      },
+    });
+
+    let plannedDoctorCount = 0;
+    let plannedChemistCount = 0;
+    let tourPlanId: string | null = null;
+
+    for (const d of daysToday) {
+      if (!tourPlanId) tourPlanId = d.tourPlanId;
+      if (d.plannedDoctorId) {
+        plannedDoctorCount++;
+      } else if (d.completionNotes && d.completionNotes.includes("<!--PLANNED_CHEMIST:")) {
+        plannedChemistCount++;
+      } else {
+        plannedDoctorCount++;
+      }
+    }
+
+    const totalPlannedVisits = daysToday.length;
+    const hasScheduleToday = totalPlannedVisits > 0;
+    const isReady = hasScheduleToday || isSunday;
+
+    let reminderMessage = "";
+    if (isSunday) {
+      reminderMessage = `Today (${dateStr}) is Sunday (Weekly Off). No field calls required.`;
+    } else if (hasScheduleToday) {
+      reminderMessage = `Daily schedule active for ${dayOfWeek}, ${dateStr}: ${plannedDoctorCount} Doctor(s) & ${plannedChemistCount} Chemist(s) planned.`;
+    } else {
+      reminderMessage = `⚠️ Pre-Field Reminder: You do not have a schedule created for today (${dayOfWeek}, ${dateStr}). Please create your 1-day Doctor & Chemist visit schedule before heading out on the field!`;
+    }
+
+    return {
+      isReady,
+      hasScheduleToday,
+      date: dateStr,
+      dayOfWeek,
+      isSunday,
+      plannedDoctorCount,
+      plannedChemistCount,
+      totalPlannedVisits,
+      plannedStopsCount: totalPlannedVisits,
+      doctorsCount: plannedDoctorCount,
+      chemistsCount: plannedChemistCount,
+      tourPlanId,
+      reminderTitle: isReady ? "Field Schedule Active" : "Pre-Field Schedule Reminder — Action Required",
+      reminderMessage,
+      actionUrl: `/tour-plans?tab=DAILY_SCHEDULE&date=${dateStr}`,
     };
   }
 

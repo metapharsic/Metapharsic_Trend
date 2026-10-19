@@ -29,6 +29,12 @@ import {
   Trash2,
   Store,
   Building,
+  Download,
+  Printer,
+  FileText,
+  CheckSquare,
+  Square,
+  Filter,
   type LucideIcon,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
@@ -47,8 +53,12 @@ interface Territory {
 interface Doctor {
   id: string;
   fullName: string;
+  primarySpecialty?: string;
+  clinicAddress?: string;
   dpsScore?: number;
   dpsTier?: string;
+  beatName?: string;
+  subArea?: string;
 }
 
 interface Chemist {
@@ -164,6 +174,26 @@ export default function TourPlansDashboard() {
   const [deletingPlan, setDeletingPlan] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // 1-Day Plan Modal state (with Doctor & Chemist Clubbing)
+  const [showSingleDayModal, setShowSingleDayModal] = useState(false);
+  const [singleDayDate, setSingleDayDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [singleDayTerritoryId, setSingleDayTerritoryId] = useState<string>("");
+  const [singleDayBeatName, setSingleDayBeatName] = useState<string>("");
+  const [singleDayDoctorIds, setSingleDayDoctorIds] = useState<string[]>([]);
+  const [singleDayChemistIds, setSingleDayChemistIds] = useState<string[]>([]);
+  const [singleDayNotes, setSingleDayNotes] = useState<string>("");
+  const [singleDaySaving, setSingleDaySaving] = useState(false);
+  const [doctorSearchTerm, setDoctorSearchTerm] = useState("");
+  const [chemistSearchTerm, setChemistSearchTerm] = useState("");
+
+  // Download & Print Modal state
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloadMode, setDownloadMode] = useState<"TODAY" | "ALL">("TODAY");
+  const [targetPrintDate, setTargetPrintDate] = useState<string>(new Date().toISOString().slice(0, 10));
+
+  // Field Readiness state
+  const [fieldReadiness, setFieldReadiness] = useState<any | null>(null);
+
   const handleDeletePlan = async () => {
     if (!deletingPlan) return;
     setIsDeleting(true);
@@ -239,15 +269,267 @@ export default function TourPlansDashboard() {
     }
   };
 
+  const handleCreateSingleDayPlan = async () => {
+    if (!singleDayDate || !singleDayTerritoryId) {
+      alert("Please select a date and territory.");
+      return;
+    }
+    setSingleDaySaving(true);
+    try {
+      const targetEmpId = selectedMrId !== "ALL" ? selectedMrId : (selectedEvaluation?.employeeId || undefined);
+      await apiClient.post("/api/sfa/tour-plan/single-day", {
+        employeeId: targetEmpId,
+        date: singleDayDate,
+        territoryId: singleDayTerritoryId,
+        beatName: singleDayBeatName || null,
+        doctorIds: singleDayDoctorIds,
+        chemistIds: singleDayChemistIds,
+        notes: singleDayNotes || null,
+      });
+      setShowSingleDayModal(false);
+      setSingleDayDoctorIds([]);
+      setSingleDayChemistIds([]);
+      setSingleDayNotes("");
+      loadData(selectedMonth, false, selectedMrId);
+      setActiveTab("DAILY_SCHEDULE");
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message || err?.message || "Failed to create single day schedule");
+    } finally {
+      setSingleDaySaving(false);
+    }
+  };
+
+  const openAppendDayModal = () => {
+    let nextDateStr = new Date().toISOString().slice(0, 10);
+    if (selectedEvaluation && selectedEvaluation.days.length > 0) {
+      const dates = selectedEvaluation.days.map((d) => d.date).sort();
+      const lastDate = new Date(dates[dates.length - 1]);
+      const nextDate = new Date(lastDate);
+      nextDate.setDate(nextDate.getDate() + 1);
+      if (nextDate.getDay() === 0) {
+        // Skip Sunday
+        nextDate.setDate(nextDate.getDate() + 1);
+      }
+      nextDateStr = nextDate.toISOString().slice(0, 10);
+    }
+    setSingleDayDate(nextDateStr);
+    const terrId = selectedEvaluation?.territoryId || territories[0]?.id || "";
+    setSingleDayTerritoryId(terrId);
+    setSingleDayDoctorIds([]);
+    setSingleDayChemistIds([]);
+    setSingleDayNotes("");
+    if (terrId) {
+      loadDoctorsForTerritory(terrId);
+      loadChemistsForTerritory(terrId);
+    }
+    setShowSingleDayModal(true);
+  };
+
+  const handlePrintSchedule = () => {
+    window.print();
+  };
+
+  const handleDownloadHtmlSchedule = () => {
+    if (!selectedEvaluation) return;
+    const targetDate = downloadMode === "TODAY" ? targetPrintDate : null;
+    const daysToInclude = targetDate
+      ? selectedEvaluation.days.filter((d) => d.date === targetDate)
+      : selectedEvaluation.days.filter((d) => !d.isSunday);
+
+    const docCount = daysToInclude.filter((d) => d.entityType !== "CHEMIST" && d.plannedDoctorId).length;
+    const chemCount = daysToInclude.filter((d) => d.entityType === "CHEMIST").length;
+    const doneCount = daysToInclude.filter((d) => d.visitStatus === "DONE" || d.isCompleted).length;
+
+    const rows = daysToInclude
+      .map((d, i) => {
+        const isChem = d.entityType === "CHEMIST";
+        const name = isChem
+          ? d.plannedChemistName || "Retail Chemist"
+          : d.plannedDoctorName || "Doctor Visit";
+        const details = isChem
+          ? d.chemistAddress || d.subArea || "Chemist Outlet"
+          : [d.doctorSpecialty, d.doctorDpsTier].filter(Boolean).join(" • ") || "Practitioner";
+        const loc = [d.beatName, d.territoryName].filter(Boolean).join(" · ");
+        const isDone = d.visitStatus === "DONE" || d.isCompleted;
+
+        return `
+        <tr style="border-bottom: 1px solid #e2e8f0; ${isDone ? "background-color: #f0fdf4;" : ""}">
+          <td style="padding: 10px 8px; text-align: center; font-weight: bold; width: 40px;">${i + 1}</td>
+          <td style="padding: 10px 8px; text-align: center; width: 70px;">
+            <span style="display: inline-block; padding: 2px 6px; font-size: 10px; font-weight: bold; border-radius: 4px; ${
+              isChem
+                ? "background: #f3e8ff; color: #6b21a8; border: 1px solid #d8b4fe;"
+                : "background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc;"
+            }">
+              ${isChem ? "CHEMIST" : "DOCTOR"}
+            </span>
+          </td>
+          <td style="padding: 10px 8px;">
+            <div style="font-weight: bold; color: #0f172a;">${name}</div>
+            <div style="font-size: 11px; color: #64748b;">${details}</div>
+          </td>
+          <td style="padding: 10px 8px; font-size: 12px; color: #334155;">${loc}</td>
+          <td style="padding: 10px 8px; text-align: center; width: 90px;">
+            <div style="width: 22px; height: 22px; border: 2px solid #334155; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; margin: 0 auto; ${
+              isDone ? "background: #059669; color: white; border-color: #059669;" : "background: white;"
+            }">
+              ${isDone ? "✓" : ""}
+            </div>
+            <div style="font-size: 9px; font-weight: bold; color: ${
+              isDone ? "#059669" : "#64748b"
+            }; margin-top: 2px;">
+              ${isDone ? "COMPLETED" : "CALL DONE [ ]"}
+            </div>
+          </td>
+          <td style="padding: 10px 8px; font-size: 11px; color: #64748b; width: 100px; text-align: center;">
+            ___ : ___ In<br>___ : ___ Out
+          </td>
+          <td style="padding: 10px 8px; font-size: 11px; color: #475569; width: 140px;">
+            ${
+              d.completionNotes
+                ? d.completionNotes.replace(/<!--.*?-->/g, "").trim()
+                : '<span style="color: #cbd5e1;">[ Rx / Sample / Stock Notes ]</span>'
+            }
+          </td>
+          <td style="padding: 10px 8px; width: 100px; text-align: center; border-left: 1px dashed #cbd5e1;">
+            <span style="font-size: 9px; color: #94a3b8;">Stamp / Sign</span>
+          </td>
+        </tr>
+      `;
+      })
+      .join("");
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>MR Field Schedule - ${selectedEvaluation.employeeName} - ${targetDate || selectedEvaluation.month}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 24px; color: #0f172a; font-size: 13px; line-height: 1.4; }
+    @media print {
+      body { margin: 10mm; }
+      .no-print { display: none !important; }
+      @page { size: A4 portrait; margin: 10mm; }
+    }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+    th { background: #f8fafc; color: #475569; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px; border-bottom: 2px solid #cbd5e1; }
+  </style>
+</head>
+<body>
+  <div style="border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 14px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+      <div>
+        <h1 style="margin: 0; font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px;">METAPHARSIC PHARMACEUTICALS</h1>
+        <p style="margin: 2px 0 0 0; font-size: 12px; font-weight: 600; color: #0284c7; text-transform: uppercase; letter-spacing: 1px;">
+          Trend MR SFA — Official Field Call Schedule & Execution Sheet
+        </p>
+      </div>
+      <div style="text-align: right;">
+        <span style="display: inline-block; padding: 4px 10px; font-size: 11px; font-weight: bold; border-radius: 9999px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;">
+          APPROVED FIELD ROSTER
+        </span>
+        <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Date: ${targetDate || selectedEvaluation.month}</div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-top: 14px; background: #f1f5f9; padding: 10px 14px; border-radius: 8px;">
+      <div><span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block;">Field Representative</span><strong>${selectedEvaluation.employeeName}</strong></div>
+      <div><span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block;">HQ / Corridor</span><strong>${selectedEvaluation.territoryName || "General Area"}</strong></div>
+      <div><span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block;">Planned Calls</span><strong>${docCount} Doctors + ${chemCount} Chemists (${docCount + chemCount} Total)</strong></div>
+      <div><span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block;">Execution Progress</span><strong style="color: #047857;">${doneCount}/${daysToInclude.length} Completed</strong></div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 40px;">#</th>
+        <th style="width: 70px;">Type</th>
+        <th>Doctor / Chemist Visit Details</th>
+        <th>Beat & Location</th>
+        <th style="width: 90px; text-align: center;">Completed</th>
+        <th style="width: 100px; text-align: center;">Time Log</th>
+        <th style="width: 140px;">Clinical Rx / Order Notes</th>
+        <th style="width: 100px; text-align: center;">Chemist / Dr Sign</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+    </tbody>
+  </table>
+
+  <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #cbd5e1; display: flex; justify-content: space-between; align-items: flex-end; font-size: 11px;">
+    <div>
+      <p style="margin: 0; color: #64748b;">Notice: Check off calls upon completion. Submit signed sheet or sync online before 8:00 PM.</p>
+      <p style="margin: 2px 0 0 0; color: #94a3b8; font-size: 10px;">Generated via Metapharsic Trend MR Multi-Agent SFA Engine · Print-Ready Checkbox Form</p>
+    </div>
+    <div style="display: flex; gap: 40px; text-align: center;">
+      <div>
+        <div style="width: 140px; border-bottom: 1px solid #334155; margin-bottom: 4px; height: 30px;"></div>
+        <span style="font-weight: bold; color: #334155;">MR Field Signature</span>
+      </div>
+      <div>
+        <div style="width: 140px; border-bottom: 1px solid #334155; margin-bottom: 4px; height: 30px;"></div>
+        <span style="font-weight: bold; color: #334155;">ASM Verification Stamp</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `MR_Field_Schedule_${selectedEvaluation.employeeName.replace(/\s+/g, "_")}_${
+      targetDate || selectedEvaluation.month
+    }.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   useEffect(() => {
     setRole(decodeRole());
-    loadData(selectedMonth, true, selectedMrId);
+    loadData(selectedMonth, false, selectedMrId);
 
     // Fetch master territories for editing
     apiClient
       .get("/api/mr/territories")
-      .then((res) => setTerritories(res.data.data.territories || []))
+      .then((res) => {
+        const list = res.data.data.territories || [];
+        setTerritories(list);
+        if (list.length > 0 && !singleDayTerritoryId) {
+          setSingleDayTerritoryId(list[0].id);
+          loadDoctorsForTerritory(list[0].id);
+          loadChemistsForTerritory(list[0].id);
+        }
+      })
       .catch((err) => console.error("Failed to load territories:", err));
+
+    // Check field readiness for today
+    apiClient
+      .get("/api/sfa/tour-plan/readiness")
+      .then((res) => {
+        if (res.data?.success) setFieldReadiness(res.data.data);
+      })
+      .catch(() => {});
+
+    // Inspect URL query params for ?tab=DAILY_SCHEDULE&date=YYYY-MM-DD
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam === "DAILY_SCHEDULE") {
+        setActiveTab("DAILY_SCHEDULE");
+      }
+      const dateParam = params.get("date");
+      if (dateParam) {
+        setSingleDayDate(dateParam);
+        setTargetPrintDate(dateParam);
+        if (params.get("action") === "create_day") {
+          setShowSingleDayModal(true);
+        }
+      }
+    }
   }, [selectedMonth]);
 
   const loadDoctorsForTerritory = async (territoryId: string) => {
@@ -259,6 +541,11 @@ export default function TourPlansDashboard() {
       const docs = (res.data.data.entities || []).map((e: any) => ({
         id: e.id,
         fullName: e.name || e.fullName,
+        primarySpecialty: e.primarySpecialty,
+        clinicAddress: e.clinicAddress,
+        dpsTier: e.dpsTier,
+        beatName: e.beatName,
+        subArea: e.subArea,
       }));
       setDoctorsByTerritory((prev) => ({ ...prev, [territoryId]: docs }));
     } catch (err) {
@@ -676,33 +963,44 @@ export default function TourPlansDashboard() {
           >
             <span>Daily Schedule Editor</span>
             <span className="bg-sky-100 text-sky-700 text-xs px-2.5 py-0.5 rounded-full font-bold">
-              {selectedEvaluation ? `${selectedEvaluation.days.length} Days MR` : `${dynamicWorkingDays} Days MR`}
+              {selectedEvaluation ? `${new Set(selectedEvaluation.days.map((d) => d.date)).size} Days Active` : `1-Day / On-Demand`}
             </span>
           </button>
         </div>
 
-        {/* Quick Options Bar for Monthly Tour Plans (1) */}
-        {activeTab === "OVERVIEW" && isManager && (
-          <div className="pb-2 flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-slate-500 font-semibold">Options:</span>
+        {/* Quick Options Bar for Tour Plans & Daily Schedules */}
+        <div className="pb-2 flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-slate-500 font-semibold">Quick Options:</span>
+          <button
+            onClick={openAppendDayModal}
+            className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-3 py-1 rounded-xl font-bold text-xs shadow-2xs transition-colors"
+            title="Create or append a 1-day field schedule clubbing doctors and chemists"
+          >
+            <Plus size={13} />
+            <span>Plan 1-Day Schedule</span>
+          </button>
+          {selectedEvaluation && (
+            <button
+              onClick={() => setShowDownloadModal(true)}
+              className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 px-3 py-1 rounded-xl font-bold text-xs shadow-2xs transition-colors"
+              title="Download or print field-ready schedule with checkboxes for offline/on-field check-off"
+            >
+              <Printer size={13} className="text-slate-600" />
+              <span>Download / Print Schedule</span>
+            </button>
+          )}
+          {activeTab === "OVERVIEW" && isManager && (
             <button
               onClick={() => handleProvision27DayPlan("ALL")}
               disabled={provisioning}
               className="inline-flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-3 py-1 rounded-xl font-bold text-xs shadow-2xs transition-colors disabled:opacity-50"
-              title={`Auto-provision ${dynamicWorkingDays} days MR working schedule for all fleet representatives`}
+              title={`Optional: Auto-provision full month (${dynamicWorkingDays} days) working schedule for all fleet representatives`}
             >
               <Sparkles size={13} className="text-emerald-600" />
-              <span>Auto-Provision {dynamicWorkingDays} Days MR (All)</span>
+              <span>Auto-Provision Full Month ({dynamicWorkingDays}d)</span>
             </button>
-            <button
-              onClick={() => setActiveTab("DAILY_SCHEDULE")}
-              className="inline-flex items-center gap-1.5 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 px-3 py-1 rounded-xl font-bold text-xs shadow-2xs transition-colors"
-            >
-              <CalendarDays size={13} className="text-sky-600" />
-              <span>Daily Schedule Editor ({dynamicWorkingDays}d)</span>
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* TAB 1: OVERVIEW TABLE */}
@@ -928,13 +1226,21 @@ export default function TourPlansDashboard() {
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-900">
-              Daily Schedule Editor ({dynamicWorkingDays} Days MR)
+              Daily Schedule Editor — Start with 1 Day & Append
             </h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-              Select an MR from the fleet or auto-provision an accurate {dynamicWorkingDays}-day working tour schedule for {new Date(`${selectedMonth}-01`).toLocaleDateString("en-IN", { month: "long", year: "numeric" })} (month days excluding Sundays).
+            <p className="text-xs text-slate-500 max-w-lg mx-auto mt-1">
+              Create a focused 1-day field schedule clubbing target doctors and retail chemists for complete beat coverage. You can append days one by one as your field visits progress, or optionally auto-provision an entire month.
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={openAppendDayModal}
+              className="inline-flex items-center gap-2 bg-sky-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-sky-700 shadow-sm transition-colors"
+            >
+              <Plus size={14} />
+              <span>Create 1-Day Schedule (Clubbed Doctors & Chemists)</span>
+            </button>
+
             {isManager && mrEmployees.length > 0 && (
               <SearchableSelect
                 value={selectedMrId}
@@ -954,18 +1260,22 @@ export default function TourPlansDashboard() {
                 ))}
               </SearchableSelect>
             )}
-            <button
-              onClick={() => handleProvision27DayPlan(selectedMrId !== "ALL" ? selectedMrId : undefined)}
-              disabled={provisioning}
-              className="inline-flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-emerald-700 shadow-sm transition-colors disabled:opacity-50"
-            >
-              <Sparkles size={14} className={provisioning ? "animate-spin" : ""} />
-              <span>
-                {provisioning
-                  ? "Provisioning..."
-                  : `Auto-Provision ${dynamicWorkingDays} Days MR Plan`}
-              </span>
-            </button>
+
+            {isManager && (
+              <button
+                onClick={() => handleProvision27DayPlan(selectedMrId !== "ALL" ? selectedMrId : undefined)}
+                disabled={provisioning}
+                className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 px-4 py-2.5 rounded-xl text-xs font-bold shadow-2xs transition-colors disabled:opacity-50"
+                title={`Auto-provision entire ${dynamicWorkingDays}-day working schedule`}
+              >
+                <Sparkles size={14} className={provisioning ? "animate-spin text-emerald-600" : "text-emerald-600"} />
+                <span>
+                  {provisioning
+                    ? "Provisioning..."
+                    : `Auto-Provision ${dynamicWorkingDays} Days (Optional)`}
+                </span>
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1143,7 +1453,27 @@ export default function TourPlansDashboard() {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
-                    {/* Add / Append Day Button for MRs and Managers */}
+                    {/* Plan 1-Day Schedule / Append Button */}
+                    <button
+                      onClick={openAppendDayModal}
+                      className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-colors shrink-0"
+                      title="Plan 1-day schedule clubbing doctors and chemists"
+                    >
+                      <Plus size={14} />
+                      <span>Plan 1-Day Schedule</span>
+                    </button>
+
+                    {/* Download & Print Field Schedule with Checkboxes */}
+                    <button
+                      onClick={() => setShowDownloadModal(true)}
+                      className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-colors shrink-0"
+                      title="Download or print field-ready schedule with checkboxes for on-field execution"
+                    >
+                      <Printer size={14} className="text-slate-600" />
+                      <span>Download / Print Schedule</span>
+                    </button>
+
+                    {/* Quick Add Stop Button */}
                     <button
                       onClick={() => {
                         const todayStr = new Date().toISOString().slice(0, 10);
@@ -1156,18 +1486,17 @@ export default function TourPlansDashboard() {
                         }
                         setAddingDay(true);
                       }}
-                      className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-colors shrink-0"
-                      title="Append or add a new working day to this tour plan"
+                      className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-2.5 py-1.5 rounded-xl font-semibold text-xs transition-colors shrink-0"
+                      title="Quickly add an extra doctor or chemist stop"
                     >
-                      <Plus size={14} />
-                      <span>Append / Add Day</span>
+                      <span>+ Stop</span>
                     </button>
 
                     {/* Filter Tabs */}
-                    <div className="flex items-center gap-1.5 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold">
+                    <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold">
                       <button
                         onClick={() => setVisitFilter("ALL")}
-                        className={`px-3 py-1 rounded-lg transition-all ${
+                        className={`px-2.5 py-1 rounded-lg transition-all ${
                           visitFilter === "ALL"
                             ? "bg-white text-slate-900 shadow-xs font-bold"
                             : "text-slate-600 hover:text-slate-900"
@@ -1177,7 +1506,7 @@ export default function TourPlansDashboard() {
                       </button>
                       <button
                         onClick={() => setVisitFilter("DONE")}
-                        className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                        className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
                           visitFilter === "DONE"
                             ? "bg-emerald-600 text-white shadow-xs font-bold"
                             : "text-emerald-700 hover:bg-white/60"
@@ -1187,7 +1516,7 @@ export default function TourPlansDashboard() {
                       </button>
                       <button
                         onClick={() => setVisitFilter("NOT_DONE")}
-                        className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                        className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
                           visitFilter === "NOT_DONE"
                             ? "bg-red-600 text-white shadow-xs font-bold"
                             : "text-red-700 hover:bg-white/60"
@@ -1197,7 +1526,7 @@ export default function TourPlansDashboard() {
                       </button>
                       <button
                         onClick={() => setVisitFilter("PENDING")}
-                        className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                        className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
                           visitFilter === "PENDING"
                             ? "bg-amber-500 text-white shadow-xs font-bold"
                             : "text-amber-800 hover:bg-white/60"
@@ -1228,9 +1557,26 @@ export default function TourPlansDashboard() {
                             : "hover:bg-sky-50/40"
                         }`}
                       >
-                        <div className="flex items-center gap-4 min-w-[200px]">
+                        <div className="flex items-center gap-3 min-w-[220px]">
+                          {/* On-Field Interactive Checkbox */}
+                          {!day.isSunday && (
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={() => handleToggleVisitStatus(day, isDone ? "PENDING" : "DONE")}
+                              className="p-1.5 rounded-xl hover:bg-slate-200/60 transition-colors shrink-0 text-slate-400 hover:text-emerald-600"
+                              title={isDone ? "Call Completed! Click to uncheck" : "Click to mark Call Done"}
+                            >
+                              {isDone ? (
+                                <CheckSquare size={22} className="text-emerald-600" />
+                              ) : (
+                                <Square size={22} className="text-slate-400 hover:text-slate-600" />
+                              )}
+                            </button>
+                          )}
+
                           <div
-                            className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center text-center border ${
+                            className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center text-center border shrink-0 ${
                               day.isSunday
                                 ? "bg-slate-100 border-slate-200"
                                 : isDone
@@ -1302,32 +1648,46 @@ export default function TourPlansDashboard() {
                           <div className="flex items-center gap-2">
                             {day.entityType === "CHEMIST" ? (
                               <>
-                                <Store size={14} className="text-purple-600 shrink-0" />
+                                <Store size={15} className="text-purple-600 shrink-0" />
                                 <div>
-                                  <span className="text-[10px] uppercase font-bold text-purple-600 block">Planned Chemist</span>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="font-semibold text-slate-900">{day.plannedChemistName || "Retail Chemist Visit"}</span>
-                                    <span className="bg-purple-100 text-purple-800 font-bold px-1.5 py-0.5 rounded text-[10px] border border-purple-200">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[10px] uppercase font-bold text-purple-600">Planned Chemist</span>
+                                    <span className="bg-purple-100 text-purple-800 font-bold px-1.5 py-0.2 rounded text-[10px] border border-purple-200">
                                       Retail Chemist
                                     </span>
+                                  </div>
+                                  <div className="mt-0.5">
+                                    <span className="font-semibold text-slate-900 block">{day.plannedChemistName || "Retail Chemist Visit"}</span>
+                                    {day.chemistAddress && (
+                                      <p className="text-[11px] text-slate-500 truncate max-w-xs">{day.chemistAddress}</p>
+                                    )}
+                                    {day.chemistMobile && (
+                                      <span className="text-[10px] text-purple-700 font-mono">Ph: {day.chemistMobile}</span>
+                                    )}
                                   </div>
                                 </div>
                               </>
                             ) : (
                               <>
-                                <Stethoscope size={14} className="text-slate-400 shrink-0" />
+                                <Stethoscope size={15} className="text-sky-600 shrink-0" />
                                 <div>
-                                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Planned Doctor</span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[10px] uppercase font-bold text-sky-700">Planned Doctor</span>
+                                    {day.doctorDpsTier && (
+                                      <span className="bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded text-[10px]">
+                                        {day.doctorDpsTier}
+                                      </span>
+                                    )}
+                                  </div>
                                   {day.plannedDoctorName ? (
-                                    <div className="space-y-1">
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="font-semibold text-slate-900">{day.plannedDoctorName}</span>
-                                        {day.doctorDpsTier && (
-                                          <span className="bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded text-[10px]">
-                                            {day.doctorDpsTier}
-                                          </span>
-                                        )}
-                                      </div>
+                                    <div className="space-y-0.5 mt-0.5">
+                                      <span className="font-semibold text-slate-900 block">{day.plannedDoctorName}</span>
+                                      {day.doctorSpecialty && (
+                                        <span className="text-[11px] text-slate-600 font-medium block">{day.doctorSpecialty}</span>
+                                      )}
+                                      {day.doctorClinicAddress && (
+                                        <p className="text-[11px] text-slate-500 truncate max-w-xs">{day.doctorClinicAddress}</p>
+                                      )}
 
                                       {/* Medicine Placement Badge when call is done */}
                                       {day.medicinePlacement && (
@@ -1426,6 +1786,7 @@ export default function TourPlansDashboard() {
                                   loadDoctorsForTerritory(day.territoryId);
                                   loadChemistsForTerritory(day.territoryId);
                                 }
+                                setSingleDayBeatName(day.beatName || "");
                                 setAddingDay(true);
                               }}
                               className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold px-2.5 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors shadow-xs"
@@ -1458,6 +1819,32 @@ export default function TourPlansDashboard() {
                       No visits match the current "{visitFilter}" filter.
                     </div>
                   )}
+                </div>
+
+                {/* Day Matrix Bottom Actions Bar */}
+                <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={16} className="text-sky-600" />
+                    <span className="text-xs font-semibold text-slate-700">
+                      Multi-Agent Field Schedule Controls ({new Set(selectedEvaluation.days.map((d) => d.date)).size} days active)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={openAppendDayModal}
+                      className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-colors"
+                    >
+                      <Plus size={14} />
+                      <span>Append Next Day (Doctors & Chemists)</span>
+                    </button>
+                    <button
+                      onClick={() => setShowDownloadModal(true)}
+                      className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-colors"
+                    >
+                      <Printer size={14} className="text-slate-600" />
+                      <span>Download / Print Field Sheet</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -2207,6 +2594,473 @@ export default function TourPlansDashboard() {
                 {isDeleting ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}
                 <span>{isDeleting ? "Deleting..." : "Yes, Delete Plan"}</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 1-DAY SCHEDULE CREATOR & APPEND MODAL (CLUBBING DOCTORS & CHEMISTS) */}
+      {showSingleDayModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 border border-slate-200 my-8">
+            <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-slate-900">
+                    Plan 1-Day Schedule (Doctors & Chemists Clubbed)
+                  </h3>
+                  <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+                    Daily Schedule Multi-Agent
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Set up or append a single day field itinerary for {selectedEvaluation?.employeeName || "Representative"}. Doctors and chemists are clubbed together for comprehensive beat coverage.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSingleDayModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+              {/* Date & Territory */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                    Itinerary Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={singleDayDate}
+                    onChange={(e) => setSingleDayDate(e.target.value)}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold bg-white focus:outline-sky-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                    Field Territory *
+                  </label>
+                  <SearchableSelect
+                    value={singleDayTerritoryId}
+                    onChange={(e) => {
+                      const tid = e.target.value;
+                      setSingleDayTerritoryId(tid);
+                      setSingleDayDoctorIds([]);
+                      setSingleDayChemistIds([]);
+                      if (tid) {
+                        loadDoctorsForTerritory(tid);
+                        loadChemistsForTerritory(tid);
+                      }
+                    }}
+                    placeholder="Select Territory"
+                    searchPlaceholder="Search territory..."
+                  >
+                    <option value="">Select Territory</option>
+                    {territories.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </SearchableSelect>
+                </div>
+              </div>
+
+              {/* Beat Name */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                  Beat / Route Zone (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Beat-A Central Clinic & Chemist Hub"
+                  value={singleDayBeatName}
+                  onChange={(e) => setSingleDayBeatName(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs bg-white focus:outline-sky-500"
+                />
+              </div>
+
+              {/* Clubbed Doctors Selection */}
+              <div className="bg-sky-50/50 border border-sky-100 rounded-xl p-3.5 space-y-2.5">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Stethoscope size={16} className="text-sky-600 shrink-0" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Target Doctors ({singleDayDoctorIds.length} Selected)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Filter doctors..."
+                      value={doctorSearchTerm}
+                      onChange={(e) => setDoctorSearchTerm(e.target.value)}
+                      className="text-xs border border-slate-200 bg-white rounded-lg px-2 py-1 w-36"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const docs = (doctorsByTerritory[singleDayTerritoryId] || []).filter((d) =>
+                          d.fullName.toLowerCase().includes(doctorSearchTerm.toLowerCase()) ||
+                          (d.primarySpecialty && d.primarySpecialty.toLowerCase().includes(doctorSearchTerm.toLowerCase()))
+                        );
+                        setSingleDayDoctorIds(Array.from(new Set([...singleDayDoctorIds, ...docs.map((d) => d.id)])));
+                      }}
+                      className="text-[11px] font-bold text-sky-700 hover:text-sky-900 bg-sky-100 px-2 py-1 rounded"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSingleDayDoctorIds([])}
+                      className="text-[11px] font-bold text-slate-500 hover:text-slate-700 bg-slate-200 px-2 py-1 rounded"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-40 overflow-y-auto divide-y divide-slate-100 bg-white rounded-lg border border-slate-200 p-1">
+                  {(doctorsByTerritory[singleDayTerritoryId] || [])
+                    .filter((d) =>
+                      d.fullName.toLowerCase().includes(doctorSearchTerm.toLowerCase()) ||
+                      (d.primarySpecialty && d.primarySpecialty.toLowerCase().includes(doctorSearchTerm.toLowerCase()))
+                    )
+                    .map((doc) => {
+                      const isChecked = singleDayDoctorIds.includes(doc.id);
+                      return (
+                        <label
+                          key={doc.id}
+                          className={`flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors ${
+                            isChecked ? "bg-sky-50" : "hover:bg-slate-50"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSingleDayDoctorIds([...singleDayDoctorIds, doc.id]);
+                              } else {
+                                setSingleDayDoctorIds(singleDayDoctorIds.filter((id) => id !== doc.id));
+                              }
+                            }}
+                            className="mt-0.5 rounded text-sky-600 focus:ring-sky-500"
+                          />
+                          <div className="text-xs flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-800">{doc.fullName}</span>
+                              {doc.dpsTier && (
+                                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 rounded">
+                                  {doc.dpsTier}
+                                </span>
+                              )}
+                              {doc.primarySpecialty && (
+                                <span className="text-[10px] text-slate-500 font-medium">({doc.primarySpecialty})</span>
+                              )}
+                            </div>
+                            {doc.clinicAddress && (
+                              <p className="text-[11px] text-slate-500 truncate max-w-md">{doc.clinicAddress}</p>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+
+                  {(!doctorsByTerritory[singleDayTerritoryId] ||
+                    doctorsByTerritory[singleDayTerritoryId].length === 0) && (
+                    <div className="p-3 text-center text-xs text-slate-400">
+                      {singleDayTerritoryId ? "No doctors found in territory." : "Select a territory first."}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Clubbed Chemists Selection */}
+              <div className="bg-purple-50/50 border border-purple-100 rounded-xl p-3.5 space-y-2.5">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Store size={16} className="text-purple-600 shrink-0" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Target Retail Chemists ({singleDayChemistIds.length} Selected)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Filter chemists..."
+                      value={chemistSearchTerm}
+                      onChange={(e) => setChemistSearchTerm(e.target.value)}
+                      className="text-xs border border-slate-200 bg-white rounded-lg px-2 py-1 w-36"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const chems = (chemistsByTerritory[singleDayTerritoryId] || []).filter((c) =>
+                          c.name.toLowerCase().includes(chemistSearchTerm.toLowerCase()) ||
+                          (c.address && c.address.toLowerCase().includes(chemistSearchTerm.toLowerCase()))
+                        );
+                        setSingleDayChemistIds(Array.from(new Set([...singleDayChemistIds, ...chems.map((c) => c.id)])));
+                      }}
+                      className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-100 px-2 py-1 rounded"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSingleDayChemistIds([])}
+                      className="text-[11px] font-bold text-slate-500 hover:text-slate-700 bg-slate-200 px-2 py-1 rounded"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-40 overflow-y-auto divide-y divide-slate-100 bg-white rounded-lg border border-slate-200 p-1">
+                  {(chemistsByTerritory[singleDayTerritoryId] || [])
+                    .filter((c) =>
+                      c.name.toLowerCase().includes(chemistSearchTerm.toLowerCase()) ||
+                      (c.address && c.address.toLowerCase().includes(chemistSearchTerm.toLowerCase()))
+                    )
+                    .map((chem) => {
+                      const isChecked = singleDayChemistIds.includes(chem.id);
+                      return (
+                        <label
+                          key={chem.id}
+                          className={`flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors ${
+                            isChecked ? "bg-purple-50" : "hover:bg-slate-50"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSingleDayChemistIds([...singleDayChemistIds, chem.id]);
+                              } else {
+                                setSingleDayChemistIds(singleDayChemistIds.filter((id) => id !== chem.id));
+                              }
+                            }}
+                            className="mt-0.5 rounded text-purple-600 focus:ring-purple-500"
+                          />
+                          <div className="text-xs flex-1">
+                            <span className="font-bold text-slate-800 block">{chem.name}</span>
+                            {chem.address && (
+                              <p className="text-[11px] text-slate-500 truncate max-w-md">{chem.address}</p>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+
+                  {(!chemistsByTerritory[singleDayTerritoryId] ||
+                    chemistsByTerritory[singleDayTerritoryId].length === 0) && (
+                    <div className="p-3 text-center text-xs text-slate-400">
+                      {singleDayTerritoryId ? "No chemists found in territory." : "Select a territory first."}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Day Objective / Notes */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                  Field Call Objective & Notes
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Focus on Metapharsic Cardio launch and stock order checks at key chemist outlets."
+                  value={singleDayNotes}
+                  onChange={(e) => setSingleDayNotes(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-white focus:outline-sky-500"
+                />
+              </div>
+
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-xs text-emerald-900">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <span>
+                  <strong>DailyScheduleClubbingAgent:</strong> {singleDayDoctorIds.length} Doctor(s) and {singleDayChemistIds.length} Chemist(s) will be clubbed together on {singleDayDate}.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <button
+                disabled={singleDaySaving}
+                onClick={() => setShowSingleDayModal(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={singleDaySaving || !singleDayDate || !singleDayTerritoryId}
+                onClick={handleCreateSingleDayPlan}
+                className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-5 py-2 text-xs font-bold rounded-xl shadow-xs transition-colors disabled:opacity-50"
+              >
+                {singleDaySaving ? <RefreshCw size={13} className="animate-spin" /> : <Plus size={14} />}
+                <span>{singleDaySaving ? "Saving Itinerary..." : "Save 1-Day Schedule"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DOWNLOAD & PRINT FIELD SCHEDULE MODAL */}
+      {showDownloadModal && selectedEvaluation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-5 border border-slate-200 my-8">
+            <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Printer size={18} className="text-sky-600" />
+                  <h3 className="text-lg font-bold text-slate-900">
+                    Field-Ready Schedule Export & Printable Sheet
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Export formatted field call sheet equipped with physical verification checkboxes ([ ]) for on-field call completion.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDownloadModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Scope Toggle */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-700 uppercase">Export Scope:</span>
+                <div className="inline-flex rounded-xl bg-slate-200/80 p-0.5 text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setDownloadMode("TODAY")}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      downloadMode === "TODAY"
+                        ? "bg-white text-slate-900 shadow-xs font-bold"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Target Date ({targetPrintDate})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDownloadMode("ALL")}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      downloadMode === "ALL"
+                        ? "bg-white text-slate-900 shadow-xs font-bold"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    All Days ({new Set(selectedEvaluation.days.map((d) => d.date)).size} Days)
+                  </button>
+                </div>
+              </div>
+
+              {downloadMode === "TODAY" && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-slate-500 font-medium">Select Date:</span>
+                  <input
+                    type="date"
+                    value={targetPrintDate}
+                    onChange={(e) => setTargetPrintDate(e.target.value)}
+                    className="text-xs border border-slate-300 rounded-lg px-2.5 py-1 bg-white font-bold"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Live Sheet Preview */}
+            <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-3">
+              <div className="flex justify-between items-center text-xs border-b border-slate-200 pb-2">
+                <div>
+                  <span className="font-bold text-slate-900">{selectedEvaluation.employeeName}</span>
+                  <span className="text-slate-500 ml-2">Territory: {selectedEvaluation.territoryName || "Field Beat"}</span>
+                </div>
+                <span className="bg-sky-100 text-sky-800 font-bold px-2 py-0.5 rounded text-[10px]">
+                  Print-Ready Format with Checkboxes [ ]
+                </span>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto bg-white rounded-lg border border-slate-200 divide-y divide-slate-100 text-xs">
+                {(downloadMode === "TODAY"
+                  ? selectedEvaluation.days.filter((d) => d.date === targetPrintDate)
+                  : selectedEvaluation.days.filter((d) => !d.isSunday)
+                ).map((entry, idx) => (
+                  <div key={entry.id || idx} className="p-2.5 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="inline-block w-5 h-5 rounded border-2 border-slate-400 text-center text-[10px] font-bold text-emerald-700 bg-white leading-4">
+                        {entry.visitStatus === "DONE" || entry.isCompleted ? "✓" : ""}
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded uppercase ${
+                            entry.entityType === "CHEMIST" ? "bg-purple-100 text-purple-800" : "bg-sky-100 text-sky-800"
+                          }`}>
+                            {entry.entityType || "DOCTOR"}
+                          </span>
+                          <span className="font-bold text-slate-800">
+                            {entry.entityType === "CHEMIST" ? entry.plannedChemistName || "Chemist Visit" : entry.plannedDoctorName || "Doctor Visit"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {entry.entityType === "CHEMIST" ? entry.chemistAddress || entry.subArea || "Local Chemist" : entry.doctorClinicAddress || entry.doctorSpecialty || "Clinic / Hospital"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right text-[11px] text-slate-400 font-mono">
+                      [____:____ AM/PM]
+                    </div>
+                  </div>
+                ))}
+
+                {(downloadMode === "TODAY"
+                  ? selectedEvaluation.days.filter((d) => d.date === targetPrintDate)
+                  : selectedEvaluation.days.filter((d) => !d.isSunday)
+                ).length === 0 && (
+                  <div className="p-6 text-center text-xs text-slate-400 italic">
+                    No scheduled visits found for this selection. Use "Plan 1-Day Schedule" to add calls.
+                  </div>
+                )}
+              </div>
+
+              <div className="text-[11px] text-slate-500 flex justify-between items-center pt-1">
+                <span>Field signature blocks and verification rows included in exported sheet.</span>
+                <span className="text-slate-400 font-mono">Form Template: SFA-TP-CHK-V2</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-between items-center gap-2 pt-3 border-t border-slate-100">
+              <button
+                onClick={() => setShowDownloadModal(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                Close
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownloadHtmlSchedule}
+                  className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-bold rounded-xl shadow-xs transition-colors"
+                  title="Download standalone HTML file that works offline and can be saved or opened on phone/laptop"
+                >
+                  <Download size={14} />
+                  <span>Download HTML Sheet</span>
+                </button>
+                <button
+                  onClick={handlePrintSchedule}
+                  className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 text-xs font-bold rounded-xl shadow-xs transition-colors"
+                  title="Directly trigger browser print dialog to print or save as PDF"
+                >
+                  <Printer size={14} />
+                  <span>Print / Save as PDF</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

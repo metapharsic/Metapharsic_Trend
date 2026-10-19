@@ -81,6 +81,7 @@ export default function LoginPage() {
         if (mrRes.data.data.refreshToken) {
           localStorage.setItem("refreshToken", mrRes.data.data.refreshToken);
         }
+        sessionStorage.removeItem("dismissed_field_schedule_reminder");
         redirectForRole(mrRes.data.data.user.role);
       } catch (mrErr: any) {
         setError(mrErr?.response?.data?.error?.message || "Login failed");
