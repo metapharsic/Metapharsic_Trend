@@ -315,17 +315,19 @@ async function main() {
 
     const visitIdList = visitUpdates.map((u) => `'${u.id}'`).join(", ");
 
-    let vpsBatchSql = `
-      BEGIN;
+    let vpsBatchSql = `BEGIN;\n`;
 
-      UPDATE "Visit"
-      SET 
-        "createdAt" = CASE "id" ${visitCases} END,
-        "startedAt" = CASE "id" ${visitStartedCases} END,
-        "endedAt" = CASE "id" ${visitEndedCases} END,
-        "followUpDate" = CASE "id" ${visitFollowUpCases} END
-      WHERE "id" IN (${visitIdList});
-    `;
+    if (visitUpdates.length > 0) {
+      vpsBatchSql += `
+        UPDATE "Visit"
+        SET 
+          "createdAt" = CASE "id" ${visitCases} END,
+          "startedAt" = CASE "id" ${visitStartedCases} END,
+          "endedAt" = CASE "id" ${visitEndedCases} END,
+          "followUpDate" = CASE "id" ${visitFollowUpCases} END
+        WHERE "id" IN (${visitIdList});
+      `;
+    }
 
     if (orderUpdates.length > 0) {
       const orderCreatedCases = orderUpdates
@@ -410,4 +412,6 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+if (require.main === module) {
+  main().catch(console.error);
+}
