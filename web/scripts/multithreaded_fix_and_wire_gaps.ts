@@ -95,8 +95,8 @@ if (!isMainThread) {
           const doc = tierADoctors[i];
           const assignedMr = mrs[i % mrs.length];
 
-          // Distribute across October 2026 dates (e.g. Oct 6 to Oct 28)
-          const day = 5 + (i % 24);
+          // Distribute across actual October 2026 dates (Oct 1 to Oct 19)
+          const day = 1 + (i % 19);
           const hour = 10 + (i % 6);
           const minute = (i * 15) % 60;
           const visitDate = new Date(Date.UTC(2026, 9, day, hour, minute));
@@ -198,8 +198,9 @@ if (!isMainThread) {
         let visitsCreated = 0;
         const activatedReps = new Set<string>();
 
-        // Ensure every day from Oct 1 to Oct 31, 2026 has active field visits
-        for (let day = 1; day <= 31; day++) {
+        // Ensure elapsed days from Oct 1 to Oct 19, 2026 (month-to-date) have active field visits
+        const currentDayLimit = Math.min(new Date().getDate(), 19);
+        for (let day = 1; day <= currentDayLimit; day++) {
           // Check existing visits on this date
           const dayStart = new Date(Date.UTC(2026, 9, day, 0, 0, 0));
           const dayEnd = new Date(Date.UTC(2026, 9, day, 23, 59, 59));
@@ -304,7 +305,7 @@ if (!isMainThread) {
         for (let i = 0; i < beatDoctors.length; i++) {
           const doc = beatDoctors[i];
           const mr = mrs[i % mrs.length];
-          const visitDate = new Date(Date.UTC(2026, 9, 8 + (i % 20), 10 + (i % 5), (i * 15) % 60));
+          const visitDate = new Date(Date.UTC(2026, 9, 1 + (i % 19), 10 + (i % 5), (i * 15) % 60));
 
           await prisma.visit.create({
             data: {
@@ -330,7 +331,7 @@ if (!isMainThread) {
         for (let i = 0; i < beatChemists.length; i++) {
           const chem = beatChemists[i];
           const mr = mrs[i % mrs.length];
-          const visitDate = new Date(Date.UTC(2026, 9, 9 + (i % 20), 11 + (i % 5), (i * 20) % 60));
+          const visitDate = new Date(Date.UTC(2026, 9, 1 + (i % 19), 11 + (i % 5), (i * 20) % 60));
 
           await prisma.visit.create({
             data: {
@@ -365,7 +366,7 @@ if (!isMainThread) {
           const chem = zeroOrderChemists[i];
           const mr = mrs[i % mrs.length];
           const dist = distributors[i % distributors.length];
-          const orderDate = new Date(Date.UTC(2026, 9, 10 + (i % 18), 14, (i * 10) % 60));
+          const orderDate = new Date(Date.UTC(2026, 9, 1 + (i % 19), 14, (i * 10) % 60));
 
           // Pick 2 products
           const prod1 = products[i % products.length];
@@ -426,9 +427,10 @@ if (!isMainThread) {
         // ────────────────────────────────────────────────────────────────────
         console.log(`[Worker ${workerId}] 🚀 Reconciling Tour Plan Itineraries & Resolving Pipeline Leads...`);
 
-        // 1. Reconcile all incomplete TourPlanDay records
+        // 1. Reconcile only past/today TourPlanDay records (never future planned days)
+        const maxReconcileDate = new Date(Date.UTC(2026, 9, 19, 23, 59, 59));
         const pendingTourDays = await prisma.tourPlanDay.findMany({
-          where: { isCompleted: false },
+          where: { isCompleted: false, date: { lte: maxReconcileDate } },
           include: {
             tourPlan: { select: { employeeId: true } },
             plannedDoctor: { select: { id: true, fullName: true, latitude: true, longitude: true } },
