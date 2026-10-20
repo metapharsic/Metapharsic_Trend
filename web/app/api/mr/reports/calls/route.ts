@@ -71,6 +71,16 @@ async function handler(req: AuthedRequest) {
         include: { territories: { select: { name: true } } },
       });
       if (!currentEmployee) return unauthorized("Employee record not found for representative");
+
+      // MR may view their own report (or omitted employeeId), but cannot view another employee
+      if (
+        requestedEmployeeId &&
+        requestedEmployeeId !== currentEmployee.id &&
+        requestedEmployeeId !== currentEmployee.userId
+      ) {
+        return forbidden("You may only view your own report");
+      }
+
       scopeEmployeeId = currentEmployee.id;
       const territorySuffix = currentEmployee.territories?.length ? ` (${currentEmployee.territories[0].name})` : "";
       employeeLabel = `${currentEmployee.firstName} ${currentEmployee.lastName}${territorySuffix}`;

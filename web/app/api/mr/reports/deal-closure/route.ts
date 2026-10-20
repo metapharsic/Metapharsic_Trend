@@ -27,9 +27,15 @@ async function handler(req: AuthedRequest) {
       // MR user: always smoothly scope to their own employee record
       const emp = await db.employee.findUnique({
         where: { userId: req.user.sub },
-        select: { id: true },
+        select: { id: true, userId: true },
       });
       if (!emp) return badRequest("Employee record not found for representative");
+
+      // MR may view their own deal closures, but cannot view another employee's
+      if (employeeId && employeeId !== emp.id && employeeId !== emp.userId) {
+        return forbidden("You may only view your own deal closure analysis");
+      }
+
       scopeEmployeeId = emp.id;
     } else if (employeeId) {
       // Manager user requesting a specific MR

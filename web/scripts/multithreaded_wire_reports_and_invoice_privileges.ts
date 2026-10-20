@@ -3,9 +3,30 @@ import { PrismaClient, Role } from "@prisma/client";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import jwt from "jsonwebtoken";
 
 const currentFilename = typeof __filename !== "undefined" ? __filename : fileURLToPath(import.meta.url);
 const currentDirname = typeof __dirname !== "undefined" ? __dirname : path.dirname(currentFilename);
+
+import { signAccessToken } from "../lib/auth.ts";
+
+function createAuthToken(userId: string, role: Role): string {
+  return signAccessToken({ sub: userId, role });
+}
+
+function mockReq(url: string, token: string): any {
+  const headers = new Map<string, string>();
+  headers.set("authorization", `Bearer ${token}`);
+  return {
+    url,
+    headers: {
+      get: (h: string) => headers.get(h.toLowerCase()) ?? null,
+    },
+    cookies: {
+      get: () => undefined,
+    },
+  };
+}
 
 if (!isMainThread) {
   const { threadId, workerType, dbUrl } = workerData;
@@ -17,7 +38,7 @@ if (!isMainThread) {
     const startTime = Date.now();
     try {
       if (workerType === "THREAD_MR_REPORTS_VERIFIER") {
-        console.log(`[Thread ${threadId}: THREAD_MR_REPORTS_VERIFIER] Verifying MR Call Reports & Deal Closures access...`);
+        console.log(`[Thread ${threadId}: THREAD_MR_REPORTS_VERIFIER] Verifying MR Call Reports & Deal Closures runtime access...`);
 
         // Find MR users
         const mrUsers = await prisma.user.findMany({
@@ -28,7 +49,6 @@ if (!isMainThread) {
         if (mrUsers.length === 0) throw new Error("No MR users found in database");
         console.log(`[Thread ${threadId}] Found ${mrUsers.length} MR users in database.`);
 
-        // For each MR, check their visits/calls data
         for (const u of mrUsers) {
           if (!u.employee) continue;
           const visitsCount = await prisma.visit.count({
@@ -41,19 +61,51 @@ if (!isMainThread) {
             where: { employeeId: u.employee.id, chemistId: { not: null } },
           });
 
-          console.log(`[Thread ${threadId}] MR ${u.employee.firstName} ${u.employee.lastName} (${u.employee.employeeCode}): ${visitsCount} total visits (${doctorCalls} Dr, ${chemistCalls} Chemist)`);
+          console.log(`[Thread ${threadId}] MR ${u.employee.firstName} ${u.employee.lastName} (${u.email}): ${visitsCount} visits (${doctorCalls} Dr, ${chemistCalls} Chemist)`);
         }
 
-        // Verify total calls in DB
-        const totalVisits = await prisma.visit.count();
-        console.log(`[Thread ${threadId}] Total field visits logged in DB: ${totalVisits}`);
+        // Test API route handler runtime behavior
+        const { GET: getCallReports } = await import("../app/api/mr/reports/calls/route.ts");
+        const { GET: getDealClosures } = await import("../app/api/mr/reports/deal-closure/route.ts");
+
+        const testMR = mrUsers[0];
+        const otherMR = mrUsers[1] || mrUsers[0];
+        const mrToken = createAuthToken(testMR.id, Role.MR);
+
+        // 1. MR fetches own report
+        const ownReq = mockReq("http://localhost:5555/api/mr/reports/calls?period=all", mrToken);
+        const ownRes = await getCallReports(ownReq, { params: {} });
+        if (ownRes.status !== 200) {
+          throw new Error(`MR viewing own call report failed with status ${ownRes.status}`);
+        }
+        console.log(`[Thread ${threadId}] PASS: MR successfully views own call report (HTTP 200).`);
+
+        // 2. MR attempts to fetch another MR's report
+        if (testMR.employee && otherMR.employee && testMR.id !== otherMR.id) {
+          const snoopingReq = mockReq(
+            `http://localhost:5555/api/mr/reports/calls?period=all&employeeId=${otherMR.employee.id}`,
+            mrToken
+          );
+          const snoopingRes = await getCallReports(snoopingReq, { params: {} });
+          if (snoopingRes.status !== 403) {
+            throw new Error(`MR requesting another employee's calls should return 403 Forbidden, got ${snoopingRes.status}`);
+          }
+          console.log(`[Thread ${threadId}] PASS: MR requesting another MR's report is blocked (HTTP 403 Forbidden).`);
+        }
+
+        // 3. Deal closure report verification
+        const dcReq = mockReq("http://localhost:5555/api/mr/reports/deal-closure", mrToken);
+        const dcRes = await getDealClosures(dcReq, { params: {} });
+        if (dcRes.status !== 200) {
+          throw new Error(`MR viewing deal closures failed with status ${dcRes.status}`);
+        }
+        console.log(`[Thread ${threadId}] PASS: MR views deal closures with automatic personal scoping (HTTP 200).`);
 
         parentPort?.postMessage({
           success: true,
           threadId,
           workerType,
           mrCount: mrUsers.length,
-          totalVisits,
           durationMs: Date.now() - startTime,
         });
       } else if (workerType === "THREAD_INVOICE_PRIVILEGES_VERIFIER") {
@@ -63,16 +115,29 @@ if (!isMainThread) {
         const invoiceCount = await prisma.invoice.count();
         console.log(`[Thread ${threadId}] Total statutory invoices in DB: ${invoiceCount}`);
 
-        // 2. Check sample invoice
         const sampleInvoice = await prisma.invoice.findFirst({
           include: { order: true },
         });
 
         if (sampleInvoice) {
           console.log(`[Thread ${threadId}] Sample Invoice #${sampleInvoice.invoiceNo} (Amount: ₹${sampleInvoice.amount}, Paid: ${sampleInvoice.paid})`);
+
+          // 2. Test runtime DELETE /api/invoices/[id] handler with MR credentials
+          const { DELETE: deleteInvoice } = await import("../app/api/invoices/[id]/route.ts");
+
+          const mrUser = await prisma.user.findFirst({ where: { role: Role.MR } });
+          if (mrUser) {
+            const mrToken = createAuthToken(mrUser.id, Role.MR);
+            const deleteReq = mockReq(`http://localhost:5555/api/invoices/${sampleInvoice.id}`, mrToken);
+            const deleteRes = await deleteInvoice(deleteReq, { params: { id: sampleInvoice.id } });
+            if (deleteRes.status !== 403) {
+              throw new Error(`Expected HTTP 403 Forbidden when MR attempts to delete invoice, got ${deleteRes.status}`);
+            }
+            console.log(`[Thread ${threadId}] PASS: Runtime invoice deletion by MR rejected with HTTP 403 Forbidden.`);
+          }
         }
 
-        // 3. Inspect route code directly to verify Role.MR is strictly excluded and forbidden check exists
+        // 3. Inspect route code directly to verify Role.MR is strictly excluded from withAuth
         const invoiceRouteFile = path.resolve(currentDirname, "../app/api/invoices/[id]/route.ts");
         const invoiceRouteCode = fs.readFileSync(invoiceRouteFile, "utf-8");
 
@@ -87,8 +152,7 @@ if (!isMainThread) {
           throw new Error("Security Violation: Explicit Role.MR forbidden check missing in deleteInvoice handler!");
         }
 
-        console.log(`[Thread ${threadId}] PASS: Role.MR is revoked from DELETE /api/invoices/[id] withAuth.`);
-        console.log(`[Thread ${threadId}] PASS: Explicit 403 Forbidden check for Role.MR is enforced in handler.`);
+        console.log(`[Thread ${threadId}] PASS: Role.MR revoked from DELETE /api/invoices/[id] withAuth.`);
 
         // 4. Verify orders page frontend hides Delete button for MR
         const ordersPageFile = path.resolve(currentDirname, "../app/(dashboard)/orders/page.tsx");
@@ -110,12 +174,14 @@ if (!isMainThread) {
           durationMs: Date.now() - startTime,
         });
       } else if (workerType === "THREAD_DB_PROVISIONING_VERIFIER") {
-        console.log(`[Thread ${threadId}: THREAD_DB_PROVISIONING_VERIFIER] Verifying Database Provisioning & Multi-Agent Telemetry Hiding...`);
+        console.log(`[Thread ${threadId}: THREAD_DB_PROVISIONING_VERIFIER] Verifying Database Provisioning, Disturbance Hiding & Version...`);
 
-        // Check Tour Plans provisioning
+        // Check Tour Plans & schedules provisioning
         const tourPlansCount = await prisma.tourPlan.count();
         const tourPlanDaysCount = await prisma.tourPlanDay.count();
-        console.log(`[Thread ${threadId}] DB Provisioned: ${tourPlansCount} Tour Plans, ${tourPlanDaysCount} Day Schedules.`);
+        const visitsCount = await prisma.visit.count();
+        const ordersCount = await prisma.order.count();
+        console.log(`[Thread ${threadId}] DB Provisioned: ${tourPlansCount} Tour Plans, ${tourPlanDaysCount} Day Schedules, ${visitsCount} Visits, ${ordersCount} Orders.`);
 
         // Verify Tour Plans UI file hides "Multi-Agent Tour Intelligence Status"
         const tourPlansPageFile = path.resolve(currentDirname, "../app/(dashboard)/tour-plans/page.tsx");
@@ -125,10 +191,9 @@ if (!isMainThread) {
         if (hasTourIntelligenceStatus) {
           throw new Error("Disturbance still present: Multi-Agent Tour Intelligence Status found in tour-plans/page.tsx!");
         }
+        console.log(`[Thread ${threadId}] PASS: 'Multi-Agent Tour Intelligence Status' visual cards are hidden.`);
 
-        console.log(`[Thread ${threadId}] PASS: 'Multi-Agent Tour Intelligence Status' visual cards are successfully hidden.`);
-
-        // Verify MR Reports Page role decoding and title scoping
+        // Verify MR Reports Page title scoping
         const mrReportsPageFile = path.resolve(currentDirname, "../app/(dashboard)/mr/reports/page.tsx");
         const mrReportsPageCode = fs.readFileSync(mrReportsPageFile, "utf-8");
 
@@ -136,8 +201,16 @@ if (!isMainThread) {
         if (!hasDynamicTitle) {
           throw new Error("MR Reports Title is not dynamically scoped for MR users!");
         }
-
         console.log(`[Thread ${threadId}] PASS: MR Reports page has dynamic role-scoped title.`);
+
+        // Verify package.json version
+        const pkgFile = path.resolve(currentDirname, "../package.json");
+        const pkg = JSON.parse(fs.readFileSync(pkgFile, "utf-8"));
+        console.log(`[Thread ${threadId}] Package Version: ${pkg.version}`);
+        if (!pkg.version || pkg.version === "0.1.0") {
+          throw new Error("Package version was not bumped!");
+        }
+        console.log(`[Thread ${threadId}] PASS: Major version updated to ${pkg.version}.`);
 
         parentPort?.postMessage({
           success: true,
@@ -145,6 +218,7 @@ if (!isMainThread) {
           workerType,
           tourPlansCount,
           tourPlanDaysCount,
+          version: pkg.version,
           durationMs: Date.now() - startTime,
         });
       } else {

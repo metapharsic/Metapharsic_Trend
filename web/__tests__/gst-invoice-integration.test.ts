@@ -145,7 +145,17 @@ describe("Order booking -> invoice GST integration", () => {
     });
     expect(initialLedger.length).toBeGreaterThan(0);
 
-    // Delete invoice via DELETE /api/invoices/[id]
+    // Verify MR is strictly forbidden from deleting statutory tax invoice
+    const mrDeleteRes = await deleteInvoice(
+      jsonRequest(`/api/invoices/${invoice!.id}`, {
+        method: "DELETE",
+        token: tokenFor(fx.mrUserId, Role.MR),
+      }),
+      { params: { id: invoice!.id } }
+    );
+    expect(mrDeleteRes.status).toBe(403);
+
+    // Delete invoice via DELETE /api/invoices/[id] by Admin
     const deleteRes = await deleteInvoice(
       jsonRequest(`/api/invoices/${invoice!.id}`, {
         method: "DELETE",
