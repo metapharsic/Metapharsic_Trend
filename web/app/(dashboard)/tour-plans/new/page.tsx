@@ -53,7 +53,23 @@ interface DayBlock {
   doctorIds: string[];
 }
 
-function defaultInitialDay(monthStr: string): DayBlock {
+interface SubmittedScheduleSummary {
+  tourPlanId: string;
+  status: string;
+  date: string;
+  territoryName: string;
+  doctors: Doctor[];
+  totalDoctorCalls: number;
+  beats: string[];
+}
+
+function defaultInitialDay(monthStr: string, explicitDate?: string | null): DayBlock {
+  if (explicitDate) return { date: explicitDate, territoryId: "", doctorIds: [] };
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  if (todayStr.startsWith(monthStr)) {
+    return { date: todayStr, territoryId: "", doctorIds: [] };
+  }
   return { date: `${monthStr}-01`, territoryId: "", doctorIds: [] };
 }
 
@@ -94,15 +110,17 @@ function NewTourPlanForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [role, setRole] = useState<string | null>(null);
-  const initialMonth = searchParams.get("month") ?? new Date().toISOString().slice(0, 7);
+  const initialDate = searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
+  const initialMonth = searchParams.get("month") ?? initialDate.slice(0, 7);
   const [month, setMonth] = useState(initialMonth);
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [loadingTerritories, setLoadingTerritories] = useState(true);
   const [doctorsByTerritory, setDoctorsByTerritory] = useState<Record<string, Doctor[]>>({});
   const [loadingDoctorsFor, setLoadingDoctorsFor] = useState<Record<string, boolean>>({});
-  const [days, setDays] = useState<DayBlock[]>([defaultInitialDay(initialMonth)]);
+  const [days, setDays] = useState<DayBlock[]>([defaultInitialDay(initialMonth, initialDate)]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submittedSummary, setSubmittedSummary] = useState<SubmittedScheduleSummary | null>(null);
 
   // Per-day search & filter states
   const [doctorSearch, setDoctorSearch] = useState<Record<number, string>>({});
@@ -225,42 +243,6 @@ function NewTourPlanForm() {
     });
   };
 
-  const autoFillWorkingDays = () => {
-    if (!month) return;
-    if (days.some((d) => d.doctorIds.length > 0)) {
-      const confirmReplace = window.confirm(
-        "Auto-filling working days will regenerate all Mon–Sat days for this month. Proceed?"
-      );
-      if (!confirmReplace) return;
-    }
-
-    const [yearStr, monthNumStr] = month.split("-");
-    const year = parseInt(yearStr, 10);
-    const monthIndex = parseInt(monthNumStr, 10) - 1;
-    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-    const newDays: DayBlock[] = [];
-    const defaultTerritoryId = days[0]?.territoryId || "";
-
-    for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
-      const dateObj = new Date(year, monthIndex, dayNum);
-      // Skip Sundays (0 = Sunday)
-      if (dateObj.getDay() === 0) continue;
-      const dateStr = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
-      newDays.push({
-        date: dateStr,
-        territoryId: defaultTerritoryId,
-        doctorIds: [],
-      });
-    }
-
-    if (newDays.length > 0) {
-      setDays(newDays);
-      if (defaultTerritoryId) {
-        loadDoctors(defaultTerritoryId);
-      }
-    }
-  };
-
   const addDay = () => {
     // Intelligently default date to day after last day's date
     const lastDay = days[days.length - 1];
@@ -319,8 +301,31 @@ function NewTourPlanForm() {
 
     setSubmitting(true);
     try {
-      await apiClient.post("/api/sfa/tour-plan/submit", payload);
-      router.push("/tour-plans");
+      const res = await apiClient.post("/api/sfa/tour-plan/submit", payload);
+      const returnedPlanId = res.data?.data?.tourPlanId;
+      const returnedStatus = res.data?.data?.status || (isAdmin ? "APPROVED" : "APPROVED");
+
+      const targetDay = validDays[0];
+      const targetTerritory = territories.find((t) => t.id === targetDay?.territoryId);
+      const targetDoctors = (doctorsByTerritory[targetDay?.territoryId] || []).filter((d) =>
+        targetDay?.doctorIds.includes(d.id)
+      );
+
+      setSubmittedSummary({
+        tourPlanId: returnedPlanId,
+        status: returnedStatus,
+        date: targetDay?.date || initialDate,
+        territoryName: targetTerritory?.name || "Field Territory",
+        doctors: targetDoctors,
+        totalDoctorCalls: totalCallsPlanned,
+        beats: Array.from(
+          new Set(
+            targetDoctors
+              .map((d) => d.beatName?.split(":")[0]?.trim())
+              .filter(Boolean) as string[]
+          )
+        ),
+      });
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
@@ -337,19 +342,19 @@ function NewTourPlanForm() {
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-display font-bold text-slate-900">New Tour Plan</h1>
+            <h1 className="text-2xl font-display font-bold text-slate-900">Plan Tour for the Day</h1>
             {isAdmin ? (
               <span className="bg-emerald-100 text-emerald-800 text-xs px-3 py-1 rounded-full font-bold border border-emerald-200">
                 Executive Mode (Direct Authorization)
               </span>
             ) : (
               <span className="bg-sky-100 text-sky-800 text-xs px-3 py-1 rounded-full font-bold border border-sky-200">
-                Representative Planning Mode
+                MR Daily Tour Schedule
               </span>
             )}
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Build your monthly doctor call roadmap. Select each territory and review doctor call counts before final submission.
+            Build your focused doctor visit schedule for the day. Plan day-by-day as field visits progress without needing to plan for the entire month.
           </p>
         </div>
 
@@ -366,21 +371,172 @@ function NewTourPlanForm() {
         </div>
       </div>
 
-      {/* Critical Post-Approval Locking Alert Banner */}
-      <div className="bg-amber-50/80 border border-amber-300 rounded-2xl p-4 flex items-start gap-3 shadow-xs">
-        <Lock size={18} className="text-amber-600 mt-0.5 shrink-0" />
-        <div className="text-xs text-amber-900">
+      {/* Daily Planning Policy Notice */}
+      <div className="bg-sky-50/80 border border-sky-200 rounded-2xl p-4 flex items-start gap-3 shadow-xs">
+        <Sparkles size={18} className="text-sky-600 mt-0.5 shrink-0" />
+        <div className="text-xs text-sky-900">
           <strong className="font-bold block text-sm mb-0.5">
-            Strict Post-Approval Lock Policy
+            Day-by-Day Field Schedule Planning
           </strong>
-          Once this Tour Plan is submitted and approved by executive management,{" "}
-          <strong>no modifications will be permitted</strong> on territory routes or planned doctors.
-          Ensure that the selected doctors and call counts below represent your exact scheduled itinerary before submitting.
+          Select your target territory, beats, and doctor calls for the day. When submitted, your schedule is verified, recorded, and live for field tracking and call reporting.
         </div>
       </div>
 
-      {/* Live Plan-Level Summary Bar */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {submittedSummary ? (
+        <div className="space-y-6">
+          {/* Success & Approval Banner */}
+          <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                <CheckCircle2 size={26} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-xl font-display font-bold text-emerald-950">
+                    Day Tour Schedule Successfully Submitted
+                  </h2>
+                  <span className="bg-emerald-600 text-white text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider shadow-xs">
+                    {submittedSummary.status === "APPROVED" ? "Approved by Admin" : "Submitted for Admin Approval"}
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-800 mt-1">
+                  {submittedSummary.status === "APPROVED"
+                    ? "Your 1-day itinerary has been authorized by management and is live for field execution."
+                    : "Your 1-day itinerary has been submitted and notifications dispatched for review."}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => router.push(`/tour-plans?tab=DAILY_SCHEDULE&date=${submittedSummary.date}`)}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer"
+              >
+                <span>View in Daily Schedule</span>
+                <ArrowRight size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* Schedule Summary Card */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  Target Field Schedule Summary
+                </span>
+                <h3 className="text-lg font-bold text-slate-900 mt-0.5">
+                  {formatDateBadge(submittedSummary.date).label || submittedSummary.date} — {submittedSummary.territoryName}
+                </h3>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Calls</span>
+                  <span className="text-base font-bold text-sky-900">{submittedSummary.totalDoctorCalls} Doctor Call(s)</span>
+                </div>
+                <div className="h-8 w-px bg-slate-200" />
+                <div className="text-right">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Beats Covered</span>
+                  <span className="text-base font-bold text-slate-800">
+                    {submittedSummary.beats.length > 0 ? submittedSummary.beats.join(", ") : "Main Beat"}
+                  </span>
+                </div>
+                <div className="h-8 w-px bg-slate-200" />
+                <div className="text-right">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Status</span>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase ${
+                    submittedSummary.status === "APPROVED" ? "bg-emerald-100 text-emerald-800" : "bg-sky-100 text-sky-800"
+                  }`}>
+                    {submittedSummary.status === "APPROVED" ? "Admin Approved" : "Submitted"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* List of Scheduled Doctors */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Planned Call Itinerary ({submittedSummary.doctors.length} Doctors)
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {submittedSummary.doctors.map((doc, idx) => (
+                  <div
+                    key={doc.id}
+                    className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition-colors flex items-start gap-3"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-sky-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-slate-900 text-sm truncate">{doc.name}</span>
+                        {doc.beatName && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 shrink-0">
+                            {doc.beatName}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-2">
+                        {doc.primarySpecialty && (
+                          <span className="text-slate-600 font-medium">{doc.primarySpecialty}</span>
+                        )}
+                        {doc.subArea && (
+                          <span className="text-slate-500">• {doc.subArea}</span>
+                        )}
+                        {doc.dpsTier && (
+                          <span className="text-amber-700 font-semibold">• Tier: {doc.dpsTier}</span>
+                        )}
+                      </div>
+                      {doc.clinicAddress && (
+                        <div className="text-[11px] text-slate-400 truncate mt-1">
+                          {doc.clinicAddress}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmittedSummary(null);
+                  setDays([defaultInitialDay(month, initialDate)]);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
+              >
+                Plan Another Day
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => router.push("/tour-plans")}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
+                >
+                  All Tour Plans
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/tour-plans?tab=DAILY_SCHEDULE&date=${submittedSummary.date}`)}
+                  className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer"
+                >
+                  <span>Start Field Calls</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Live Plan-Level Summary Bar */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
           <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Days Configured</span>
           <span className="text-xl font-bold text-slate-900">{validDays.length} Days</span>
@@ -747,7 +903,7 @@ function NewTourPlanForm() {
         })}
       </div>
 
-      {/* Action Buttons: Add Day & Auto-Provision Month */}
+      {/* Action Buttons: Add Day */}
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -755,15 +911,6 @@ function NewTourPlanForm() {
           className="flex items-center gap-2 text-sky-700 bg-sky-50 hover:bg-sky-100 px-4 py-2.5 rounded-xl text-sm font-bold border border-sky-200 transition-colors shadow-2xs cursor-pointer"
         >
           <Plus size={16} /> Add Day {days.length + 1}
-        </button>
-
-        <button
-          type="button"
-          onClick={autoFillWorkingDays}
-          className="flex items-center gap-2 text-slate-700 bg-white hover:bg-slate-50 px-4 py-2.5 rounded-xl text-sm font-bold border border-slate-300 transition-colors shadow-2xs cursor-pointer"
-          title="Auto-generate Monday to Saturday dates for this month"
-        >
-          <Sparkles size={16} className="text-amber-500" /> Auto-Fill Working Days (Mon–Sat)
         </button>
       </div>
 
@@ -820,6 +967,8 @@ function NewTourPlanForm() {
           </button>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

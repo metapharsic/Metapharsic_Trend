@@ -1423,6 +1423,60 @@ export default function TourPlansDashboard() {
             </div>
           )}
 
+          {/* Active Daily Schedule Summary Card */}
+          {(() => {
+            const targetDateStr = singleDayDate || new Date().toISOString().slice(0, 10);
+            const todayStops = selectedEvaluation.days.filter((d) => d.date === targetDateStr);
+            if (todayStops.length === 0) return null;
+            const docStops = todayStops.filter((d) => d.plannedDoctorId);
+            const chemStops = todayStops.filter((d) => d.plannedChemistId);
+            const completedToday = todayStops.filter((d) => d.isCompleted || d.visitStatus === "DONE").length;
+            const isApproved = selectedEvaluation.status === "APPROVED";
+
+            return (
+              <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl p-5 shadow-md border border-slate-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold shrink-0 ${
+                    isApproved ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-sky-500/20 text-sky-400 border border-sky-500/30"
+                  }`}>
+                    <CalendarDays size={22} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                        Field Schedule Summary ({targetDateStr})
+                      </span>
+                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                        isApproved ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40" : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                      }`}>
+                        {isApproved ? "✓ Admin Approved" : "Pending Approval"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-slate-300 mt-1">
+                      <span>{docStops.length} Doctor Call(s) Planned</span>
+                      <span>•</span>
+                      <span>{chemStops.length} Chemist Call(s)</span>
+                      <span>•</span>
+                      <span className="text-emerald-400 font-semibold">{completedToday} / {todayStops.length} Visited</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => {
+                      const el = document.getElementById(`day-${targetDateStr}`);
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className="bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-3.5 py-2 rounded-xl border border-white/20 transition-colors cursor-pointer"
+                  >
+                    View Stops ({todayStops.length})
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Daily Schedule List Matrix */}
           {(() => {
             const allDays = selectedEvaluation.days;

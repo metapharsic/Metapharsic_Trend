@@ -22,13 +22,24 @@ async function submitTourPlan(req: AuthedRequest) {
       where: { employeeId_month: { employeeId: employee.id, month: normalizedMonth } },
     });
 
+    // In the day-by-day MR workflow, reps submit their schedule day-by-day.
+    // If a plan already exists for this month (even if approved or pending), allow appending/updating the day's itinerary.
     const isManager = req.user.role === Role.ADMIN || req.user.role === Role.MD;
-    if (existing && existing.status !== TourPlanStatus.DRAFT && existing.status !== TourPlanStatus.REJECTED && !isManager) {
-      return conflict("A tour plan for this month is already submitted or approved");
-    }
+    
+    // Determine target status: preserve approved status if already approved, or approve if manager
+    let targetStatus: TourPlanStatus = TourPlanStatus.PENDING_ASM;
+    let targetApproverId: string | null = null;
 
-    const targetStatus = isManager ? TourPlanStatus.APPROVED : TourPlanStatus.PENDING_ASM;
-    const targetApproverId = isManager ? employee.id : null;
+    if (isManager) {
+      targetStatus = TourPlanStatus.APPROVED;
+      targetApproverId = employee.id;
+    } else if (existing?.status === TourPlanStatus.APPROVED) {
+      targetStatus = TourPlanStatus.APPROVED;
+      targetApproverId = existing.approvedById || employee.id;
+    } else if (existing?.status === TourPlanStatus.PENDING_ASM) {
+      targetStatus = TourPlanStatus.PENDING_ASM;
+      targetApproverId = null;
+    }
 
     // Pre-fetch doctor metadata for beat and subArea population
     const doctorIds = days.map((d) => d.plannedDoctorId).filter(Boolean) as string[];
@@ -37,6 +48,11 @@ async function submitTourPlan(req: AuthedRequest) {
       select: { id: true, beatName: true, subArea: true },
     });
     const doctorMap = new Map(doctorMeta.map((d) => [d.id, d]));
+
+    // Unique dates targeted by this submission
+    const submittedDates = Array.from(
+      new Set(days.map((d) => startOfUtcDay(d.date).getTime()))
+    ).map((t) => new Date(t));
 
     const tourPlan = await db.$transaction(async (tx) => {
       const plan = existing
@@ -48,7 +64,14 @@ async function submitTourPlan(req: AuthedRequest) {
             data: { employeeId: employee.id, month: normalizedMonth, status: targetStatus, approvedById: targetApproverId },
           });
 
-      await tx.tourPlanDay.deleteMany({ where: { tourPlanId: plan.id } });
+      // Selectively replace only the submitted dates so existing days of the month are preserved
+      await tx.tourPlanDay.deleteMany({
+        where: {
+          tourPlanId: plan.id,
+          date: { in: submittedDates },
+        },
+      });
+
       await tx.tourPlanDay.createMany({
         data: days.map((day) => {
           const doc = day.plannedDoctorId ? doctorMap.get(day.plannedDoctorId) : null;
