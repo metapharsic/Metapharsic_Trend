@@ -61,13 +61,21 @@ async function handler(req: AuthedRequest) {
       Role.ASM,
     ] as Role[]).includes(req.user.role as Role);
 
-    if (requestedEmployeeId && !isManager) {
-      return forbidden("You may only view your own report");
-    }
-
     let scopeEmployeeId: string | undefined;
     let employeeLabel = "All MRs Fleet Combined";
-    if (requestedEmployeeId) {
+
+    if (!isManager) {
+      // MR user: always smoothly scope to their own employee record
+      const currentEmployee = await db.employee.findUnique({
+        where: { userId: req.user.sub },
+        include: { territories: { select: { name: true } } },
+      });
+      if (!currentEmployee) return unauthorized("Employee record not found for representative");
+      scopeEmployeeId = currentEmployee.id;
+      const territorySuffix = currentEmployee.territories?.length ? ` (${currentEmployee.territories[0].name})` : "";
+      employeeLabel = `${currentEmployee.firstName} ${currentEmployee.lastName}${territorySuffix}`;
+    } else if (requestedEmployeeId) {
+      // Manager user requesting a specific MR
       const employee = await db.employee.findFirst({
         where: {
           OR: [
@@ -81,14 +89,6 @@ async function handler(req: AuthedRequest) {
       scopeEmployeeId = employee.id;
       const territorySuffix = employee.territories?.length ? ` (${employee.territories[0].name})` : "";
       employeeLabel = `${employee.firstName} ${employee.lastName}${territorySuffix}`;
-    } else if (!isManager) {
-      const employee = await db.employee.findUnique({
-        where: { userId: req.user.sub },
-        include: { territories: { select: { name: true } } },
-      });
-      if (!employee) return unauthorized("Employee record not found");
-      scopeEmployeeId = employee.id;
-      employeeLabel = `${employee.firstName} ${employee.lastName}`;
     }
 
     const { start, end } = periodRange(period, anchor, startDateParam ?? undefined, endDateParam ?? undefined);

@@ -237,6 +237,7 @@ function timeStr(iso: string) {
 
 export default function MrReportsPage() {
   const [activeTab, setActiveTab] = useState<"calls" | "closure">("calls");
+  const [role, setRole] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>("all");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -263,6 +264,27 @@ export default function MrReportsPage() {
   >("ALL");
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("accessToken");
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          setRole(payload.role ?? null);
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, []);
+
+  const isMR = role === "MR";
+
+  useEffect(() => {
+    if (isMR) {
+      setReps([]);
+      setSelectedRep("");
+      return;
+    }
     apiClient
       .get("/api/manager/mrs")
       .then((res) => {
@@ -273,13 +295,13 @@ export default function MrReportsPage() {
         }
       })
       .catch(() => setReps([]));
-  }, [selectedRep]);
+  }, [selectedRep, isMR]);
 
   const fetchReport = useCallback(() => {
     setLoading(true);
     setError(null);
     const params: Record<string, string> = { period };
-    if (selectedRep) params.employeeId = selectedRep;
+    if (!isMR && selectedRep) params.employeeId = selectedRep;
     if (period === "custom" && customStart && customEnd) {
       params.startDate = customStart;
       params.endDate = customEnd;
@@ -296,7 +318,7 @@ export default function MrReportsPage() {
         setError(err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || "Failed to load customer call reports.");
       })
       .finally(() => setLoading(false));
-  }, [period, selectedRep, customStart, customEnd]);
+  }, [period, selectedRep, customStart, customEnd, isMR]);
 
   useEffect(() => {
     fetchReport();
@@ -588,7 +610,7 @@ export default function MrReportsPage() {
               </div>
             )}
             <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white flex items-center gap-2.5">
-              <span>All MRs — Call Reports &amp; Deal Closures</span>
+              <span>{isMR ? "My Customer Call Reports & Deal Closures" : "All MRs — Call Reports & Deal Closures"}</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold uppercase tracking-wider">
                 Live Field Sync
               </span>
@@ -771,7 +793,7 @@ export default function MrReportsPage() {
               <RefreshCw className="h-3.5 w-3.5" />
               Retry Now
             </button>
-            {selectedRep && (
+            {!isMR && selectedRep && (
               <button
                 onClick={() => setSelectedRep("")}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition cursor-pointer"
@@ -797,7 +819,7 @@ export default function MrReportsPage() {
                       <User className="h-4 w-4 text-indigo-500" />
                       <span>Representative Scope:</span>
                     </div>
-                    {reps.length > 0 ? (
+                    {!isMR && reps.length > 0 ? (
                       <SearchableSelect
                         value={selectedRep}
                         onChange={(e) => setSelectedRep(e.target.value)}
@@ -819,7 +841,7 @@ export default function MrReportsPage() {
                       </SearchableSelect>
                     ) : (
                       <span className="text-xs font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl">
-                        My Call Reports Only
+                        {isMR ? "My Call Reports Only" : "All Assigned Reps"}
                       </span>
                     )}
                   </div>
@@ -1411,31 +1433,33 @@ export default function MrReportsPage() {
                 {/* ROW 1: PRIMARY CONTROLS & MR SELECTOR */}
                 <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
                   {/* MR SELECTOR DROPDOWN */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                      <User size={13} className="text-emerald-500" />
-                      Select MR:
-                    </span>
-                    <SearchableSelect
-                      value={selectedRep}
-                      onChange={(e) => setSelectedRep(e.target.value)}
-                      placeholder="All Medical Representatives"
-                      searchPlaceholder="Search MR..."
-                      className="w-auto min-w-[220px]"
-                      allowClear
-                    >
-                      <option value="">All Medical Representatives ({reps.length})</option>
-                      {reps.map((r) => {
-                        const val = r.employeeId || r.id;
-                        const terr = (r.territories && r.territories[0]) || r.territory;
-                        return (
-                          <option key={val} value={val}>
-                            {r.firstName} {r.lastName} {terr ? `(${terr})` : ""}
-                          </option>
-                        );
-                      })}
-                    </SearchableSelect>
-                  </div>
+                  {!isMR && reps.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                        <User size={13} className="text-emerald-500" />
+                        Select MR:
+                      </span>
+                      <SearchableSelect
+                        value={selectedRep}
+                        onChange={(e) => setSelectedRep(e.target.value)}
+                        placeholder="All Medical Representatives"
+                        searchPlaceholder="Search MR..."
+                        className="w-auto min-w-[220px]"
+                        allowClear
+                      >
+                        <option value="">All Medical Representatives ({reps.length})</option>
+                        {reps.map((r) => {
+                          const val = r.employeeId || r.id;
+                          const terr = (r.territories && r.territories[0]) || r.territory;
+                          return (
+                            <option key={val} value={val}>
+                              {r.firstName} {r.lastName} {terr ? `(${terr})` : ""}
+                            </option>
+                          );
+                        })}
+                      </SearchableSelect>
+                    </div>
+                  )}
 
                   {/* CLOSE THIS WEEK TOGGLE & EXCEL BUTTON */}
                   <div className="flex items-center gap-2">

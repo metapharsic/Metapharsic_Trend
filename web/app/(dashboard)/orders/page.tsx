@@ -253,6 +253,8 @@ export default function OrdersDashboard() {
   const isAdmin = role === "ADMIN" || role === "MD";
   const canAdvance = role === "ASM" || isAdmin;
   const canManageInvoices = role === "ASM" || isAdmin || role === "MR";
+  // MR is strictly revoked from deleting statutory tax invoices; only Admin/MD/ASM can delete.
+  const canDeleteInvoices = isAdmin || role === "ASM";
   // Admins/MDs have full privileges to edit/delete any order; MR/ASM can edit open ones.
   const canEditOrders = role === "MR" || role === "ASM" || isAdmin;
 
@@ -693,15 +695,17 @@ export default function OrdersDashboard() {
                         >
                           Mark {inv.paid ? "Unpaid" : "Paid"}
                         </button>
-                        <button
-                          onClick={() => {
-                            setDeleteInvoice(inv);
-                            setDeleteInvoiceError(null);
-                          }}
-                          className="text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors font-semibold text-xs border border-transparent hover:border-red-100"
-                        >
-                          Delete
-                        </button>
+                        {canDeleteInvoices && (
+                          <button
+                            onClick={() => {
+                              setDeleteInvoice(inv);
+                              setDeleteInvoiceError(null);
+                            }}
+                            className="text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors font-semibold text-xs border border-transparent hover:border-red-100"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </td>
                     )}
                   </tr>

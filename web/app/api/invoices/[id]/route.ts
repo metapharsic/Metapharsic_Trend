@@ -73,10 +73,7 @@ async function deleteInvoice(
     if (!existing) return notFound("Invoice not found");
 
     if (req.user.role === Role.MR) {
-      const employee = await db.employee.findUnique({ where: { userId: req.user.sub } });
-      if (!employee || existing.order.employeeId !== employee.id) {
-        return forbidden("You may only delete invoices for orders you booked yourself");
-      }
+      return forbidden("Representatives (MR) are not authorized to delete invoices. Statutory tax records require administrator authorization.");
     }
 
     await db.$transaction(async (tx) => {
@@ -97,4 +94,4 @@ async function deleteInvoice(
 }
 
 export const PUT = withAuth(updateInvoice, [Role.ASM, Role.ADMIN, Role.MD]);
-export const DELETE = withAuth(deleteInvoice, [Role.ADMIN, Role.ASM, Role.MD, Role.MR]);
+export const DELETE = withAuth(deleteInvoice, [Role.ADMIN, Role.ASM, Role.MD]);

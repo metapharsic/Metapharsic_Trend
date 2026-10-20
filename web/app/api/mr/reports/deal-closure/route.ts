@@ -23,10 +23,16 @@ async function handler(req: AuthedRequest) {
 
     let scopeEmployeeId: string | undefined;
 
-    if (employeeId) {
-      if (!isManager) {
-        return forbidden("You may only view your own deal closure analysis");
-      }
+    if (!isManager) {
+      // MR user: always smoothly scope to their own employee record
+      const emp = await db.employee.findUnique({
+        where: { userId: req.user.sub },
+        select: { id: true },
+      });
+      if (!emp) return badRequest("Employee record not found for representative");
+      scopeEmployeeId = emp.id;
+    } else if (employeeId) {
+      // Manager user requesting a specific MR
       const employee = await db.employee.findFirst({
         where: {
           OR: [
@@ -37,13 +43,6 @@ async function handler(req: AuthedRequest) {
         select: { id: true },
       });
       scopeEmployeeId = employee?.id || employeeId;
-    } else if (!isManager) {
-      const emp = await db.employee.findUnique({
-        where: { userId: req.user.sub },
-        select: { id: true },
-      });
-      if (!emp) return badRequest("Employee record not found");
-      scopeEmployeeId = emp.id;
     }
 
     const summary = await DealClosureAgentsService.analyzeDealClosures({

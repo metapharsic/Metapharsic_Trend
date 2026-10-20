@@ -808,14 +808,14 @@ export default function TourPlansDashboard() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-display font-bold text-slate-900">
-              Tour Plans & Multi-Agent Daily Scheduler
+              Tour Plans & Daily Field Scheduler
             </h1>
             <span className="bg-sky-100 text-sky-700 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-sky-200">
               Live DB Synced
             </span>
           </div>
           <p className="text-sm text-slate-500 mt-1">
-            Provision, optimize, and edit daily tour schedules backed by multi-agent route and CRM targeting models.
+            Provision, optimize, and edit daily tour schedules backed by intelligent route and CRM targeting models.
           </p>
         </div>
 
@@ -881,51 +881,7 @@ export default function TourPlansDashboard() {
         </div>
       </div>
 
-      {/* Multi-Agent Telemetry Status Cards */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Bot className="text-sky-600" size={20} />
-            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">
-              Multi-Agent Tour Intelligence Status
-            </h2>
-          </div>
-          <span className="text-xs text-slate-400 font-mono">
-            Agents Active: 4/4 | Model: Real-Time DB Engine
-          </span>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {telemetry.length > 0 ? (
-            telemetry.map((agent, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between hover:border-sky-300 transition-colors"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-slate-800 truncate">{agent.name}</span>
-                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      ACTIVE
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 line-clamp-2 mb-3">{agent.role}</p>
-                </div>
-
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-600">
-                  <span>Latency: {agent.latencyMs}ms</span>
-                  <span>Conf: {Math.round(agent.confidence * 100)}%</span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="col-span-4 bg-white p-4 rounded-xl text-center text-xs text-slate-400 border border-slate-200">
-              Loading multi-agent execution status...
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* KPI Tiles */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
