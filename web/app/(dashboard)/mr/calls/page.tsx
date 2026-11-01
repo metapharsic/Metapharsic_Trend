@@ -180,7 +180,8 @@ export default function CallHistoryPage() {
   const openEdit = (v: Visit) => {
     setEditing(v);
     const existingPhone = v.doctor?.mobile || v.doctor?.whatsApp || v.chemist?.mobile || "";
-    setEditPhone(existingPhone);
+    const cleanExisting = existingPhone.replace(/\D/g, "");
+    setEditPhone(cleanExisting === "9848011223" ? "" : existingPhone);
     setEditPurpose(v.purpose);
     setEditFeedback(v.feedback ?? "");
     setEditDuration(v.durationMinutes !== null ? String(v.durationMinutes) : "");
@@ -234,6 +235,9 @@ export default function CallHistoryPage() {
     const cleanDigits = editPhone.replace(/\D/g, "");
     if (!editPhone.trim() || cleanDigits.length < 10) {
       return setEditError("Doctor/Chemist contact phone number is mandatory (minimum 10 digits).");
+    }
+    if (cleanDigits === "9848011223") {
+      return setEditError("Please enter a valid contact phone number (default placeholder 9848011223 is not allowed).");
     }
 
     setSaving(true);

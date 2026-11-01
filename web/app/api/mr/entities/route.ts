@@ -4,6 +4,13 @@ import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, apiError } from "@/lib/api-response";
 import { PaginationSchema } from "@/lib/validators";
 
+function sanitizePhone(phone?: string | null): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (!digits || digits === "9848011223") return null;
+  return phone;
+}
+
 async function handler(req: AuthedRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -115,7 +122,7 @@ async function handler(req: AuthedRequest) {
         beatName: d.beatName ?? null,
         subArea: d.subArea ?? null,
         primarySpecialty: d.primarySpecialty,
-        phone: d.mobile || d.whatsApp || d.assistantContact || "9848011223",
+        phone: sanitizePhone(d.mobile || d.whatsApp || d.assistantContact),
         latitude: d.latitude,
         longitude: d.longitude,
       }));
@@ -192,7 +199,7 @@ async function handler(req: AuthedRequest) {
         beatName: c.beatName ?? null,
         subArea: c.subArea ?? null,
         contactPerson: c.contactPerson,
-        phone: c.mobile || "9848011223",
+        phone: sanitizePhone(c.mobile),
         licenseNo: c.licenseNo,
         dlCopyUrl: c.dlCopyUrl,
         dlStatus: c.dlStatus || (c.dlCopyUrl ? "VERIFIED" : "MISSING"),
@@ -245,7 +252,7 @@ async function handler(req: AuthedRequest) {
           territoryId: d.territoryId,
           territoryName: d.territory?.name ?? null,
           primarySpecialty: d.primarySpecialty,
-          phone: d.mobile || d.whatsApp || d.assistantContact || "9848011223",
+          phone: sanitizePhone(d.mobile || d.whatsApp || d.assistantContact),
           latitude: d.latitude,
           longitude: d.longitude,
         })),
@@ -257,7 +264,7 @@ async function handler(req: AuthedRequest) {
           territoryId: c.territoryId,
           territoryName: c.territory?.name ?? null,
           contactPerson: c.contactPerson,
-          phone: c.mobile || "9848011223",
+          phone: sanitizePhone(c.mobile),
           latitude: c.latitude,
           longitude: c.longitude,
         })),

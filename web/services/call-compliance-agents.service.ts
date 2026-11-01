@@ -55,6 +55,15 @@ export class CallComplianceAgentsService {
     // Format clean standard (10 digits or with country code)
     const formatted = digitsOnly.length === 10 ? digitsOnly : digitsOnly.slice(-10);
 
+    // Reject hardcoded placeholder number
+    if (digitsOnly === "9848011223" || formatted === "9848011223") {
+      return {
+        isValid: false,
+        cleanPhone: "",
+        error: "Please enter a valid doctor/chemist contact phone number (default placeholder 9848011223 is not allowed).",
+      };
+    }
+
     return {
       isValid: true,
       cleanPhone: formatted,

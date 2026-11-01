@@ -223,13 +223,15 @@ function NewCallForm() {
     captureGps();
   }, []);
 
-  // Pre-fill phone if selected entity already has one on file
+  // Pre-fill phone ONLY if selected entity has an authentic phone on file (not hardcoded placeholder)
   useEffect(() => {
-    if (selected && selected.phone) {
-      setContactPhone(selected.phone);
-    } else if (selected && !selected.phone) {
-      setContactPhone("9848011223");
-    } else if (!selected) {
+    const rawPhone = selected?.phone?.trim() || "";
+    const cleanDigits = rawPhone.replace(/\D/g, "");
+    const isPlaceholder = !cleanDigits || cleanDigits === "9848011223";
+
+    if (selected && !isPlaceholder) {
+      setContactPhone(rawPhone);
+    } else {
       setContactPhone("");
     }
   }, [selected]);
@@ -333,6 +335,7 @@ function NewCallForm() {
         territoryName: matchedTerritory,
         subArea: created.subArea || null,
         beatName: created.beatName || null,
+        phone: newMobile.trim() || created.mobile || null,
         licenseNo: newLicenseNo.trim() || created.licenseNo || null,
         dlCopyUrl: uploadedDlUrl || created.dlCopyUrl || null,
         dlStatus: uploadedDlUrl ? "VERIFIED" : (created.dlStatus || "PENDING_VERIFICATION"),
@@ -395,6 +398,9 @@ function NewCallForm() {
     const cleanDigits = contactPhone.replace(/\D/g, "");
     if (cleanDigits.length < 10) {
       return setError("Please enter a valid contact phone number with at least 10 digits.");
+    }
+    if (cleanDigits === "9848011223") {
+      return setError("Please enter a valid contact phone number (default placeholder 9848011223 is not allowed).");
     }
     if (!purpose.trim()) return setError("Purpose is required.");
     if (requirePhoto && !photo) return setError("A visit verification photo is required.");
@@ -544,7 +550,7 @@ function NewCallForm() {
                     <span>Contact Phone Number *</span>
                     <span className="text-[10px] font-black text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">MANDATORY</span>
                   </span>
-                  {selected.phone ? (
+                  {selected.phone && selected.phone.replace(/\D/g, "") !== "9848011223" ? (
                     <span className="text-[10px] text-emerald-600 font-semibold">Verified on master file</span>
                   ) : (
                     <span className="text-[10px] text-amber-600 font-semibold">Required for audit</span>

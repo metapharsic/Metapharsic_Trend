@@ -326,10 +326,11 @@ async function createVisit(req: AuthedRequest) {
           existingPhone = c?.mobile || null;
         }
 
-        if (!existingPhone || existingPhone.replace(/\D/g, "").length < 10) {
+        const cleanExisting = existingPhone ? existingPhone.replace(/\D/g, "") : "";
+        if (!cleanExisting || cleanExisting.length < 10 || cleanExisting === "9848011223") {
           return badRequest(phoneValidation.error || "Doctor/Chemist contact phone number is mandatory for all calls.");
         }
-        verifiedPhone = existingPhone.replace(/\D/g, "").slice(-10);
+        verifiedPhone = cleanExisting.slice(-10);
       }
 
       // Background Entity Contact Sync Agent: Keep doctor/chemist contact cards up to date
