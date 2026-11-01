@@ -3,6 +3,9 @@ import { PrismaClient } from "@prisma/client";
 import { CreditAgentsService } from "../services/credit-agents.service";
 import { round2 } from "../lib/pricing";
 import { postAutoLedger, reverseAutoLedger, SYSTEM_ACCOUNT_CODES } from "../lib/ledger";
+import * as path from "node:path";
+import * as fs from "node:fs";
+import { pathToFileURL } from "node:url";
 
 export interface ThreadExecutionResult {
   threadId: number;
@@ -335,6 +338,7 @@ async function main() {
     return new Promise<ThreadExecutionResult>((resolve) => {
       const worker = new Worker(__filename, {
         workerData: { ...task, dbUrl },
+        execArgv: ["--import", "tsx"],
       });
 
       worker.on("message", (res: ThreadExecutionResult) => {
