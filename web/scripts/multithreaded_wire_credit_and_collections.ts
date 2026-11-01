@@ -267,6 +267,9 @@ export async function executeCreditCollectionWorkerTask(
         agentRole: "Agent 4: Payment Lifecycle & Auto-Ledger Guard Agent",
         status: isSuccess ? "SUCCESS" : "FAILED",
         durationMs: Date.now() - startTime,
+        error: !isSuccess
+          ? `Simulation mismatch: deductionMatched=${outstandingMatched} (exp ${expectedOutstandingDuring}, got ${actualOutstandingDuring}), restoredMatched=${restoredMatched} (exp ${initialOutstanding}, got ${actualOutstandingAfter})`
+          : undefined,
         data: {
           targetChemist: chemistWithDues.chemistName,
           targetInvoiceNo: targetInvoice.invoiceNo,
@@ -297,25 +300,6 @@ export async function executeCreditCollectionWorkerTask(
 }
 
 // ─────────────────────────────────────────────────────────────
-// WORKER THREAD ENTRY POINT
-// ─────────────────────────────────────────────────────────────
-if (!isMainThread) {
-  const { threadId, taskName, dbUrl } = workerData;
-  executeCreditCollectionWorkerTask(threadId, taskName, dbUrl)
-    .then((result) => parentPort?.postMessage(result))
-    .catch((err) =>
-      parentPort?.postMessage({
-        threadId,
-        name: taskName,
-        status: "FAILED",
-        durationMs: 0,
-        agentRole: "Worker Failure",
-        error: err.message,
-      })
-    );
-}
-
-// ─────────────────────────────────────────────────────────────
 // MAIN THREAD ORCHESTRATOR
 // ─────────────────────────────────────────────────────────────
 async function main() {
@@ -336,9 +320,28 @@ async function main() {
 
   const threadPromises = tasks.map((task) => {
     return new Promise<ThreadExecutionResult>((resolve) => {
-      const worker = new Worker(__filename, {
+      const workerScript = `
+        const { workerData, parentPort } = require("node:worker_threads");
+        try {
+          require("tsx/cjs");
+        } catch (_) {}
+        const { executeCreditCollectionWorkerTask } = require(${JSON.stringify(__filename)});
+        const { threadId, taskName, dbUrl } = workerData;
+        executeCreditCollectionWorkerTask(threadId, taskName, dbUrl)
+          .then((res) => parentPort?.postMessage(res))
+          .catch((err) => parentPort?.postMessage({
+            threadId,
+            name: taskName,
+            status: "FAILED",
+            durationMs: 0,
+            agentRole: "Worker Failure",
+            error: err.message,
+          }));
+      `;
+
+      const worker = new Worker(workerScript, {
+        eval: true,
         workerData: { ...task, dbUrl },
-        execArgv: ["--import", "tsx"],
       });
 
       worker.on("message", (res: ThreadExecutionResult) => {
