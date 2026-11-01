@@ -151,7 +151,7 @@ function EnterpriseCreditDashboard({ role }: { role: string | null }) {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [riskFilter, setRiskFilter] = useState("ALL");
   const [territoryFilter, setTerritoryFilter] = useState("ALL");
-  const [scopeFilter, setScopeFilter] = useState<"ALL" | "OUTSTANDING" | "CRITICAL">("OUTSTANDING");
+  const [scopeFilter, setScopeFilter] = useState<"ALL" | "OUTSTANDING" | "CRITICAL">("ALL");
   const [sortKey, setSortKey] = useState<string>("outstanding");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [exportingExcel, setExportingExcel] = useState(false);
@@ -1305,9 +1305,14 @@ function LogPaymentModal({
   onSuccess: () => void;
 }) {
   const [chemistId, setChemistId] = useState(initialChemist?.chemistId || "");
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState(initialInvoice?.id || "");
   const [amount, setAmount] = useState(initialInvoice ? String(initialInvoice.unpaidBalance) : "");
   const [paymentMode, setPaymentMode] = useState("CASH");
-  const [refNumber, setRefNumber] = useState(initialInvoice ? `[INV-${initialInvoice.invoiceNo}]` : "");
+  const [refNumber, setRefNumber] = useState(
+    initialInvoice
+      ? `[${initialInvoice.invoiceNo.startsWith("INV-") ? initialInvoice.invoiceNo : `INV-${initialInvoice.invoiceNo}`}]`
+      : ""
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1327,6 +1332,7 @@ function LogPaymentModal({
         chemistId,
         amount: amt,
         refNumber: finalRef,
+        invoiceId: selectedInvoiceId || initialInvoice?.id || undefined,
       });
       onSuccess();
     } catch (err: any) {
@@ -1400,6 +1406,37 @@ function LogPaymentModal({
                 <span className="text-slate-500 font-semibold">Risk Status:</span>
                 <span className="font-bold uppercase text-emerald-600">{selectedChemist.status}</span>
               </div>
+            </div>
+          )}
+
+          {selectedChemist && selectedChemist.openInvoices && selectedChemist.openInvoices.length > 0 && !initialInvoice && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                Allocate to Generated Invoice (Optional)
+              </label>
+              <SearchableSelect
+                value={selectedInvoiceId}
+                onChange={(e) => {
+                  const invId = e.target.value;
+                  setSelectedInvoiceId(invId);
+                  const inv = selectedChemist.openInvoices?.find((i) => i.id === invId);
+                  if (inv) {
+                    setAmount(String(inv.unpaidBalance));
+                    setRefNumber(`[${inv.invoiceNo}]`);
+                  } else {
+                    setRefNumber("");
+                  }
+                }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+                placeholder="FIFO Auto Allocation across all open invoices..."
+                options={[
+                  { value: "", label: "Auto FIFO Allocation across all open invoices" },
+                  ...selectedChemist.openInvoices.map((inv) => ({
+                    value: inv.id,
+                    label: `Invoice #${inv.invoiceNo} — Bal: ${currency(inv.unpaidBalance)} (${inv.ageDays}d old, ${inv.agingBucket})`,
+                  })),
+                ]}
+              />
             </div>
           )}
 

@@ -161,29 +161,71 @@ export class CreditAgentsService {
       db.collection.findMany({
         orderBy: { createdAt: "desc" },
         include: {
-          chemist: { select: { name: true } },
+          chemist: {
+            select: {
+              name: true,
+              territory: { select: { name: true } },
+            },
+          },
           employee: { select: { firstName: true, lastName: true } },
         },
       }),
       db.collection.aggregate({
-        where: { createdAt: { gte: todayIst } },
+        where: {
+          ...(params.employeeId ? { employeeId: params.employeeId } : {}),
+          createdAt: { gte: todayIst },
+        },
         _sum: { amount: true },
       }),
       db.collection.aggregate({
-        where: { createdAt: { gte: monthIst } },
+        where: {
+          ...(params.employeeId ? { employeeId: params.employeeId } : {}),
+          createdAt: { gte: monthIst },
+        },
         _sum: { amount: true },
       }),
     ]);
     const reconciliationLatency = Date.now() - t0Invoices;
 
-    // Filter by territory scope or employee scope if MR view
-    const targetChemists = params.territoryIds && params.territoryIds.length > 0
-      ? chemists.filter((c) => c.territoryId && params.territoryIds!.includes(c.territoryId))
-      : params.employeeId
-      ? chemists.filter((c) => c.territory?.employee?.id === params.employeeId)
-      : params.territoryId
-      ? chemists.filter((c) => c.territoryId === params.territoryId)
-      : chemists;
+    // Filter by territory scope or employee scope with comprehensive activity linkage:
+    // Chemists in assigned territory OR chemists where the MR booked orders/invoices or collected payments.
+    let targetChemists = chemists;
+    if (params.territoryIds && params.territoryIds.length > 0) {
+      targetChemists = chemists.filter((c) => c.territoryId && params.territoryIds!.includes(c.territoryId));
+    } else if (params.territoryId) {
+      targetChemists = chemists.filter((c) => c.territoryId === params.territoryId);
+    } else if (params.employeeId) {
+      const empId = params.employeeId;
+      const linkedChemistIds = new Set<string>();
+
+      // 1. Chemists in territory assigned to MR
+      for (const c of chemists) {
+        if (c.territory?.employee?.id === empId) {
+          linkedChemistIds.add(c.id);
+        }
+      }
+
+      // 2. Chemists where MR booked orders / generated invoices
+      for (const inv of invoices) {
+        if (inv.order?.employeeId === empId && inv.order?.chemistId) {
+          linkedChemistIds.add(inv.order.chemistId);
+        }
+      }
+
+      // 3. Chemists where MR recorded collections
+      for (const col of collections) {
+        if (col.employeeId === empId && col.chemistId) {
+          linkedChemistIds.add(col.chemistId);
+        }
+      }
+
+      // If MR has active linkages, show those; otherwise fall back to all chemists so MR can operate
+      if (linkedChemistIds.size > 0) {
+        targetChemists = chemists.filter((c) => linkedChemistIds.has(c.id));
+      } else {
+        targetChemists = chemists;
+      }
+    }
 
     const targetChemistIds = new Set(targetChemists.map((c) => c.id));
 
@@ -406,15 +448,20 @@ export class CreditAgentsService {
     chemistBreakdowns.sort((a, b) => b.totalOutstanding - a.totalOutstanding);
     const scoringLatency = Date.now() - t0Scoring;
 
-    // Format recent collections list
+    // Format recent collections list — include collections recorded by this MR or for MR's chemists
     const recentCollections: CollectionReceiptRow[] = collections
-      .filter((c) => targetChemistIds.has(c.chemistId))
+      .filter((c) => {
+        if (params.employeeId) {
+          return c.employeeId === params.employeeId || targetChemistIds.has(c.chemistId);
+        }
+        return targetChemistIds.has(c.chemistId);
+      })
       .slice(0, 30)
       .map((c) => ({
         id: c.id,
         chemistId: c.chemistId,
         chemistName: c.chemist?.name || "Chemist Outlet",
-        territoryName: "Local Territory",
+        territoryName: c.chemist?.territory?.name || "Local Territory",
         mrName: c.employee ? `${c.employee.firstName} ${c.employee.lastName}` : "Direct Collection",
         amount: Number(c.amount),
         paymentMode: c.refNumber?.includes("[") ? c.refNumber.split("]")[0].replace("[", "") : "CASH",
@@ -527,6 +574,64 @@ export class CreditAgentsService {
   }
 
   /**
+   * Reconciles invoice paid status (true/false) based on cumulative collections for the chemist.
+   * Walks open invoices in chronological order (FIFO) and flags invoices as paid when covered.
+   */
+  public static async reconcileChemistInvoicePaidStatus(
+    client: any,
+    chemistId: string
+  ): Promise<{ updatedCount: number; paidInvoiceIds: string[]; unpaidInvoiceIds: string[] }> {
+    const [invoices, collections] = await Promise.all([
+      client.invoice.findMany({
+        where: { order: { chemistId } },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, grandTotal: true, amount: true, paid: true },
+      }),
+      client.collection.aggregate({
+        where: { chemistId },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    let remainingFunds = Number(collections._sum.amount || 0);
+    const paidInvoiceIds: string[] = [];
+    const unpaidInvoiceIds: string[] = [];
+    let updatedCount = 0;
+
+    for (const inv of invoices) {
+      const invTotal = Number(inv.grandTotal ?? inv.amount ?? 0);
+      const isPaid = remainingFunds >= invTotal && invTotal > 0;
+      if (remainingFunds >= invTotal) {
+        remainingFunds -= invTotal;
+      } else {
+        remainingFunds = 0;
+      }
+
+      if (isPaid) {
+        paidInvoiceIds.push(inv.id);
+        if (!inv.paid) {
+          await client.invoice.update({
+            where: { id: inv.id },
+            data: { paid: true },
+          });
+          updatedCount++;
+        }
+      } else {
+        unpaidInvoiceIds.push(inv.id);
+        if (inv.paid) {
+          await client.invoice.update({
+            where: { id: inv.id },
+            data: { paid: false },
+          });
+          updatedCount++;
+        }
+      }
+    }
+
+    return { updatedCount, paidInvoiceIds, unpaidInvoiceIds };
+  }
+
+  /**
    * Multi-Agent Payment Retrieval & Database Table Reversal Engine
    * Reverses a payment collection receipt, restores invoice balances,
    * reverses ledger postings, and recalculates credit exposure & aging matrix.
@@ -551,7 +656,6 @@ export class CreditAgentsService {
     const collectionAmount = Number(collection.amount);
     const chemistId = collection.chemistId;
     const chemistName = collection.chemist?.name || "Chemist Outlet";
-    const refNo = collection.refNumber || "";
 
     // ─────────────────────────────────────────────────────────────
     // TRANSACTION: Database Tables Reversal & Sync
@@ -561,38 +665,11 @@ export class CreditAgentsService {
       // 1. Reverse AutoLedger postings
       await reverseAutoLedger(tx, "COLLECTION", collection.id);
 
-      // 2. Check if refNumber references an invoice (e.g., "[INV-1002]")
-      const invMatch = refNo.match(/\[(INV-[^\]]+)\]/i) || refNo.match(/(INV-[A-Za-z0-9-]+)/i);
-      if (invMatch) {
-        const invNo = invMatch[1];
-        const invoice = await tx.invoice.findUnique({ where: { invoiceNo: invNo } });
-        if (invoice) {
-          // Revert paid status to false so it re-appears as open/unpaid
-          await tx.invoice.update({
-            where: { id: invoice.id },
-            data: { paid: false },
-          });
-        }
-      }
-
-      // Reconcile all unpaid invoices for this chemist: ensure paid flag is false if balance remains
-      const chemistOrders = await tx.order.findMany({
-        where: { chemistId },
-        select: { id: true },
-      });
-      const orderIds = chemistOrders.map((o) => o.id);
-
-      if (orderIds.length > 0) {
-        await tx.invoice.updateMany({
-          where: {
-            orderId: { in: orderIds },
-          },
-          data: { paid: false },
-        });
-      }
-
-      // 3. Delete the collection entry from the database
+      // 2. Delete the collection entry from the database
       await tx.collection.delete({ where: { id: collection.id } });
+
+      // 3. Reconcile FIFO invoice paid status for this chemist
+      await CreditAgentsService.reconcileChemistInvoicePaidStatus(tx, chemistId);
     });
 
     const reversalLatency = Date.now() - tReversal;

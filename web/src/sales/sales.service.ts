@@ -12,6 +12,7 @@ import { bestSchemeFor, round2 } from "@/lib/scheme";
 import { outstandingBalance, canPlaceOrder } from "@/lib/credit";
 import { computeInvoiceTotals } from "@/lib/gst";
 import { postAutoLedger, SYSTEM_ACCOUNT_CODES } from "@/lib/ledger";
+import { CreditAgentsService } from "@/services/credit-agents.service";
 
 export class SalesService {
   /**
@@ -341,12 +342,15 @@ export class SalesService {
           sourceId: collection.id,
           lines: [
             { accountCode: SYSTEM_ACCOUNT_CODES.bank, debit: data.amount, credit: 0 },
-            { accountCode: SYSTEM_ACCOUNT_CODES.accountsReceivable, debit: 0, credit: data.amount },
+            { accountCode: SYSTEM_ACCOUNT_CODES.accountsReceivable, credit: Number(data.amount), debit: 0 },
           ],
         });
       } catch (e) {
         console.warn("[Collection] Ledger posting skipped:", e);
       }
+
+      // Reconcile and update invoice paid status
+      await CreditAgentsService.reconcileChemistInvoicePaidStatus(tx, data.chemistId);
 
       return collection;
     });
