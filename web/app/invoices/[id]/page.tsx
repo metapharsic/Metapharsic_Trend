@@ -2,10 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Printer, ArrowLeft, Download, Layers, FileText, CheckCircle2, Scissors } from "lucide-react";
+import { Printer, ArrowLeft, Download, Layers, FileText, CheckCircle2, Scissors, Pencil } from "lucide-react";
 import QRCode from "qrcode";
 import { apiClient } from "@/lib/api-client";
 import { SearchableSelect } from "@/components/searchable-select";
+import { EditInvoiceModal } from "@/components/edit-invoice-modal";
 import { computeLineTotals, computeLineTotalsWithSplit, determineTaxSplit, taxClassSummaryWithSplit, computeFreeStripsValue } from "@/lib/gst";
 
 // ============================================================================
@@ -712,8 +713,10 @@ export default function InvoicePage() {
   const [viewMode, setViewMode] = useState<"ORIGINAL" | "DUPLICATE" | "TRIPLICATE" | "ALL_THREE" | "DUAL_2UP">("ORIGINAL");
   const [leftCopy, setLeftCopy] = useState<"ORIGINAL" | "DUPLICATE" | "TRIPLICATE">("ORIGINAL");
   const [rightCopy, setRightCopy] = useState<"ORIGINAL" | "DUPLICATE" | "TRIPLICATE">("DUPLICATE");
+  const [role, setRole] = useState<string | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState(false);
 
-  useEffect(() => {
+  const loadData = () => {
     if (!orderId) return;
     Promise.all([
       apiClient.get(`/api/orders/${orderId}`),
@@ -727,7 +730,21 @@ export default function InvoicePage() {
         setError(err.response?.data?.error || err.message || "Failed to load invoice");
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("accessToken");
+      if (token) {
+        try {
+          setRole(JSON.parse(atob(token.split(".")[1])).role ?? null);
+        } catch {}
+      }
+    }
+    loadData();
   }, [orderId]);
+
+  const isAdmin = role === "ADMIN" || role === "MD";
 
   useEffect(() => {
     if (!order) return;
@@ -1078,6 +1095,15 @@ export default function InvoicePage() {
             >
               <Layers size={13} /> All 3 Copies (Bundle)
             </button>
+            {isAdmin && order?.invoice && (
+              <button
+                onClick={() => setEditingInvoice(true)}
+                className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 text-xs font-mono font-bold transition rounded shadow-xs"
+                title="Admin Only: Edit Invoice Details & Line Items"
+              >
+                <Pencil size={13} /> Edit Invoice
+              </button>
+            )}
           </div>
         </div>
 
@@ -1280,6 +1306,17 @@ export default function InvoicePage() {
             variant="single"
           />
         </div>
+      )}
+
+      {editingInvoice && order?.invoice && (
+        <EditInvoiceModal
+          invoiceId={order.id}
+          onClose={() => setEditingInvoice(false)}
+          onSaved={() => {
+            setEditingInvoice(false);
+            loadData();
+          }}
+        />
       )}
     </div>
   );

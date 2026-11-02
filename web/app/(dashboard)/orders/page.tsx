@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { SearchableSelect } from "@/components/searchable-select";
+import { EditInvoiceModal } from "@/components/edit-invoice-modal";
 
 interface OrderItem {
   id: string;
@@ -169,6 +170,7 @@ export default function OrdersDashboard() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [invoiceBusyId, setInvoiceBusyId] = useState<string | null>(null);
+  const [editInvoiceId, setEditInvoiceId] = useState<string | null>(null);
   const [deleteInvoice, setDeleteInvoice] = useState<any | null>(null);
   const [deleteInvoiceError, setDeleteInvoiceError] = useState<string | null>(null);
   const [deletingInvoice, setDeletingInvoice] = useState(false);
@@ -688,6 +690,15 @@ export default function OrdersDashboard() {
                     </td>
                     {canManageInvoices && (
                       <td className="px-6 py-4 text-right whitespace-nowrap">
+                        {isAdmin && (
+                          <button
+                            onClick={() => setEditInvoiceId(inv.id)}
+                            className="text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors font-semibold text-xs border border-transparent hover:border-indigo-100 mr-1"
+                            title="Edit Invoice Details & Line Items (Admin Only)"
+                          >
+                            Edit
+                          </button>
+                        )}
                         <button
                           disabled={invoiceBusyId === inv.id}
                           onClick={() => togglePaid(inv)}
@@ -804,6 +815,18 @@ export default function OrdersDashboard() {
           onSaved={() => {
             setEditOrderId(null);
             load();
+          }}
+        />
+      )}
+
+      {editInvoiceId && (
+        <EditInvoiceModal
+          invoiceId={editInvoiceId}
+          onClose={() => setEditInvoiceId(null)}
+          onSaved={() => {
+            setEditInvoiceId(null);
+            loadInvoices();
+            load(ordersPage);
           }}
         />
       )}
