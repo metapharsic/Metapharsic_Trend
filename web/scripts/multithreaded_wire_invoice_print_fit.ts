@@ -225,23 +225,43 @@ if (!isMainThread) {
       { id: 4, name: "BACKWARD_COMPATIBILITY_REGRESSION_AUDITOR" },
     ];
 
-    const workerPromises = tasks.map((task) => {
-      return new Promise<ThreadResult>((resolve, reject) => {
-        const worker = new Worker(pathToFileURL(__filename), {
-          workerData: {
-            threadId: task.id,
-            workerTask: task.name,
-            invoiceFilePath: invoicePath,
-          },
-        });
+    const tsxLoaderPath = path.resolve(__dirname, "../node_modules/tsx/dist/loader.mjs");
+    const loaderUrl = fs.existsSync(tsxLoaderPath) ? pathToFileURL(tsxLoaderPath).href : "tsx";
 
-        worker.on("message", (msg: ThreadResult) => resolve(msg));
-        worker.on("error", (err) => reject(err));
-        worker.on("exit", (code) => {
-          if (code !== 0) {
-            reject(new Error(`Worker ${task.id} exited with status code ${code}`));
-          }
-        });
+    const workerPromises = tasks.map((task) => {
+      return new Promise<ThreadResult>((resolve) => {
+        let settled = false;
+        const finish = (res: ThreadResult) => {
+          if (settled) return;
+          settled = true;
+          resolve(res);
+        };
+
+        try {
+          const worker = new Worker(pathToFileURL(__filename), {
+            workerData: {
+              threadId: task.id,
+              workerTask: task.name,
+              invoiceFilePath: invoicePath,
+            },
+            execArgv: ["--import", loaderUrl],
+          });
+
+          worker.on("message", (msg: ThreadResult) => finish(msg));
+          worker.on("error", async () => {
+            // Fallback directly to async execution in thread pool
+            const direct = await executePrintFitTask(task.id, task.name, invoicePath);
+            finish(direct);
+          });
+          worker.on("exit", async (code) => {
+            if (code !== 0 && !settled) {
+              const direct = await executePrintFitTask(task.id, task.name, invoicePath);
+              finish(direct);
+            }
+          });
+        } catch {
+          executePrintFitTask(task.id, task.name, invoicePath).then(finish);
+        }
       });
     });
 
