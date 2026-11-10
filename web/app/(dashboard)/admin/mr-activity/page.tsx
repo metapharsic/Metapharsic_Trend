@@ -61,6 +61,8 @@ interface MR {
   lastName: string;
   territories: string[];
   phone?: string;
+  email?: string;
+  role?: string;
   isActive: boolean;
 }
 
@@ -94,7 +96,7 @@ export default function MrActivityPage() {
   const [selectedMr, setSelectedMr] = useState<string | null>(null);
   const [cursor, setCursor] = useState<Date>(() => new Date());
   const [counts, setCounts] = useState<Record<string, number>>({});
-  const [byMr, setByMr] = useState<Record<string, { name: string; userId?: string; employeeId?: string; total: number }>>({});
+  const [byMr, setByMr] = useState<Record<string, { name: string; userId?: string; employeeId?: string; role?: string; total: number }>>({});
   const [byDay, setByDay] = useState<Record<string, DayVisit[]>>({});
   const [availableMonths, setAvailableMonths] = useState<MonthItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,6 +111,7 @@ export default function MrActivityPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [exporting, setExporting] = useState(false);
   const [gapsModalOpen, setGapsModalOpen] = useState(false);
+  const [inlineGapsOpen, setInlineGapsOpen] = useState(false);
   const [gapsActiveTab, setGapsActiveTab] = useState<"DAYS" | "MRS" | "PRESCRIPTION" | "BEATS">("DAYS");
   const [summaryMetrics, setSummaryMetrics] = useState<{
     totalCalls: number;
@@ -140,16 +143,16 @@ export default function MrActivityPage() {
     };
   } | null>(null);
 
-  // Load MR list on mount
+  // Load complete user directory on mount (MRs, ASMs, Admins for executive monitoring)
   useEffect(() => {
     apiClient
-      .get("/api/manager/mrs")
+      .get("/api/manager/mrs?all=true")
       .then((res) => {
         const list = res.data?.data?.mrs || [];
         setMrs(list);
       })
       .catch((err) => {
-        console.error("Failed to load MRs:", err);
+        console.error("Failed to load user directory:", err);
       });
   }, []);
 
@@ -207,6 +210,7 @@ export default function MrActivityPage() {
   }, [fetchSummary]);
 
   const days = useMemo(() => Array.from({ length: daysInMonth(cursor) }, (_, i) => i + 1), [cursor]);
+  const firstDayOffset = useMemo(() => new Date(cursor.getFullYear(), cursor.getMonth(), 1).getDay(), [cursor]);
   const monthLabel = useMemo(() => formatMonthLabel(cursor), [cursor]);
   const currentMonthKey = useMemo(() => monthKey(cursor), [cursor]);
   const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -245,10 +249,14 @@ export default function MrActivityPage() {
     return list.sort((a, b) => (b?.time || "").localeCompare(a?.time || ""));
   }, [byDay]);
 
-  // Filtered visits based on target filter, selected area, and search query
+  // Filtered visits based on selected day, target filter, selected area, and search query
   const filteredVisits = useMemo(() => {
     return allVisitsThisMonth.filter((v) => {
       if (!v) return false;
+      if (selectedDay) {
+        const visitDay = (v.time || "").slice(0, 10);
+        if (visitDay !== selectedDay) return false;
+      }
       if (targetFilter !== "ALL") {
         if (targetFilter === "Doctor" && v.targetType !== "Doctor") return false;
         if (targetFilter === "Chemist" && v.targetType !== "Chemist") return false;
@@ -269,15 +277,15 @@ export default function MrActivityPage() {
       }
       return true;
     });
-  }, [allVisitsThisMonth, targetFilter, selectedArea, searchQuery]);
+  }, [allVisitsThisMonth, selectedDay, targetFilter, selectedArea, searchQuery]);
 
-  // Options for SearchableSelect MR Dropdown
+  // Options for SearchableSelect MR / User Dropdown (All users visible to Admin)
   const mrOptions: SearchableOption[] = useMemo(() => {
     const list: SearchableOption[] = [
       {
         value: "ALL",
-        label: "All Medical Representatives",
-        sublabel: `${mrs.length} Field Reps Configured`,
+        label: "All Users & Field Force",
+        sublabel: `${mrs.length} Users / Reps Registered`,
         badge: `${totalCalls} calls`,
       },
     ];
@@ -285,10 +293,11 @@ export default function MrActivityPage() {
     mrs.forEach((mr) => {
       const mrStats = byMr[mr.id] || (mr.employeeId ? byMr[mr.employeeId] : undefined);
       const count = mrStats?.total ?? 0;
+      const rolePrefix = mr.role ? `[${mr.role}] ` : "";
       list.push({
         value: mr.id,
-        label: `${mr.firstName} ${mr.lastName}`.trim(),
-        sublabel: mr.territories?.length ? mr.territories.join(", ") : mr.phone || "Field Representative",
+        label: `${rolePrefix}${mr.firstName} ${mr.lastName}`.trim(),
+        sublabel: mr.territories?.length ? mr.territories.join(", ") : mr.phone || mr.email || `${mr.role || "User"} Staff`,
         badge: `${count} call${count === 1 ? "" : "s"}`,
       });
     });
@@ -631,12 +640,133 @@ export default function MrActivityPage() {
 
           <div className="flex items-center gap-2 shrink-0">
             <button
+              onClick={() => setInlineGapsOpen(!inlineGapsOpen)}
+              className="text-xs font-bold text-amber-950 bg-amber-100/90 hover:bg-amber-200/90 border border-amber-300 px-3.5 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
+            >
+              <AlertTriangle size={14} className="text-amber-700" />
+              {inlineGapsOpen ? "Hide Inline Gaps ▲" : "Inline Gaps ▼"}
+            </button>
+            <button
               onClick={() => setGapsModalOpen(true)}
               className="text-xs font-bold text-amber-950 bg-white hover:bg-amber-100/70 border border-amber-300 px-4 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
             >
               <ShieldAlert size={14} className="text-amber-600" />
               Analyze & Remediate Gaps →
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Inlined Field Force Coverage Gap Intelligence Panel */}
+      {inlineGapsOpen && summaryMetrics?.gapAnalytics && (
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-amber-200 space-y-4 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                <AlertTriangle size={18} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Inlined Field Activity & Coverage Gap Diagnostics</h3>
+                <p className="text-xs text-slate-400">Diagnosis of zero-call days, inactive reps, and overdue prescribers for {monthLabel}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setInlineGapsOpen(false)}
+              className="text-xs font-semibold text-slate-400 hover:text-slate-600 p-1"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Gap Sub-Tabs */}
+          <div className="flex flex-wrap gap-2 pt-1">
+            {[
+              { id: "DAYS" as const, label: "Zero-Call Days", count: summaryMetrics.gapAnalytics.gapDaysCount, icon: Calendar },
+              { id: "MRS" as const, label: "Inactive Field Staff", count: summaryMetrics.gapAnalytics.inactiveMrsCount, icon: UserX },
+              { id: "PRESCRIPTION" as const, label: "Overdue Prescribers", count: summaryMetrics.gapAnalytics.tierAGapCount, icon: Stethoscope },
+              { id: "BEATS" as const, label: "Unvisited Beats", count: summaryMetrics.gapAnalytics.unvisitedBeatsCount, icon: Navigation },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = gapsActiveTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setGapsActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-xl transition-all border ${
+                    isActive
+                      ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                      : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  <Icon size={13} />
+                  <span>{tab.label}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isActive ? "bg-amber-800/60 text-white" : "bg-slate-200 text-slate-700"}`}>
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Gap Tab Contents Inlined */}
+          <div className="pt-2">
+            {gapsActiveTab === "DAYS" && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                {days.map((d) => {
+                  const iso = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                  const count = counts[iso] ?? 0;
+                  if (count > 0) return null;
+                  return (
+                    <div key={d} className="p-2.5 rounded-xl border border-amber-200/60 bg-amber-50/40 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 block">Day {d}</span>
+                      <span className="text-xs font-bold text-amber-800">0 Calls</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {gapsActiveTab === "MRS" && (
+              <div className="space-y-2">
+                {summaryMetrics.gapAnalytics.inactiveMrs.length === 0 ? (
+                  <p className="text-xs text-emerald-600 font-semibold py-4 text-center">✓ 100% of field personnel are active this month!</p>
+                ) : (
+                  summaryMetrics.gapAnalytics.inactiveMrs.map((mr) => (
+                    <div key={mr.id} className="p-3 rounded-xl border border-rose-100 bg-rose-50/30 flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-800">{mr.name} ({mr.email})</span>
+                      <span className="font-bold text-rose-600 bg-rose-100 px-2.5 py-0.5 rounded-lg">0 calls</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {gapsActiveTab === "PRESCRIPTION" && (
+              <div className="space-y-2">
+                {summaryMetrics.gapAnalytics.overdueTierADoctors.slice(0, 5).map((doc) => (
+                  <div key={doc.id} className="p-3 rounded-xl border border-slate-100 bg-slate-50 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="font-bold text-slate-800">{doc.fullName} ({doc.specialty})</p>
+                      <p className="text-[10px] text-slate-400">{doc.subArea || "Area"} · {doc.beatName || "Beat"}</p>
+                    </div>
+                    <span className="font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg">
+                      {doc.gapDays ? `${doc.gapDays}d overdue` : "Unvisited"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {gapsActiveTab === "BEATS" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {summaryMetrics.gapAnalytics.unvisitedBeats.map((b) => (
+                  <div key={b} className="p-2.5 rounded-xl border border-slate-100 bg-slate-50 flex items-center justify-between text-xs">
+                    <span className="font-medium text-slate-700 truncate mr-2">{b}</span>
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100/60 px-1.5 py-0.5 rounded shrink-0">0 visits</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -771,6 +901,141 @@ export default function MrActivityPage() {
         </div>
       </div>
 
+      {/* Inlined Monthly Activity Calendar Matrix */}
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <CalendarDays size={16} className="text-indigo-600" />
+                Monthly Field Activity Matrix — {monthLabel}
+              </h3>
+              <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2.5 py-0.5 rounded-full">
+                {totalCalls} fleet calls
+              </span>
+              <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2 py-0.5 rounded-full">
+                {activeDaysCount} active days
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Live fleet call density. Click any day to filter calls inline, or click active day to view full month.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {selectedDay && (
+              <button
+                onClick={() => setSelectedDay(null)}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-xl transition-colors"
+              >
+                <X size={12} /> Filtered to {new Date(selectedDay + "T00:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short" })} ({counts[selectedDay] || 0} calls) · Clear Day
+              </button>
+            )}
+            <button
+              onClick={handlePrevMonth}
+              className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors"
+              title="Previous Month"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={handleNextMonth}
+              className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors"
+              title="Next Month"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* 7-Day Inlined Calendar Grid */}
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayName) => (
+            <div key={dayName} className="text-center text-[11px] font-bold text-slate-400 uppercase py-1">
+              {dayName}
+            </div>
+          ))}
+
+          {/* First day offset padding */}
+          {Array.from({ length: firstDayOffset }, (_, i) => (
+            <div key={`offset-${i}`} className="aspect-square rounded-2xl bg-slate-50/20 border border-transparent" />
+          ))}
+
+          {days.map((d) => {
+            const iso = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+            const count = counts[iso] ?? 0;
+            const isToday = iso === todayIso;
+            const isSelected = selectedDay === iso;
+
+            return (
+              <button
+                key={d}
+                type="button"
+                onClick={() => {
+                  setSelectedDay(isSelected ? null : iso);
+                }}
+                className={`aspect-square rounded-2xl p-1.5 sm:p-2 flex flex-col items-center justify-between text-xs font-semibold border transition-all cursor-pointer ${
+                  isSelected
+                    ? "bg-indigo-600 text-white border-indigo-600 ring-4 ring-indigo-200 shadow-md scale-105 z-10"
+                    : count > 0
+                    ? "bg-indigo-50/80 hover:bg-indigo-100 text-indigo-900 border-indigo-200/70 hover:scale-102 shadow-xs"
+                    : "bg-slate-50/60 hover:bg-slate-100/60 text-slate-400 border-slate-100 hover:border-slate-200"
+                } ${isToday && !isSelected ? "ring-2 ring-indigo-500 ring-offset-1 font-bold" : ""}`}
+                title={count > 0 ? `${iso}: ${count} field call(s)` : `${iso}: 0 calls (Gap day)`}
+              >
+                <div className="w-full flex items-center justify-between">
+                  <span className={`text-[11px] ${isSelected ? "text-white" : isToday ? "text-indigo-600 font-extrabold" : "text-slate-600"}`}>
+                    {d}
+                  </span>
+                  {isToday && (
+                    <span className={`text-[8px] font-extrabold uppercase px-1 py-0.2 rounded ${isSelected ? "bg-white text-indigo-700" : "bg-indigo-600 text-white"}`}>
+                      Today
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-center w-full my-auto">
+                  {count > 0 ? (
+                    <span className={`text-xs sm:text-sm font-bold block ${isSelected ? "text-white" : "text-indigo-700"}`}>
+                      {count}
+                      <span className="text-[9px] font-normal hidden sm:inline ml-0.5">call{count === 1 ? "" : "s"}</span>
+                    </span>
+                  ) : (
+                    <span className={`text-[10px] block ${isSelected ? "text-indigo-100" : "text-slate-300"}`}>—</span>
+                  )}
+                </div>
+
+                <div className="w-full flex justify-center">
+                  {count > 0 ? (
+                    <div className={`h-1 w-5 rounded-full ${isSelected ? "bg-white/80" : "bg-indigo-500"}`} />
+                  ) : (
+                    <div className="h-1 w-2 rounded-full bg-amber-300" title="Zero calls logged" />
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Legend */}
+        <div className="pt-2 flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-500">
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" /> Active Calls
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400" /> Gap Day (0 Calls)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full ring-2 ring-indigo-500 ring-offset-1 bg-white" /> Today
+            </span>
+          </div>
+          <span className="text-slate-400 text-xs italic">
+            {activeDaysCount} of {daysInMonth(cursor)} active field days ({daysInMonth(cursor) - activeDaysCount} gap days)
+          </span>
+        </div>
+      </div>
+
       {/* Error Banner with Retry */}
       {error && (
         <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-rose-800 flex items-start gap-3">
@@ -878,110 +1143,6 @@ export default function MrActivityPage() {
         </div>
       )}
 
-      {/* Selected Day Modal Drawer */}
-      {selectedDay && (
-        <div
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
-          onClick={() => setSelectedDay(null)}
-        >
-          <div
-            className="bg-white rounded-3xl p-6 w-full max-w-xl max-h-[85vh] overflow-y-auto shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  Field Calls on {new Date(selectedDay + "T00:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {(byDay[selectedDay] || []).length} recorded visits
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedDay(null)}
-                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {(byDay[selectedDay] || []).length === 0 ? (
-              <p className="text-sm text-slate-400 py-8 text-center">No calls recorded on this date.</p>
-            ) : (
-              <ul className="space-y-3">
-                {(byDay[selectedDay] || []).map((v) => (
-                  <li key={v.id} className="border border-slate-100 rounded-2xl p-4 hover:border-indigo-100 hover:bg-indigo-50/20 transition-colors">
-                    <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <div>
-                        <span className="text-sm font-bold text-slate-900">{v.target}</span>
-                        <span className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                          {v.targetType || "Field Contact"}
-                        </span>
-                      </div>
-                      <span className="text-xs text-slate-400 whitespace-nowrap font-medium">
-                        {new Date(v.time).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </div>
-
-                    {!selectedMr && (
-                      <p className="text-xs text-indigo-600 font-semibold mb-1 flex items-center gap-1">
-                        <Users2 size={12} /> {v.mrName}
-                      </p>
-                    )}
-
-                    <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed mt-1">
-                      {v.purpose}
-                    </p>
-
-                    {v.feedback && (
-                      <div className="bg-slate-50 rounded-xl p-2.5 mt-2 border border-slate-100">
-                        <p className="text-[11px] text-slate-600">
-                          <span className="font-bold text-slate-700">Customer Feedback: </span>
-                          {v.feedback}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-                      {v.beatName && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/60 flex items-center gap-1">
-                          <Navigation size={9} /> {v.beatName}
-                        </span>
-                      )}
-                      {v.subArea && (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 flex items-center gap-1">
-                          <MapPin size={9} /> {v.subArea}
-                        </span>
-                      )}
-                      {v.cqsScore != null && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
-                          <Award size={9} /> CQS: {v.cqsScore}/100
-                        </span>
-                      )}
-                      {v.boxesPlaced != null && v.boxesPlaced > 0 && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200/60 flex items-center gap-1">
-                          <Package size={9} /> {v.boxesPlaced} Boxes
-                        </span>
-                      )}
-                      {v.receptiveness && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                          {v.receptiveness}
-                        </span>
-                      )}
-                      {v.durationMinutes != null && (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 flex items-center gap-1">
-                          <Clock size={10} /> {v.durationMinutes} min
-                        </span>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Main Content Area */}
       {loading ? (
         <div className="bg-white rounded-3xl p-16 shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
@@ -991,27 +1152,28 @@ export default function MrActivityPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column: MR Call Volume Leaderboard */}
+          {/* Left Column: User & MR Call Volume Leaderboard */}
           <div className="lg:col-span-1 bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                 <Users2 size={16} className="text-indigo-600" />
-                Call Volume by MR
+                Call Volume by User / Field Force
               </h3>
               <span className="text-xs font-semibold text-slate-400">
-                {sortedByMr.length} Field Reps
+                {sortedByMr.length} Active Users
               </span>
             </div>
 
             {sortedByMr.length === 0 ? (
               <div className="py-8 text-center text-slate-400 text-xs">
-                No MR call activity recorded for this period.
+                No user call activity recorded for this period.
               </div>
             ) : (
               <div className="space-y-3">
                 {sortedByMr.map(([id, data]) => {
                   const isSelected = selectedMr === id || (data.userId && selectedMr === data.userId) || (data.employeeId && selectedMr === data.employeeId);
                   const percentage = totalCalls > 0 ? Math.round((data.total / totalCalls) * 100) : 0;
+                  const roleTag = (data as any).role ? `[${(data as any).role}] ` : "";
 
                   return (
                     <div
@@ -1025,6 +1187,7 @@ export default function MrActivityPage() {
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs font-bold text-slate-800 truncate mr-2">
+                          {roleTag && <span className="text-[10px] font-bold text-indigo-600 mr-1">{roleTag}</span>}
                           {data.name}
                         </span>
                         <span className="text-xs font-bold text-indigo-600 shrink-0">
@@ -1052,26 +1215,44 @@ export default function MrActivityPage() {
           <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
               <div>
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <CalendarDays size={16} className="text-indigo-600" />
-                  {selectedMrName ? `${selectedMrName}'s Calls` : "All Field Visits"} — {monthLabel}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <CalendarDays size={16} className="text-indigo-600" />
+                    {selectedMrName ? `${selectedMrName}'s Calls` : "All Field Visits"} — {monthLabel}
+                  </h3>
+                  {selectedDay && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                      Day {selectedDay.slice(8)}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Showing {filteredVisits.length} of {allVisitsThisMonth.length} calls
-                  {selectedMr && " (Filtered by MR)"}
+                  {selectedDay && ` on ${selectedDay}`}
+                  {selectedMr && " (Filtered by User)"}
                   {targetFilter !== "ALL" && ` (Type: ${targetFilter})`}
                   {searchQuery && ` (Keyword: "${searchQuery}")`}
                 </p>
               </div>
 
-              {selectedMr && (
-                <button
-                  onClick={() => setSelectedMr(null)}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1.5 rounded-xl transition-colors"
-                >
-                  <X size={12} /> Clear MR Filter
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {selectedDay && (
+                  <button
+                    onClick={() => setSelectedDay(null)}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 hover:text-amber-900 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl transition-colors"
+                  >
+                    <X size={12} /> Clear Day ({selectedDay.slice(8)})
+                  </button>
+                )}
+                {selectedMr && (
+                  <button
+                    onClick={() => setSelectedMr(null)}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1.5 rounded-xl transition-colors"
+                  >
+                    <X size={12} /> Clear User Filter
+                  </button>
+                )}
+              </div>
             </div>
 
             {filteredVisits.length === 0 ? (

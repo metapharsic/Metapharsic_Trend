@@ -7,8 +7,8 @@
   "autoPullSchedule": "TWICE_WEEKLY",
   "autoSyncOnPull": false,
   "lastCheckedAt": "2026-10-13T17:07:13.056Z",
-  "lastPulledAt": "2026-10-28T21:30:01.350Z",
-  "lastPullStatus": "NO_CHANGES",
+  "lastPulledAt": "2026-11-10T13:28:50.423Z",
+  "lastPullStatus": "SUCCESS",
   "lastPulledFiles": [
     {
       "filename": ".gitignore",
@@ -20,37 +20,89 @@
   ],
   "lastFetchedCommits": [
     {
-      "hash": "28b1c6fb",
+      "hash": "129a085",
       "author": "Metapharsic Admin",
-      "date": "2026-10-18",
-      "message": "feat(mr-dl-tasks): MR client DL upload with 4-agent verification council, complete task role management, and multithreaded wiring"
+      "date": "2026-11-02",
+      "message": "chore(scripts): robust multi-threaded worker fallback loader for cross-platform linux/windows execution"
     },
     {
-      "hash": "140e4def",
+      "hash": "8d013a9",
       "author": "Metapharsic Admin",
-      "date": "2026-10-17",
-      "message": "fix(mr-activity): resolve permissions, userId mismatch, auto-month sync, and wire universal SearchableSelect"
+      "date": "2026-11-02",
+      "message": "feat(invoice): calibrate print layout to fit 100% left-right width and enhance font visibility"
     },
     {
-      "hash": "f96a7ad4",
+      "hash": "b272a1d",
       "author": "Metapharsic Admin",
-      "date": "2026-10-17",
-      "message": "fix(git): disable git pager in Push_To_GitHub.bat to prevent terminal hanging on diff"
+      "date": "2026-11-02",
+      "message": "feat(invoices): wire Admin-only invoice editing with RBAC security, live GST recalculation, double-entry ledger sync, and multithreaded parity engine"
     },
     {
-      "hash": "e11a472c",
+      "hash": "3b30c22",
       "author": "Metapharsic Admin",
-      "date": "2026-10-17",
-      "message": "feat(ui): universal searchable & filterable dropdowns, 27-day MR tour plans, and VPS synchronization"
+      "date": "2026-11-01",
+      "message": "fix(credit-collections): run isolated eval worker in multithreaded engine to eliminate duplicate task runs and ensure cross-platform linux worker parity"
     },
     {
-      "hash": "20e41cb7",
+      "hash": "722713b",
       "author": "Metapharsic Admin",
-      "date": "2026-10-16",
-      "message": "feat(collections): enhance credit risk management, validate invoices, and wire reporting option via multi-threaded engine"
+      "date": "2026-11-01",
+      "message": "fix(credit-collections): use direct --import tsx in worker threads for universal cross-platform node compatibility"
     }
   ],
   "pullHistory": [
+    {
+      "timestamp": "2026-11-10T13:27:40.590Z",
+      "type": "MANUAL",
+      "branch": "main",
+      "beforeHash": "129a085",
+      "afterHash": "129a085",
+      "status": "NO_CHANGES",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": ".gitignore",
+          "status": "modified",
+          "additions": 8,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [
+        {
+          "hash": "129a085",
+          "author": "Metapharsic Admin",
+          "date": "2026-11-02",
+          "message": "chore(scripts): robust multi-threaded worker fallback loader for cross-platform linux/windows execution"
+        },
+        {
+          "hash": "8d013a9",
+          "author": "Metapharsic Admin",
+          "date": "2026-11-02",
+          "message": "feat(invoice): calibrate print layout to fit 100% left-right width and enhance font visibility"
+        },
+        {
+          "hash": "b272a1d",
+          "author": "Metapharsic Admin",
+          "date": "2026-11-02",
+          "message": "feat(invoices): wire Admin-only invoice editing with RBAC security, live GST recalculation, double-entry ledger sync, and multithreaded parity engine"
+        },
+        {
+          "hash": "3b30c22",
+          "author": "Metapharsic Admin",
+          "date": "2026-11-01",
+          "message": "fix(credit-collections): run isolated eval worker in multithreaded engine to eliminate duplicate task runs and ensure cross-platform linux worker parity"
+        },
+        {
+          "hash": "722713b",
+          "author": "Metapharsic Admin",
+          "date": "2026-11-01",
+          "message": "fix(credit-collections): use direct --import tsx in worker threads for universal cross-platform node compatibility"
+        }
+      ],
+      "logMessage": "Already up to date.\n",
+      "id": "pull-1794317260597-5ukpl"
+    },
     {
       "timestamp": "2026-10-28T21:30:01.350Z",
       "type": "AUTO",

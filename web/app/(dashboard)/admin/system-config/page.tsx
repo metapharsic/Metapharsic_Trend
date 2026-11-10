@@ -30,11 +30,25 @@ import {
   Cpu,
   Flame,
   AlertTriangle,
+  UploadCloud,
+  DownloadCloud,
+  Server,
+  Database,
+  Activity,
+  ArrowUpRight,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { SystemUpdateModal } from "@/components/system-update-modal";
 import { SystemConfigData, PulledFileInfo, CommitInfo, PullHistoryRecord } from "@/services/system-config.service";
-import { AdHocCommitFetchResult, ApplySpecificCommitResult, AgentTelemetryStatus } from "@/services/software-update-agents.service";
+import {
+  AdHocCommitFetchResult,
+  ApplySpecificCommitResult,
+  AgentTelemetryStatus,
+  OneClickPushResult,
+  OneClickSyncResult,
+  SystemSyncOverview,
+  ParityItem,
+} from "@/services/software-update-agents.service";
 
 export default function SystemConfigurationPage() {
   const [config, setConfig] = useState<SystemConfigData | null>(null);
@@ -47,6 +61,18 @@ export default function SystemConfigurationPage() {
   const [expandedFile, setExpandedFile] = useState<string | null>(null);
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [bannerNotice, setBannerNotice] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+
+  // ── One-Click OTA Sync Command Center State ──
+  const [syncStatus, setSyncStatus] = useState<SystemSyncOverview | null>(null);
+  const [loadingSyncStatus, setLoadingSyncStatus] = useState(false);
+  const [pushingOneClick, setPushingOneClick] = useState(false);
+  const [syncingOneClick, setSyncingOneClick] = useState(false);
+  const [oneClickPushResult, setOneClickPushResult] = useState<OneClickPushResult | null>(null);
+  const [oneClickSyncResult, setOneClickSyncResult] = useState<OneClickSyncResult | null>(null);
+  const [activeConsole, setActiveConsole] = useState<"PUSH" | "SYNC" | null>(null);
+  const [showParityMatrix, setShowParityMatrix] = useState(false);
+  const [showLiveLogs, setShowLiveLogs] = useState(false);
+  const [customCommitMessage, setCustomCommitMessage] = useState("");
 
   // Ad-Hoc Commit Input & Multi-Agent State
   const [adHocRef, setAdHocRef] = useState("origin/main");
@@ -72,9 +98,60 @@ export default function SystemConfigurationPage() {
       .finally(() => setLoading(false));
   };
 
+  const loadSyncStatus = () => {
+    setLoadingSyncStatus(true);
+    apiClient
+      .get("/api/system/sync/status")
+      .then((res) => {
+        setSyncStatus(res.data.data.status);
+      })
+      .catch((err) => {
+        console.error("Failed to load sync status:", err);
+      })
+      .finally(() => setLoadingSyncStatus(false));
+  };
+
   useEffect(() => {
     loadConfig();
+    loadSyncStatus();
   }, []);
+
+  const handleOneClickPush = async () => {
+    setPushingOneClick(true);
+    setActiveConsole("PUSH");
+    try {
+      const res = await apiClient.post("/api/system/sync/push", {
+        commitMessage: customCommitMessage.trim() || undefined,
+      });
+      const data: OneClickPushResult = res.data.data.result;
+      setOneClickPushResult(data);
+      setCustomCommitMessage("");
+      showNotification("success", data.message);
+      loadConfig();
+      loadSyncStatus();
+    } catch (err: any) {
+      showNotification("error", "One-click push broadcast failed. Check server logs.");
+    } finally {
+      setPushingOneClick(false);
+    }
+  };
+
+  const handleOneClickGetDataSync = async () => {
+    setSyncingOneClick(true);
+    setActiveConsole("SYNC");
+    try {
+      const res = await apiClient.post("/api/system/sync/pull");
+      const data: OneClickSyncResult = res.data.data.result;
+      setOneClickSyncResult(data);
+      showNotification("success", data.message);
+      loadConfig();
+      loadSyncStatus();
+    } catch (err: any) {
+      showNotification("error", "One-click data sync failed. Check server logs.");
+    } finally {
+      setSyncingOneClick(false);
+    }
+  };
 
   const showNotification = (type: "success" | "error" | "info", text: string) => {
     setBannerNotice({ type, text });
@@ -260,32 +337,45 @@ export default function SystemConfigurationPage() {
           {/* Action Trigger Buttons */}
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             <button
-              onClick={handleFetchCommits}
-              disabled={fetchingCommits}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 text-xs font-bold transition-all shadow-sm hover:shadow active:scale-95 disabled:opacity-50"
-              title="Query remote GitHub repository for new commits"
+              onClick={handleOneClickPush}
+              disabled={pushingOneClick}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs transition-all shadow-lg shadow-emerald-600/30 hover:shadow-emerald-600/50 active:scale-95 disabled:opacity-50"
+              title="One-click stage, commit, push to GitHub, and sync data to VPS"
             >
-              <RefreshCw size={14} className={fetchingCommits ? "animate-spin text-indigo-400" : "text-slate-400"} />
-              <span>{fetchingCommits ? "Fetching..." : "Fetch Commits"}</span>
+              <UploadCloud size={14} className={pushingOneClick ? "animate-bounce text-emerald-200" : "text-emerald-200"} />
+              <span>{pushingOneClick ? "Pushing Data..." : "🚀 Push Data (1-Click)"}</span>
             </button>
 
             <button
-              onClick={handlePullUpdates}
-              disabled={pullingUpdates}
+              onClick={handleOneClickGetDataSync}
+              disabled={syncingOneClick}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 active:scale-95 disabled:opacity-50"
-              title="Pull latest code & files directly from GitHub origin/main"
+              title="One-click pull latest code from GitHub and sync live field visits & orders from VPS"
             >
-              <Download size={14} className={pullingUpdates ? "animate-bounce" : ""} />
-              <span>{pullingUpdates ? "Pulling Files..." : "Pull from GitHub"}</span>
+              <RefreshCw size={14} className={syncingOneClick ? "animate-spin text-indigo-200" : "text-indigo-200"} />
+              <span>{syncingOneClick ? "Syncing Data..." : "⚡ Get Data Sync (1-Click)"}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                loadSyncStatus();
+                loadConfig();
+              }}
+              disabled={loadingSyncStatus}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 text-xs font-bold transition-all shadow-sm hover:shadow active:scale-95 disabled:opacity-50"
+              title="Refresh parity and git status"
+            >
+              <RefreshCw size={13} className={loadingSyncStatus ? "animate-spin text-slate-400" : "text-slate-400"} />
+              <span>Refresh</span>
             </button>
 
             <button
               onClick={() => setUpdateModalOpen(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs transition-all shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 active:scale-95 border border-amber-400/30"
-              title="Execute Multi-Agent Application Synchronization Engine"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs transition-all shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 active:scale-95 border border-amber-400/30"
+              title="Open Multi-Agent Upgrade Wizard"
             >
               <Sparkles size={14} className="text-amber-200" />
-              <span>Sync Application</span>
+              <span>Upgrade Wizard</span>
             </button>
           </div>
         </div>
@@ -309,6 +399,324 @@ export default function SystemConfigurationPage() {
             <span>{bannerNotice.text}</span>
           </div>
         )}
+      </div>
+
+      {/* ── ONE-CLICK OTA SYNCHRONIZATION COMMAND CENTER ── */}
+      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 border border-indigo-900/60 text-white shadow-2xl space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+                <Sparkles size={18} />
+              </span>
+              <div>
+                <h2 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
+                  One-Click OTA Data Synchronization Center
+                  <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                    High-Parity Engine
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-300">
+                  One-click push local data &amp; code to GitHub + VPS, or one-click get live field calls, visits &amp; orders synchronized into local database.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Telemetry Chips */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                syncStatus?.commitsAhead && syncStatus.commitsAhead > 0
+                  ? "bg-amber-500/20 text-amber-300 border-amber-400/30 animate-pulse"
+                  : "bg-emerald-500/20 text-emerald-300 border-emerald-400/30"
+              }`}
+            >
+              <GitCommit size={13} />
+              {syncStatus?.commitsAhead && syncStatus.commitsAhead > 0
+                ? `${syncStatus.commitsAhead} Commits Ahead of GitHub`
+                : "GitHub Parity: Up-to-Date"}
+            </span>
+
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                syncStatus?.uncommittedCount && syncStatus.uncommittedCount > 0
+                  ? "bg-rose-500/20 text-rose-300 border-rose-400/30"
+                  : "bg-emerald-500/20 text-emerald-300 border-emerald-400/30"
+              }`}
+            >
+              <FileCode size={13} />
+              {syncStatus?.uncommittedCount && syncStatus.uncommittedCount > 0
+                ? `${syncStatus.uncommittedCount} Uncommitted Files`
+                : "Workspace Clean"}
+            </span>
+
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+              <Server size={13} />
+              VPS {syncStatus?.vpsConnected ? "187.127.169.217 (Online)" : "Connecting..."}
+            </span>
+
+            <button
+              onClick={() => {
+                loadSyncStatus();
+                loadConfig();
+              }}
+              disabled={loadingSyncStatus}
+              className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 border border-white/10 transition-colors"
+              title="Refresh parity status"
+            >
+              <RefreshCw size={14} className={loadingSyncStatus ? "animate-spin text-indigo-400" : ""} />
+            </button>
+          </div>
+        </div>
+
+        {/* ── TWO MAJOR ONE-CLICK ACTION CARDS ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* CARD 1: ONE-CLICK PUSH DATA */}
+          <div className="relative rounded-2xl bg-gradient-to-b from-slate-800/90 to-slate-900/90 border border-emerald-500/40 p-6 shadow-xl flex flex-col justify-between gap-5 group hover:border-emerald-400/70 transition-all">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shrink-0">
+                    <UploadCloud size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                      One-Click Push Data
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/40">
+                        1-Click
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-400">Broadcast local code &amp; inventory to GitHub and VPS</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-xs text-slate-300 bg-black/20 p-3.5 rounded-xl border border-white/5">
+                <div className="flex items-center gap-2 text-emerald-300 font-semibold">
+                  <Check size={14} className="text-emerald-400 shrink-0" />
+                  <span>Auto-stages &amp; commits all local changes automatically</span>
+                </div>
+                <div className="flex items-center gap-2 text-emerald-300 font-semibold">
+                  <Check size={14} className="text-emerald-400 shrink-0" />
+                  <span>Pushes commits to GitHub (origin/{config?.targetBranch || "main"})</span>
+                </div>
+                <div className="flex items-center gap-2 text-emerald-300 font-semibold">
+                  <Check size={14} className="text-emerald-400 shrink-0" />
+                  <span>Syncs Product inventory stock quantities, prices &amp; PTR to VPS</span>
+                </div>
+                <div className="flex items-center gap-2 text-emerald-300 font-semibold">
+                  <Check size={14} className="text-emerald-400 shrink-0" />
+                  <span>Zero-downtime hot PM2 reload on VPS (trend-mr)</span>
+                </div>
+              </div>
+
+              <div>
+                <input
+                  type="text"
+                  placeholder="Optional custom commit note (leave empty for auto-timestamp)..."
+                  value={customCommitMessage}
+                  onChange={(e) => setCustomCommitMessage(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all font-mono"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleOneClickPush}
+              disabled={pushingOneClick}
+              className="w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm tracking-wide shadow-lg shadow-emerald-600/30 hover:shadow-emerald-600/50 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              <UploadCloud size={18} className={pushingOneClick ? "animate-bounce" : ""} />
+              <span>{pushingOneClick ? "Broadcasting Data to GitHub & VPS..." : "🚀 Push Data Now (One-Click)"}</span>
+            </button>
+          </div>
+
+          {/* CARD 2: ONE-CLICK GET DATA SYNC */}
+          <div className="relative rounded-2xl bg-gradient-to-b from-slate-800/90 to-slate-900/90 border border-indigo-500/40 p-6 shadow-xl flex flex-col justify-between gap-5 group hover:border-indigo-400/70 transition-all">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400 shrink-0">
+                    <DownloadCloud size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                      One-Click Get Data Sync
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-indigo-400/20 text-indigo-300 border border-indigo-400/40">
+                        1-Click
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-400">Pull latest code and sync live field visits &amp; orders</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-xs text-slate-300 bg-black/20 p-3.5 rounded-xl border border-white/5">
+                <div className="flex items-center gap-2 text-indigo-300 font-semibold">
+                  <Check size={14} className="text-indigo-400 shrink-0" />
+                  <span>Pulls latest commits &amp; code directly from GitHub</span>
+                </div>
+                <div className="flex items-center gap-2 text-indigo-300 font-semibold">
+                  <Check size={14} className="text-indigo-400 shrink-0" />
+                  <span>Bidirectional sync for MR visits, calls, attendance &amp; orders</span>
+                </div>
+                <div className="flex items-center gap-2 text-indigo-300 font-semibold">
+                  <Check size={14} className="text-indigo-400 shrink-0" />
+                  <span>Reconciles 21 PostgreSQL database tables in both directions</span>
+                </div>
+                <div className="flex items-center gap-2 text-indigo-300 font-semibold">
+                  <Check size={14} className="text-indigo-400 shrink-0" />
+                  <span>Generates local Prisma ORM client with 100% database parity</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs px-2 py-1 bg-indigo-950/40 border border-indigo-800/40 rounded-xl">
+                <span className="text-slate-400 font-medium">Database Parity Status:</span>
+                <span className="font-bold text-indigo-300 font-mono">
+                  {syncStatus?.parityMatrix
+                    ? `${syncStatus.parityMatrix.filter((p) => p.matched).length}/${syncStatus.parityMatrix.length} Tables Matched`
+                    : "Ready to Synchronize"}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={handleOneClickGetDataSync}
+              disabled={syncingOneClick}
+              className="w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-black text-sm tracking-wide shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              <RefreshCw size={18} className={syncingOneClick ? "animate-spin" : ""} />
+              <span>{syncingOneClick ? "Syncing Live Field Data from VPS..." : "⚡ Get Data Sync Now (One-Click)"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ── EXECUTION FEEDBACK CONSOLE & LOGS ── */}
+        {(oneClickPushResult || oneClickSyncResult || pushingOneClick || syncingOneClick) && (
+          <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <Terminal size={16} className="text-indigo-400" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                  {activeConsole === "PUSH" ? "Push Broadcast Telemetry & Execution" : "Data Sync Telemetry & Parity Result"}
+                </h4>
+              </div>
+              <button
+                onClick={() => setShowLiveLogs(!showLiveLogs)}
+                className="text-[11px] font-semibold text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1"
+              >
+                <span>{showLiveLogs ? "Hide Console Logs" : "Show Console Logs"}</span>
+                <ChevronDown size={14} className={`transition-transform ${showLiveLogs ? "rotate-180" : ""}`} />
+              </button>
+            </div>
+
+            {/* Status Message */}
+            {(activeConsole === "PUSH" ? oneClickPushResult?.message : oneClickSyncResult?.message) && (
+              <div className="p-3 bg-emerald-950/60 border border-emerald-700/60 rounded-xl text-xs font-semibold text-emerald-200 flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                <span>{activeConsole === "PUSH" ? oneClickPushResult?.message : oneClickSyncResult?.message}</span>
+              </div>
+            )}
+
+            {/* Telemetry Chips */}
+            {((activeConsole === "PUSH" ? oneClickPushResult?.telemetry : oneClickSyncResult?.telemetry) || []).length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                {((activeConsole === "PUSH" ? oneClickPushResult?.telemetry : oneClickSyncResult?.telemetry) || []).map((ag) => (
+                  <div key={ag.id} className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-200">{ag.name}</span>
+                      <span className="text-[10px] font-mono text-emerald-400 font-semibold">{ag.latencyMs}ms</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 truncate" title={ag.summary}>
+                      {ag.summary}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Expandable Console Logs */}
+            {showLiveLogs && (
+              <div className="p-3.5 bg-black/80 rounded-xl border border-slate-800/80 font-mono text-[11px] text-emerald-300 max-h-56 overflow-y-auto space-y-1 leading-relaxed">
+                {((activeConsole === "PUSH" ? oneClickPushResult?.logs : oneClickSyncResult?.logs) || []).map((logLine, idx) => (
+                  <p key={idx} className="whitespace-pre-wrap">
+                    {logLine}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── INTERACTIVE DATABASE PARITY MATRIX ACCORDION ── */}
+        <div className="pt-2">
+          <div
+            onClick={() => setShowParityMatrix(!showParityMatrix)}
+            className="flex items-center justify-between p-3.5 rounded-xl bg-slate-800/40 hover:bg-slate-800/70 border border-slate-700/50 cursor-pointer select-none transition-colors"
+          >
+            <div className="flex items-center gap-2.5">
+              <Database size={16} className="text-indigo-400" />
+              <span className="text-xs font-bold text-slate-200">
+                Database Parity Matrix: Local vs VPS Production PostgreSQL
+              </span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-indigo-500/20 text-indigo-300">
+                {syncStatus?.parityMatrix
+                  ? `${syncStatus.parityMatrix.filter((p) => p.matched).length}/${syncStatus.parityMatrix.length} Matched`
+                  : "Checking..."}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <span>{showParityMatrix ? "Hide Matrix" : "View Record Breakdown"}</span>
+              <ChevronDown size={16} className={`transition-transform ${showParityMatrix ? "rotate-180" : ""}`} />
+            </div>
+          </div>
+
+          {showParityMatrix && (
+            <div className="mt-3 overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-900 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  <tr>
+                    <th className="py-2.5 px-4">Database Table</th>
+                    <th className="py-2.5 px-4">Local Count</th>
+                    <th className="py-2.5 px-4">VPS Count</th>
+                    <th className="py-2.5 px-4">Difference</th>
+                    <th className="py-2.5 px-4">Parity State</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono text-slate-300">
+                  {(syncStatus?.parityMatrix || []).map((row) => (
+                    <tr key={row.table} className="hover:bg-slate-900/50 transition-colors">
+                      <td className="py-2.5 px-4 font-bold text-white font-sans">{row.table}</td>
+                      <td className="py-2.5 px-4">{row.localCount}</td>
+                      <td className="py-2.5 px-4">{row.vpsCount}</td>
+                      <td className="py-2.5 px-4">
+                        {row.diff === 0 ? (
+                          <span className="text-slate-500">0</span>
+                        ) : row.diff > 0 ? (
+                          <span className="text-emerald-400">+{row.diff}</span>
+                        ) : (
+                          <span className="text-rose-400">{row.diff}</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-4">
+                        {row.matched ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            <CheckCircle2 size={11} /> 100% PARITY
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            <AlertTriangle size={11} /> DRIFT ({Math.abs(row.diff)})
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── AD-HOC COMMIT INSPECTOR & MULTI-AGENT FORCE FETCHER ── */}

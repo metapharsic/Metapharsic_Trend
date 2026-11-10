@@ -43,6 +43,8 @@ export interface SystemConfigData {
   lastCheckedAt: string | null;
   lastPulledAt: string | null;
   lastPullStatus: "SUCCESS" | "NO_CHANGES" | "FAILED" | "PENDING" | null;
+  lastPushedAt?: string | null;
+  lastPushStatus?: "SUCCESS" | "FAILED" | null;
   lastPulledFiles: PulledFileInfo[];
   lastFetchedCommits: CommitInfo[];
   pullHistory: PullHistoryRecord[];

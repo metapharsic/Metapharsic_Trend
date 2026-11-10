@@ -20,16 +20,24 @@ async function getMRs(req: AuthedRequest) {
     const { searchParams } = new URL(req.url);
     const activeParam = searchParams.get("active");
     const isActive = activeParam !== null ? activeParam === "true" : undefined;
+    const roleParam = searchParams.get("role");
+    const includeAll = searchParams.get("all") === "true" || roleParam === "ALL";
+
+    const roleFilter = includeAll
+      ? undefined
+      : roleParam && Object.values(Role).includes(roleParam as Role)
+      ? (roleParam as Role)
+      : Role.MR;
 
     const employees = await db.employee.findMany({
       where: {
         user: {
-          role: Role.MR,
+          ...(roleFilter ? { role: roleFilter } : {}),
           ...(isActive !== undefined ? { isActive } : {}),
         },
       },
       include: {
-        user: { select: { id: true, email: true, isActive: true, createdAt: true } },
+        user: { select: { id: true, email: true, role: true, isActive: true, createdAt: true } },
         territories: { select: { id: true, name: true } },
       },
       orderBy: { firstName: "asc" },
@@ -39,6 +47,7 @@ async function getMRs(req: AuthedRequest) {
       id: emp.user.id,
       employeeId: emp.id,
       email: emp.user.email,
+      role: emp.user.role,
       firstName: emp.firstName,
       lastName: emp.lastName,
       phone: emp.phone,

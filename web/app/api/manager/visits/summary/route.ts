@@ -15,7 +15,7 @@ async function handler(req: AuthedRequest) {
     end.setUTCMonth(end.getUTCMonth() + 1);
 
     let employeeId: string | undefined;
-    if (mrId) {
+    if (mrId && mrId !== "ALL") {
       const employee = await db.employee.findFirst({
         where: {
           OR: [
@@ -25,7 +25,7 @@ async function handler(req: AuthedRequest) {
         },
         select: { id: true, userId: true },
       });
-      if (!employee) return badRequest("MR not found");
+      if (!employee) return badRequest("User/MR not found");
       employeeId = employee.id;
     }
 
@@ -50,7 +50,7 @@ async function handler(req: AuthedRequest) {
             userId: true,
             firstName: true,
             lastName: true,
-            user: { select: { id: true, email: true } },
+            user: { select: { id: true, email: true, role: true } },
           },
         },
         doctor: {
@@ -103,9 +103,10 @@ async function handler(req: AuthedRequest) {
         : "Unknown MR";
       const uId = v.employee?.user?.id || v.employee?.userId || v.employeeId;
       const eId = v.employeeId;
+      const role = v.employee?.user ? (v.employee.user as any).role || "MR" : "MR";
 
       if (!byMr[uId]) {
-        byMr[uId] = { name, userId: uId, employeeId: eId, total: 0 };
+        byMr[uId] = { name, userId: uId, employeeId: eId, role, total: 0 } as any;
       }
       byMr[uId].total += 1;
 
@@ -171,15 +172,20 @@ async function handler(req: AuthedRequest) {
 
     const avgCqsScore = scoredVisitsCount > 0 ? Math.round((totalCqsSum / scoredVisitsCount) * 10) / 10 : null;
 
-    // Field Force Gap Analytics
+    // Field Force Gap Analytics across MR and ASM field personnel
     const allMrs = await db.employee.findMany({
-      where: { user: { role: Role.MR } },
+      where: {
+        user: {
+          role: { in: [Role.MR, Role.ASM] },
+          isActive: true,
+        },
+      },
       select: {
         id: true,
         userId: true,
         firstName: true,
         lastName: true,
-        user: { select: { email: true } },
+        user: { select: { email: true, role: true } },
       },
     });
 
@@ -190,6 +196,7 @@ async function handler(req: AuthedRequest) {
         id: m.id,
         name: `${m.firstName} ${m.lastName}`.trim(),
         email: m.user?.email || "—",
+        role: m.user?.role || "MR",
       }));
 
     const [yStr, mStr] = month.split("-");
