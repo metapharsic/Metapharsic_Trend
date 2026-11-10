@@ -25,3 +25,4 @@ async function pushData(req: AuthedRequest) {
 }
 
 export const POST = withAuth(pushData, [Role.ADMIN]);
+

@@ -734,19 +734,21 @@ export default function CallHistoryPage() {
           {filteredVisits.map((v) => {
             const target = v.doctor ?? v.chemist;
             const isDoctor = !!v.doctor;
+            const isChemist = !isDoctor && !!v.chemist;
+            const title = v.doctor?.fullName || v.chemist?.name || v.purpose || "Field Visit";
             return (
               <div
                 key={v.id}
                 onClick={() => openEdit(v)}
                 className="px-6 py-4 flex items-start gap-4 hover:bg-slate-50 transition-colors cursor-pointer"
               >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDoctor ? "bg-emerald-100 text-emerald-600" : "bg-blue-100 text-blue-600"}`}>
-                  {isDoctor ? <Stethoscope size={18} /> : <Store size={18} />}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDoctor ? "bg-emerald-100 text-emerald-600" : isChemist ? "bg-blue-100 text-blue-600" : "bg-purple-100 text-purple-600"}`}>
+                  {isDoctor ? <Stethoscope size={18} /> : isChemist ? <Store size={18} /> : <MapPin size={18} />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                      <p className="font-bold text-slate-900 text-sm truncate">{isDoctor ? v.doctor!.fullName : v.chemist!.name}</p>
+                      <p className="font-bold text-slate-900 text-sm truncate">{title}</p>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1 shrink-0">
                         <MapPin size={9} />
                         <span>{v.subArea || target?.subArea || v.area || target?.territory?.name || "General Area"}</span>
@@ -814,7 +816,7 @@ export default function CallHistoryPage() {
                               key={s.id}
                               className="text-[9px] font-medium bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200"
                             >
-                              {s.product.name} ({s.quantity})
+                              {s.product?.name || "Product"} ({s.quantity})
                             </span>
                           ))}
                           {v.samples.length > 3 && (
@@ -878,12 +880,12 @@ export default function CallHistoryPage() {
             <div className="px-5 pt-3 space-y-3">
               {/* ── Read-only info ── */}
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${editing.doctor ? "bg-emerald-100 text-emerald-600" : "bg-blue-100 text-blue-600"}`}>
-                  {editing.doctor ? <Stethoscope size={18} /> : <Store size={18} />}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${editing.doctor ? "bg-emerald-100 text-emerald-600" : editing.chemist ? "bg-blue-100 text-blue-600" : "bg-purple-100 text-purple-600"}`}>
+                  {editing.doctor ? <Stethoscope size={18} /> : editing.chemist ? <Store size={18} /> : <MapPin size={18} />}
                 </div>
                 <div>
-                  <p className="font-bold text-slate-900 text-sm">{editing.doctor?.fullName ?? editing.chemist?.name}</p>
-                  <p className="text-xs text-slate-500">{editing.doctor?.clinicAddress ?? editing.chemist?.address ?? "—"}</p>
+                  <p className="font-bold text-slate-900 text-sm">{editing.doctor?.fullName ?? editing.chemist?.name ?? editing.purpose ?? "Field Visit"}</p>
+                  <p className="text-xs text-slate-500">{editing.doctor?.clinicAddress ?? editing.chemist?.address ?? editing.subArea ?? editing.area ?? "—"}</p>
                 </div>
               </div>
 
@@ -911,7 +913,7 @@ export default function CallHistoryPage() {
                   <p className="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1">Samples Given</p>
                   <div className="flex flex-wrap gap-1.5">
                     {editing.samples.map((s) => (
-                      <span key={s.id} className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold">{s.product.name} × {s.quantity}</span>
+                      <span key={s.id} className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold">{s.product?.name || "Product"} × {s.quantity}</span>
                     ))}
                   </div>
                 </div>
@@ -1053,10 +1055,10 @@ export default function CallHistoryPage() {
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-bold text-slate-900 text-base">
-                      {selectedSampleVisit.doctor?.fullName || selectedSampleVisit.chemist?.name || "Target Entity"}
+                      {selectedSampleVisit.doctor?.fullName || selectedSampleVisit.chemist?.name || selectedSampleVisit.purpose || "Field Visit"}
                     </h3>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 uppercase">
-                      {selectedSampleVisit.doctor ? "Doctor Detailing" : "Chemist Placement"}
+                      {selectedSampleVisit.doctor ? "Doctor Detailing" : selectedSampleVisit.chemist ? "Chemist Placement" : "Field Activity"}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">

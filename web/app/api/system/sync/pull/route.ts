@@ -15,3 +15,4 @@ async function pullDataSync(req: AuthedRequest) {
 }
 
 export const POST = withAuth(pullDataSync, [Role.ADMIN]);
+

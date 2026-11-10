@@ -15,3 +15,4 @@ async function getSyncStatus(req: AuthedRequest) {
 }
 
 export const GET = withAuth(getSyncStatus, [Role.ADMIN]);
+
