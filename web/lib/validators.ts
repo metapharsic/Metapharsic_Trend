@@ -124,7 +124,11 @@ export const SubmitTourPlanSchema = z.object({
     z.object({
       date: z.coerce.date(),
       territoryId: z.string().uuid(),
-      plannedDoctorId: z.string().uuid().optional(),
+      plannedDoctorId: z.string().uuid().optional().nullable(),
+      plannedChemistId: z.string().uuid().optional().nullable(),
+      beatName: z.string().max(120).optional().nullable(),
+      subArea: z.string().max(120).optional().nullable(),
+      notes: z.string().max(500).optional().nullable(),
     })
   ).min(1, "At least one planned day is required"),
 });

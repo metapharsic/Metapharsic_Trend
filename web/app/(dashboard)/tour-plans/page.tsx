@@ -31,6 +31,7 @@ import {
   Building,
   Download,
   Printer,
+  FileSpreadsheet,
   FileText,
   CheckSquare,
   Square,
@@ -44,6 +45,7 @@ import {
   DailyTourPlanEntry,
   TourPlanEvaluation,
 } from "@/services/tour-plan-agents.service";
+import { downloadTourPlanExcelSchedule } from "@/lib/tour-plan-excel";
 
 interface Territory {
   id: string;
@@ -234,7 +236,8 @@ export default function TourPlansDashboard() {
 
         if (evals.length > 0) {
           if (!selectedPlanId || !evals.some((e) => e.id === selectedPlanId)) {
-            setSelectedPlanId(evals[0].id);
+            const firstPopulated = evals.find((e) => e.days.length > 0);
+            setSelectedPlanId((firstPopulated ?? evals[0]).id);
           }
         } else {
           setSelectedPlanId(null);
@@ -244,28 +247,40 @@ export default function TourPlansDashboard() {
       .finally(() => setLoading(false));
   };
 
-  const handleProvision27DayPlan = async (targetEmpId?: string) => {
+  const [excelExporting, setExcelExporting] = useState(false);
+
+  const handlePruneAutoDays = async (tourPlanId: string) => {
     setProvisioning(true);
     try {
-      if (!targetEmpId || targetEmpId === "ALL") {
-        await apiClient.post("/api/sfa/tour-plan/provision", {
-          month: selectedMonth,
-          provisionAll: true,
-          overwrite: true,
-        });
-      } else {
-        await apiClient.post("/api/sfa/tour-plan/provision", {
-          employeeId: targetEmpId,
-          month: selectedMonth,
-          overwrite: true,
-        });
+      const res = await apiClient.post("/api/sfa/tour-plan/prune-auto", { tourPlanId });
+      const pruned = res.data?.data?.prunedStops ?? 0;
+      if (pruned === 0) {
+        alert("This plan already has only active/custom N+1 scheduled days.");
       }
       loadData(selectedMonth, false, selectedMrId);
     } catch (err: any) {
-      console.error("Failed to provision 27-day tour plan:", err);
-      alert(err?.response?.data?.error?.message || err?.message || "Failed to provision tour plan");
+      alert(err?.response?.data?.error?.message || err?.message || "Failed to convert plan to N+1 mode");
     } finally {
       setProvisioning(false);
+    }
+  };
+
+  const handleDownloadExcelSchedule = async (
+    modeOverride?: "TODAY" | "ALL",
+    dateOverride?: string
+  ) => {
+    if (!selectedEvaluation) return;
+    setExcelExporting(true);
+    try {
+      await downloadTourPlanExcelSchedule(selectedEvaluation, {
+        mode: modeOverride ?? downloadMode,
+        targetDate: dateOverride ?? targetPrintDate,
+      });
+    } catch (err: any) {
+      console.error("Failed to generate Excel schedule:", err);
+      alert(err?.message || "Failed to generate printable Excel workbook");
+    } finally {
+      setExcelExporting(false);
     }
   };
 
@@ -293,28 +308,84 @@ export default function TourPlansDashboard() {
       loadData(selectedMonth, false, selectedMrId);
       setActiveTab("DAILY_SCHEDULE");
     } catch (err: any) {
-      alert(err?.response?.data?.error?.message || err?.message || "Failed to create single day schedule");
+      alert(err?.response?.data?.error?.message || err?.message || "Failed to create scheduled day");
     } finally {
       setSingleDaySaving(false);
     }
   };
 
-  const openAppendDayModal = () => {
+  const preloadExistingStopsForDate = (dateStr: string, fallbackTerritoryId?: string) => {
+    if (!selectedEvaluation) {
+      const tid = fallbackTerritoryId || territories[0]?.id || "";
+      setSingleDayTerritoryId(tid);
+      setSingleDayDoctorIds([]);
+      setSingleDayChemistIds([]);
+      setSingleDayBeatName("");
+      setSingleDayNotes("");
+      if (tid) {
+        loadDoctorsForTerritory(tid);
+        loadChemistsForTerritory(tid);
+      }
+      return;
+    }
+
+    const stops = selectedEvaluation.days.filter((d) => d.date === dateStr && !d.isSunday);
+    if (stops.length === 0) {
+      const tid = fallbackTerritoryId || selectedEvaluation.territoryId || territories[0]?.id || "";
+      setSingleDayTerritoryId(tid);
+      setSingleDayDoctorIds([]);
+      setSingleDayChemistIds([]);
+      setSingleDayBeatName("");
+      setSingleDayNotes("");
+      if (tid) {
+        loadDoctorsForTerritory(tid);
+        loadChemistsForTerritory(tid);
+      }
+      return;
+    }
+
+    const tid = fallbackTerritoryId || stops[0].territoryId || selectedEvaluation.territoryId || territories[0]?.id || "";
+    const docIds = Array.from(new Set(stops.map((s) => s.plannedDoctorId).filter(Boolean) as string[]));
+    const chemIds = Array.from(
+      new Set(stops.filter((s) => s.entityType === "CHEMIST" && s.plannedChemistId).map((s) => s.plannedChemistId as string))
+    );
+    setSingleDayTerritoryId(tid);
+    setSingleDayBeatName(stops[0].beatName || "");
+    setSingleDayDoctorIds(docIds);
+    setSingleDayChemistIds(chemIds);
+    setSingleDayNotes("");
+    if (tid) {
+      loadDoctorsForTerritory(tid);
+      loadChemistsForTerritory(tid);
+    }
+  };
+
+  const openEditDayStopsModal = (dateStr: string, territoryId?: string) => {
+    setSingleDayDate(dateStr);
+    preloadExistingStopsForDate(dateStr, territoryId);
+    setShowSingleDayModal(true);
+  };
+
+  const openAppendDayModal = (overrideEmployeeId?: string) => {
+    const targetEval = overrideEmployeeId
+      ? evaluations.find((e) => e.employeeId === overrideEmployeeId) || null
+      : selectedEvaluation;
     let nextDateStr = new Date().toISOString().slice(0, 10);
-    if (selectedEvaluation && selectedEvaluation.days.length > 0) {
-      const dates = selectedEvaluation.days.map((d) => d.date).sort();
-      const lastDate = new Date(dates[dates.length - 1]);
+    if (targetEval && targetEval.days.length > 0) {
+      const dates = targetEval.days.map((d) => d.date).sort();
+      const lastDate = new Date(`${dates[dates.length - 1]}T00:00:00Z`);
       const nextDate = new Date(lastDate);
-      nextDate.setDate(nextDate.getDate() + 1);
-      if (nextDate.getDay() === 0) {
+      nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+      if (nextDate.getUTCDay() === 0) {
         // Skip Sunday
-        nextDate.setDate(nextDate.getDate() + 1);
+        nextDate.setUTCDate(nextDate.getUTCDate() + 1);
       }
       nextDateStr = nextDate.toISOString().slice(0, 10);
     }
     setSingleDayDate(nextDateStr);
-    const terrId = selectedEvaluation?.territoryId || territories[0]?.id || "";
+    const terrId = targetEval?.territoryId || territories[0]?.id || "";
     setSingleDayTerritoryId(terrId);
+    setSingleDayBeatName("");
     setSingleDayDoctorIds([]);
     setSingleDayChemistIds([]);
     setSingleDayNotes("");
@@ -536,7 +607,7 @@ export default function TourPlansDashboard() {
     if (!territoryId || doctorsByTerritory[territoryId]) return;
     try {
       const res = await apiClient.get("/api/mr/entities", {
-        params: { type: "DOCTOR", territoryId, limit: 100 },
+        params: { type: "DOCTOR", territoryId, limit: 300 },
       });
       const docs = (res.data.data.entities || []).map((e: any) => ({
         id: e.id,
@@ -557,7 +628,7 @@ export default function TourPlansDashboard() {
     if (!territoryId || chemistsByTerritory[territoryId]) return;
     try {
       const res = await apiClient.get("/api/mr/entities", {
-        params: { type: "CHEMIST", territoryId, limit: 100 },
+        params: { type: "CHEMIST", territoryId, limit: 300 },
       });
       const chems = (res.data.data.entities || []).map((e: any) => ({
         id: e.id,
@@ -801,21 +872,45 @@ export default function TourPlansDashboard() {
     ? Math.round(evaluations.reduce((sum, e) => sum + e.summary.averageRouteEfficiency, 0) / evaluations.length)
     : 88;
 
+  const activeDayCount = selectedEvaluation
+    ? new Set(selectedEvaluation.days.filter((d) => !d.isSunday).map((d) => d.date)).size
+    : 0;
+
+  const prunableAutoDaysCount = React.useMemo(() => {
+    if (!selectedEvaluation) return 0;
+    const byDate = new Map<string, DailyTourPlanEntry[]>();
+    for (const d of selectedEvaluation.days) {
+      if (d.isSunday) continue;
+      if (!byDate.has(d.date)) byDate.set(d.date, []);
+      byDate.get(d.date)!.push(d);
+    }
+    let count = 0;
+    for (const entries of byDate.values()) {
+      if (entries.length === 1) {
+        const e = entries[0];
+        if (!e.isCompleted && (!e.visitStatus || e.visitStatus === "PENDING") && (!e.completionNotes || !e.completionNotes.trim())) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }, [selectedEvaluation]);
+
   return (
     <div className="space-y-6">
       {/* Header Banner */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-sky-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-sky-50 via-white to-blue-50">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-display font-bold text-slate-900">
-              Tour Plans & Daily Field Scheduler
+              Tour Plans &amp; N+1 Field Call Scheduler
             </h1>
             <span className="bg-sky-100 text-sky-700 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-sky-200">
-              Live DB Synced
+              Progressive N+1 Workflow
             </span>
           </div>
           <p className="text-sm text-slate-500 mt-1">
-            Provision, optimize, and edit daily tour schedules backed by intelligent route and CRM targeting models.
+            Plan field visits progressively (Day 1, Day 2 ... Day N+1), select multiple Doctors &amp; Retail Chemists per day, and export print-ready formatted Excel sheets.
           </p>
         </div>
 
@@ -851,37 +946,24 @@ export default function TourPlansDashboard() {
             className="border border-slate-300 rounded-xl px-3 py-2 text-sm font-semibold bg-white shadow-sm"
           />
 
-          {isManager && (
-            <button
-              onClick={() => handleProvision27DayPlan(selectedMrId)}
-              disabled={provisioning}
-              className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 shadow-sm transition-colors disabled:opacity-50"
-              title="Auto-provision complete 27-day monthly tour plan (excluding Sundays)"
-            >
-              <Sparkles size={15} className={provisioning ? "animate-spin" : ""} />
-              <span>
-                {provisioning
-                  ? "Provisioning..."
-                  : selectedMrId === "ALL"
-                  ? "Provision 27 Days (All MRs)"
-                  : "Provision 27 Days (Selected MR)"}
-              </span>
-            </button>
-          )}
+          <button
+            onClick={() => openAppendDayModal()}
+            className="flex items-center gap-1.5 bg-sky-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-sky-700 shadow-sm transition-colors"
+            title="Add next scheduled day (N+1) with multiple Doctors and Chemists"
+          >
+            <Plus size={15} />
+            <span>Add Day {activeDayCount + 1} (N+1)</span>
+          </button>
 
-          {isMR && (
-            <button
-              onClick={() => router.push("/tour-plans/new")}
-              className="flex items-center gap-1.5 bg-sky-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-sky-700 shadow-sm transition-colors"
-            >
-              <Plus size={16} />
-              Create Plan
-            </button>
-          )}
+          <button
+            onClick={() => router.push("/tour-plans/new")}
+            className="flex items-center gap-1.5 bg-white text-slate-800 border border-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 shadow-2xs transition-colors"
+          >
+            <CalendarDays size={14} className="text-sky-600" />
+            <span>Multi-Day Planner</span>
+          </button>
         </div>
       </div>
-
-
 
       {/* KPI Tiles */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -902,10 +984,10 @@ export default function TourPlansDashboard() {
                 : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
-            <span>Monthly Tour Plans ({plans.length})</span>
+            <span>Tour Plans ({plans.length})</span>
             {plans.length === 1 && (
               <span className="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                Option Available
+                N+1 Active
               </span>
             )}
           </button>
@@ -917,43 +999,45 @@ export default function TourPlansDashboard() {
                 : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
-            <span>Daily Schedule Editor</span>
+            <span>Field Call Schedule (N+1)</span>
             <span className="bg-sky-100 text-sky-700 text-xs px-2.5 py-0.5 rounded-full font-bold">
-              {selectedEvaluation ? `${new Set(selectedEvaluation.days.map((d) => d.date)).size} Days Active` : `1-Day / On-Demand`}
+              {selectedEvaluation
+                ? `${activeDayCount} Day${activeDayCount === 1 ? "" : "s"} · N+1 Ready`
+                : "Start Day 1 (N+1)"}
             </span>
           </button>
         </div>
 
-        {/* Quick Options Bar for Tour Plans & Daily Schedules */}
+        {/* Quick Options Bar */}
         <div className="pb-2 flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-slate-500 font-semibold">Quick Options:</span>
+          <span className="text-xs text-slate-500 font-semibold">Quick Actions:</span>
           <button
-            onClick={openAppendDayModal}
+            onClick={() => openAppendDayModal()}
             className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-3 py-1 rounded-xl font-bold text-xs shadow-2xs transition-colors"
-            title="Create or append a 1-day field schedule clubbing doctors and chemists"
+            title="Schedule Day N+1 selecting multiple doctors and retail chemists"
           >
             <Plus size={13} />
-            <span>Plan 1-Day Schedule</span>
+            <span>Add Day {activeDayCount + 1} (Doctors &amp; Chemists)</span>
           </button>
+          {selectedEvaluation && (
+            <button
+              onClick={() => handleDownloadExcelSchedule("ALL")}
+              disabled={excelExporting}
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-xl font-bold text-xs shadow-2xs transition-colors disabled:opacity-50"
+              title="Download print-ready formatted Excel (.xlsx) schedule"
+            >
+              <FileSpreadsheet size={13} />
+              <span>{excelExporting ? "Exporting..." : "Export Excel (.xlsx)"}</span>
+            </button>
+          )}
           {selectedEvaluation && (
             <button
               onClick={() => setShowDownloadModal(true)}
               className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 px-3 py-1 rounded-xl font-bold text-xs shadow-2xs transition-colors"
-              title="Download or print field-ready schedule with checkboxes for offline/on-field check-off"
+              title="Open Excel & Print options modal"
             >
               <Printer size={13} className="text-slate-600" />
-              <span>Download / Print Schedule</span>
-            </button>
-          )}
-          {activeTab === "OVERVIEW" && isManager && (
-            <button
-              onClick={() => handleProvision27DayPlan("ALL")}
-              disabled={provisioning}
-              className="inline-flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-3 py-1 rounded-xl font-bold text-xs shadow-2xs transition-colors disabled:opacity-50"
-              title={`Optional: Auto-provision full month (${dynamicWorkingDays} days) working schedule for all fleet representatives`}
-            >
-              <Sparkles size={13} className="text-emerald-600" />
-              <span>Auto-Provision Full Month ({dynamicWorkingDays}d)</span>
+              <span>Print Options</span>
             </button>
           )}
         </div>
@@ -962,35 +1046,34 @@ export default function TourPlansDashboard() {
       {/* TAB 1: OVERVIEW TABLE */}
       {activeTab === "OVERVIEW" && (
         <div className="space-y-4">
-          {/* Fleet Unscheduled Notice Banner */}
+          {/* Progressive N+1 Scheduling Info Notice */}
           {isManager && mrEmployees.length > 0 && (() => {
             const planEmpIds = new Set(plans.map((p) => p.employee?.id || p.employeeId));
-            const unprovisioned = mrEmployees.filter((emp) => !planEmpIds.has(emp.id));
-            if (unprovisioned.length === 0) return null;
+            const unscheduled = mrEmployees.filter((emp) => !planEmpIds.has(emp.id));
+            if (unscheduled.length === 0) return null;
 
             return (
-              <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+              <div className="bg-gradient-to-r from-sky-50 to-indigo-50 border border-sky-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700 shrink-0 font-bold">
-                    <AlertTriangle size={18} />
+                  <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-700 shrink-0 font-bold">
+                    <CalendarDays size={18} />
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wider">
-                      Fleet Tour Schedule Notice ({unprovisioned.length} MRs Unscheduled)
+                    <h3 className="text-xs font-bold text-sky-900 uppercase tracking-wider">
+                      Ready for N+1 Scheduling ({unscheduled.length} Rep{unscheduled.length === 1 ? "" : "s"} Without Days Yet)
                     </h3>
-                    <p className="text-xs text-amber-800">
-                      {unprovisioned.map((u) => u.name).join(", ")} do not have an active 27-day working tour schedule for {new Date(`${selectedMonth}-01`).toLocaleDateString("en-IN", { month: "long", year: "numeric" })}.
+                    <p className="text-xs text-sky-800">
+                      {unscheduled.map((u) => u.name).join(", ")} can begin progressive Day 1 (N+1) Doctor &amp; Chemist selection for {new Date(`${selectedMonth}-01`).toLocaleDateString("en-IN", { month: "long", year: "numeric" })}.
                     </p>
                   </div>
                 </div>
 
                 <button
-                  disabled={provisioning}
-                  onClick={() => handleProvision27DayPlan("ALL")}
-                  className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-colors shrink-0 disabled:opacity-50"
+                  onClick={() => openAppendDayModal(unscheduled[0].id)}
+                  className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-colors shrink-0"
                 >
-                  <Sparkles size={13} />
-                  <span>Auto-Provision 27 Days for All ({unprovisioned.length})</span>
+                  <Plus size={13} />
+                  <span>Start Day 1 for {unscheduled[0].name}</span>
                 </button>
               </div>
             );
@@ -1003,7 +1086,7 @@ export default function TourPlansDashboard() {
                   <th className="px-6 py-3 font-semibold">Employee</th>
                   <th className="px-6 py-3 font-semibold">Territory</th>
                   <th className="px-6 py-3 font-semibold">Month</th>
-                  <th className="px-6 py-3 font-semibold">Doctor Calls / Days</th>
+                  <th className="px-6 py-3 font-semibold">Doctor + Chemist Calls</th>
                   <th className="px-6 py-3 font-semibold">Route Score</th>
                   <th className="px-6 py-3 font-semibold">Compliance</th>
                   <th className="px-6 py-3 font-semibold">Status</th>
@@ -1014,12 +1097,12 @@ export default function TourPlansDashboard() {
                 {plans.length === 0 && !loading && (
                   <tr>
                     <td colSpan={8} className="px-6 py-12 text-center">
-                      <p className="text-slate-500 font-medium">No tour plans found for this month.</p>
+                      <p className="text-slate-500 font-medium">No N+1 tour schedules created yet for this month.</p>
                       <button
-                        onClick={() => handleProvision27DayPlan(selectedMrId)}
-                        className="mt-3 inline-flex items-center gap-2 text-xs bg-emerald-50 text-emerald-700 font-bold px-3 py-2 rounded-lg border border-emerald-200 hover:bg-emerald-100"
+                        onClick={() => openAppendDayModal()}
+                        className="mt-3 inline-flex items-center gap-2 text-xs bg-sky-50 text-sky-700 font-bold px-3.5 py-2 rounded-lg border border-sky-200 hover:bg-sky-100"
                       >
-                        <Sparkles size={14} /> Provision 27-Day Plan from Database
+                        <Plus size={14} /> Add Day 1 (Doctors &amp; Chemists)
                       </button>
                     </td>
                   </tr>
@@ -1034,7 +1117,11 @@ export default function TourPlansDashboard() {
                   const displayTerritories = planTerritories.length > 0 ? planTerritories : [
                     evalData?.territoryName || plan.employee?.territories?.map((t: any) => t.name).join(", ") || plan.days?.[0]?.territory?.name || "General Territory"
                   ];
-                  const workingDaysCount = evalData?.days.length ?? plan.days.length;
+                  const scheduledDaysCount = evalData
+                    ? new Set(evalData.days.filter((d) => !d.isSunday).map((d) => d.date)).size
+                    : new Set((plan.days || []).map((d: any) => String(d.date).slice(0, 10))).size;
+                  const totalDocCalls = evalData?.summary.totalDoctorCalls ?? plan.days.filter((d: any) => d.plannedDoctor).length;
+                  const totalChemCalls = evalData?.summary.totalChemistCalls ?? 0;
 
                   return (
                     <tr key={plan.id} className="hover:bg-slate-50/80 transition-colors">
@@ -1043,7 +1130,7 @@ export default function TourPlansDashboard() {
                           {plan.employee.firstName} {plan.employee.lastName}
                         </p>
                         <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
-                          <CalendarDays size={11} /> {workingDaysCount} Days MR
+                          <CalendarDays size={11} /> {scheduledDaysCount} Day{scheduledDaysCount === 1 ? "" : "s"} (N+1)
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -1071,10 +1158,10 @@ export default function TourPlansDashboard() {
                         <div className="space-y-0.5">
                           <span className="flex items-center gap-1.5 font-semibold text-slate-700">
                             <Users size={14} className="text-slate-400" />
-                            {evalData?.summary.totalDoctorCalls ?? plan.days.filter((d: any) => d.plannedDoctor).length} Calls
+                            {totalDocCalls} Drs + {totalChemCalls} Chems
                           </span>
                           <span className="text-[11px] text-slate-400 font-medium">
-                            across {workingDaysCount} working days
+                            across {scheduledDaysCount} scheduled day{scheduledDaysCount === 1 ? "" : "s"}
                           </span>
                         </div>
                       </td>
@@ -1127,10 +1214,10 @@ export default function TourPlansDashboard() {
                           setActiveTab("DAILY_SCHEDULE");
                         }}
                         className="inline-flex items-center gap-1.5 text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-300 px-3 py-1.5 rounded-lg transition-colors font-bold text-xs shadow-xs"
-                        title="Open Daily Schedule Editor for this representative"
+                        title="Open Field Call Schedule (N+1) for this representative"
                       >
                         <CalendarDays size={13} className="text-sky-600" />
-                        <span>Daily Schedule ({evalData?.days.length ?? plan.days.length}d MR)</span>
+                        <span>Schedule ({scheduledDaysCount}d N+1)</span>
                       </button>
 
                       {isManager && plan.status === "PENDING_ASM" && (
@@ -1174,7 +1261,7 @@ export default function TourPlansDashboard() {
         </div>
       )}
 
-      {/* TAB 2: DAILY SCHEDULE & EDITABLE MATRIX */}
+      {/* TAB 2: PROGRESSIVE N+1 FIELD CALL SCHEDULE */}
       {activeTab === "DAILY_SCHEDULE" && !selectedEvaluation && (
         <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm space-y-4">
           <div className="w-12 h-12 bg-sky-50 text-sky-600 rounded-2xl mx-auto flex items-center justify-center">
@@ -1182,19 +1269,19 @@ export default function TourPlansDashboard() {
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-900">
-              Daily Schedule Editor — Start with 1 Day & Append
+              Field Call Schedule (N+1) — Start Day 1
             </h3>
             <p className="text-xs text-slate-500 max-w-lg mx-auto mt-1">
-              Create a focused 1-day field schedule clubbing target doctors and retail chemists for complete beat coverage. You can append days one by one as your field visits progress, or optionally auto-provision an entire month.
+              Build your schedule progressively (Day 1, then Add Day N+1) selecting multiple Doctors and Retail Chemists together per scheduled day, then export a formatted printable Excel (.xlsx) sheet.
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
-              onClick={openAppendDayModal}
+              onClick={() => openAppendDayModal()}
               className="inline-flex items-center gap-2 bg-sky-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-sky-700 shadow-sm transition-colors"
             >
               <Plus size={14} />
-              <span>Create 1-Day Schedule (Clubbed Doctors & Chemists)</span>
+              <span>Add Day 1 (Select Multiple Doctors &amp; Chemists)</span>
             </button>
 
             {isManager && mrEmployees.length > 0 && (
@@ -1216,22 +1303,6 @@ export default function TourPlansDashboard() {
                 ))}
               </SearchableSelect>
             )}
-
-            {isManager && (
-              <button
-                onClick={() => handleProvision27DayPlan(selectedMrId !== "ALL" ? selectedMrId : undefined)}
-                disabled={provisioning}
-                className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 px-4 py-2.5 rounded-xl text-xs font-bold shadow-2xs transition-colors disabled:opacity-50"
-                title={`Auto-provision entire ${dynamicWorkingDays}-day working schedule`}
-              >
-                <Sparkles size={14} className={provisioning ? "animate-spin text-emerald-600" : "text-emerald-600"} />
-                <span>
-                  {provisioning
-                    ? "Provisioning..."
-                    : `Auto-Provision ${dynamicWorkingDays} Days (Optional)`}
-                </span>
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -1243,14 +1314,14 @@ export default function TourPlansDashboard() {
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h2 className="text-lg font-bold text-slate-900">
-                  Daily Schedule Editor — {selectedEvaluation.employeeName} ({selectedEvaluation.month})
+                  Field Call Schedule (N+1) — {selectedEvaluation.employeeName} ({selectedEvaluation.month})
                 </h2>
 
                 <span className="bg-sky-600 text-white text-xs px-2.5 py-1 rounded-lg font-bold shadow-xs">
-                  {selectedEvaluation.days.length} Days MR Working Schedule
+                  {activeDayCount} Day{activeDayCount === 1 ? "" : "s"} Scheduled (Next: Day {activeDayCount + 1})
                 </span>
 
-                {/* Direct Representative Switcher in Daily Schedule Editor */}
+                {/* Direct Representative Switcher */}
                 {isManager && mrEmployees.length > 0 && (
                   <div className="flex items-center gap-1.5 bg-sky-50 border border-sky-200 rounded-xl px-2 py-1 shadow-xs">
                     <Users size={13} className="text-sky-600 shrink-0 ml-1" />
@@ -1261,7 +1332,7 @@ export default function TourPlansDashboard() {
                         const val = e.target.value;
                         if (val.startsWith("NEW:")) {
                           const empId = val.replace("NEW:", "");
-                          handleProvision27DayPlan(empId);
+                          openAppendDayModal(empId);
                         } else {
                           setSelectedPlanId(val);
                         }
@@ -1269,16 +1340,19 @@ export default function TourPlansDashboard() {
                       searchPlaceholder="Search MR schedule..."
                       buttonClassName="border-0 bg-transparent shadow-none px-2 py-0.5 text-xs font-bold text-slate-900"
                     >
-                      {evaluations.map((ev) => (
-                        <option key={ev.id} value={ev.id}>
-                          {ev.employeeName} — {ev.days.length} Days MR ({ev.status})
-                        </option>
-                      ))}
+                      {evaluations.map((ev) => {
+                        const dCnt = new Set(ev.days.filter((d) => !d.isSunday).map((d) => d.date)).size;
+                        return (
+                          <option key={ev.id} value={ev.id}>
+                            {ev.employeeName} — {dCnt} Day{dCnt === 1 ? "" : "s"} N+1 ({ev.status})
+                          </option>
+                        );
+                      })}
                       {mrEmployees
                         .filter((m) => !evaluations.some((e) => e.employeeName?.includes(m.name)))
                         .map((m) => (
                           <option key={m.id} value={`NEW:${m.id}`}>
-                            + {m.name} (Auto-Provision 27 Days MR)
+                            + {m.name} (Start Day 1 N+1)
                           </option>
                         ))}
                     </SearchableSelect>
@@ -1305,17 +1379,28 @@ export default function TourPlansDashboard() {
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-500 mt-1">
-                <span>Field Visit Territories: <strong className="text-slate-800">{selectedEvaluation.territories?.join(", ") || selectedEvaluation.territoryName || "General"}</strong></span>
-                <span>Days Scheduled: <strong>{new Set(selectedEvaluation.days.map((d) => d.date)).size}</strong></span>
+                <span>Territories: <strong className="text-slate-800">{selectedEvaluation.territories?.join(", ") || selectedEvaluation.territoryName || "General"}</strong></span>
+                <span>N+1 Days: <strong>{activeDayCount}</strong></span>
                 <span>Doctor Calls: <strong>{selectedEvaluation.summary.totalDoctorCalls}</strong></span>
                 <span>Chemist Calls: <strong className="text-purple-700">{selectedEvaluation.summary.totalChemistCalls || 0}</strong></span>
-                <span>Total Planned Entities: <strong>{selectedEvaluation.summary.totalEntitiesPlanned || selectedEvaluation.days.length}</strong></span>
+                <span>Total Planned Stops: <strong>{selectedEvaluation.summary.totalEntitiesPlanned || selectedEvaluation.days.length}</strong></span>
                 <span>Route Score: <strong className="text-emerald-600">{selectedEvaluation.summary.averageRouteEfficiency}%</strong></span>
-                <span>Compliance: <strong className="text-sky-600">{selectedEvaluation.summary.complianceScore}%</strong></span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {prunableAutoDaysCount > 1 && (
+                <button
+                  disabled={provisioning}
+                  onClick={() => handlePruneAutoDays(selectedEvaluation.id)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 transition-colors shadow-xs disabled:opacity-50"
+                  title="Remove unexecuted auto-provisioned boilerplate days while preserving all completed and custom multi-stop days"
+                >
+                  <RefreshCw size={12} className={provisioning ? "animate-spin" : ""} />
+                  <span>Reset Empty Auto-Days to N+1 ({prunableAutoDaysCount})</span>
+                </button>
+              )}
+
               <button
                 disabled={selectedEvaluation.status !== "APPROVED"}
                 onClick={() => openWhatsAppModal(selectedEvaluation)}
@@ -1348,7 +1433,7 @@ export default function TourPlansDashboard() {
                   : selectedEvaluation.status}
               </span>
 
-              {/* Admin/MD Delete Button in Daily Schedule view */}
+              {/* Admin/MD Delete Button */}
               {isAdmin && (
                 <button
                   onClick={() => {
@@ -1405,11 +1490,11 @@ export default function TourPlansDashboard() {
                       <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
                         isApproved ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40" : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
                       }`}>
-                        {isApproved ? "✓ Admin Approved" : "Pending Approval"}
+                        {isApproved ? "✓ Approved" : "Pending Approval"}
                       </span>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-slate-300 mt-1">
-                      <span>{docStops.length} Doctor Call(s) Planned</span>
+                      <span>{docStops.length} Doctor Call(s)</span>
                       <span>•</span>
                       <span>{chemStops.length} Chemist Call(s)</span>
                       <span>•</span>
@@ -1418,7 +1503,20 @@ export default function TourPlansDashboard() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  <button
+                    onClick={() => openEditDayStopsModal(targetDateStr, todayStops[0]?.territoryId)}
+                    className="bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Select Doctors &amp; Chemists
+                  </button>
+                  <button
+                    onClick={() => handleDownloadExcelSchedule("TODAY", targetDateStr)}
+                    className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <FileSpreadsheet size={13} />
+                    <span>Print Excel (.xlsx)</span>
+                  </button>
                   <button
                     onClick={() => {
                       const el = document.getElementById(`day-${targetDateStr}`);
@@ -1451,39 +1549,46 @@ export default function TourPlansDashboard() {
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-slate-800 text-sm">Day-by-Day Field Coverage & Execution Matrix</h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-bold text-slate-800 text-sm">Day-by-Day Field Coverage &amp; N+1 Execution Schedule</h3>
                       <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold border border-emerald-300">
-                        MR Day Controls Enabled
+                        {activeDayCount} Day{activeDayCount === 1 ? "" : "s"} · Doctors + Chemists
                       </span>
                     </div>
                     <span className="text-xs text-slate-500 font-medium">
-                      Modify, append, edit, or delete any tour day. Completed doctor visits can be recorded with Nearest Chemist, Doctor-Designated Chemist, or In-House dispensing.
+                      Each scheduled day supports multiple Doctors &amp; Retail Chemists. Click &quot;Select Doctors &amp; Chemists&quot; on any day or add Day {activeDayCount + 1}.
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
-                    {/* Plan 1-Day Schedule / Append Button */}
                     <button
-                      onClick={openAppendDayModal}
+                      onClick={() => openAppendDayModal()}
                       className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-colors shrink-0"
-                      title="Plan 1-day schedule clubbing doctors and chemists"
+                      title="Add Day N+1 selecting multiple doctors and chemists"
                     >
                       <Plus size={14} />
-                      <span>Plan 1-Day Schedule</span>
+                      <span>Add Day {activeDayCount + 1} (N+1)</span>
                     </button>
 
-                    {/* Download & Print Field Schedule with Checkboxes */}
+                    <button
+                      onClick={() => handleDownloadExcelSchedule("ALL")}
+                      disabled={excelExporting}
+                      className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-colors shrink-0 disabled:opacity-50"
+                      title="Download formatted print-ready Excel workbook (.xlsx)"
+                    >
+                      <FileSpreadsheet size={14} />
+                      <span>{excelExporting ? "Exporting..." : "Download Print Excel (.xlsx)"}</span>
+                    </button>
+
                     <button
                       onClick={() => setShowDownloadModal(true)}
                       className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-colors shrink-0"
-                      title="Download or print field-ready schedule with checkboxes for on-field execution"
+                      title="Print options & scope selector"
                     >
                       <Printer size={14} className="text-slate-600" />
-                      <span>Download / Print Schedule</span>
+                      <span>Print Options</span>
                     </button>
 
-                    {/* Quick Add Stop Button */}
                     <button
                       onClick={() => {
                         const todayStr = new Date().toISOString().slice(0, 10);
@@ -1497,7 +1602,7 @@ export default function TourPlansDashboard() {
                         setAddingDay(true);
                       }}
                       className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-2.5 py-1.5 rounded-xl font-semibold text-xs transition-colors shrink-0"
-                      title="Quickly add an extra doctor or chemist stop"
+                      title="Quickly add a single doctor or chemist stop"
                     >
                       <span>+ Stop</span>
                     </button>
@@ -1548,285 +1653,349 @@ export default function TourPlansDashboard() {
                   </div>
                 </div>
 
-                <div className="divide-y divide-slate-100">
-                  {displayedDays.map((day) => {
-                    const isDone = day.visitStatus === "DONE" || day.isCompleted;
-                    const isNotDone = day.visitStatus === "NOT_DONE";
-                    const isUpdating = updatingVisitId === day.id;
+                <div className="divide-y divide-slate-200">
+                  {(() => {
+                    const groupsMap = new Map<string, DailyTourPlanEntry[]>();
+                    const sortedDisplayed = [...displayedDays].sort((a, b) => a.date.localeCompare(b.date));
+                    for (const d of sortedDisplayed) {
+                      if (!groupsMap.has(d.date)) groupsMap.set(d.date, []);
+                      groupsMap.get(d.date)!.push(d);
+                    }
+                    const groupedDates = Array.from(groupsMap.entries());
 
-                    return (
-                      <div
-                        key={day.id}
-                        className={`p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-colors ${
-                          day.isSunday
-                            ? "bg-slate-50/60 opacity-60"
-                            : isDone
-                            ? "bg-emerald-50/20 hover:bg-emerald-50/40"
-                            : isNotDone
-                            ? "bg-red-50/20 hover:bg-red-50/40"
-                            : "hover:bg-sky-50/40"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 min-w-[220px]">
-                          {/* On-Field Interactive Checkbox */}
-                          {!day.isSunday && (
-                            <button
-                              type="button"
-                              disabled={isUpdating}
-                              onClick={() => handleToggleVisitStatus(day, isDone ? "PENDING" : "DONE")}
-                              className="p-1.5 rounded-xl hover:bg-slate-200/60 transition-colors shrink-0 text-slate-400 hover:text-emerald-600"
-                              title={isDone ? "Call Completed! Click to uncheck" : "Click to mark Call Done"}
-                            >
-                              {isDone ? (
-                                <CheckSquare size={22} className="text-emerald-600" />
-                              ) : (
-                                <Square size={22} className="text-slate-400 hover:text-slate-600" />
-                              )}
-                            </button>
-                          )}
+                    return groupedDates.map(([groupDate, groupEntries], groupIdx) => {
+                      const workingStops = groupEntries.filter((e) => !e.isSunday);
+                      const docCount = workingStops.filter((e) => e.entityType !== "CHEMIST" && e.plannedDoctorId).length;
+                      const chemCount = workingStops.filter((e) => e.entityType === "CHEMIST").length;
+                      const doneInGroup = workingStops.filter((e) => e.visitStatus === "DONE" || e.isCompleted).length;
+                      const primaryTerritoryId = workingStops[0]?.territoryId || selectedEvaluation.territoryId;
 
-                          <div
-                            className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center text-center border shrink-0 ${
-                              day.isSunday
-                                ? "bg-slate-100 border-slate-200"
-                                : isDone
-                                ? "bg-emerald-100 border-emerald-200 text-emerald-800"
-                                : isNotDone
-                                ? "bg-red-100 border-red-200 text-red-800"
-                                : "bg-slate-100 border-slate-200"
-                            }`}
-                          >
-                            <span className="text-[10px] uppercase font-bold text-slate-400">
-                              {day.dayOfWeek.slice(0, 3)}
-                            </span>
-                            <span className="text-base font-bold text-slate-800">
-                              {day.date.split("-")[2]}
-                            </span>
-                          </div>
-
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-bold text-slate-900">{day.date}</p>
-                              {day.isSunday ? (
-                                <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold uppercase">
-                                  Weekly Off
-                                </span>
-                              ) : isDone ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
-                                  <CheckCircle size={10} className="text-emerald-600" /> Done
-                                </span>
-                              ) : isNotDone ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] bg-red-100 text-red-800 border border-red-200 px-2 py-0.5 rounded-full font-bold">
-                                  <XCircle size={10} className="text-red-600" /> Not Done
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-bold">
-                                  <Clock size={10} className="text-amber-600" /> Pending
-                                </span>
-                              )}
+                      return (
+                        <div key={groupDate} id={`day-${groupDate}`} className="bg-white">
+                          {/* Day N Group Header */}
+                          <div className="px-6 py-3 bg-slate-100/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                              <span className="inline-flex items-center justify-center bg-slate-900 text-white text-xs font-bold px-2.5 py-1 rounded-lg">
+                                Day {groupIdx + 1}
+                              </span>
+                              <span className="text-sm font-bold text-slate-900">
+                                {groupDate} ({groupEntries[0]?.dayOfWeek})
+                              </span>
+                              <span className="text-xs font-semibold bg-sky-100 text-sky-800 border border-sky-200 px-2 py-0.5 rounded-md">
+                                {docCount} Doctor{docCount === 1 ? "" : "s"}
+                              </span>
+                              <span className="text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded-md">
+                                {chemCount} Chemist{chemCount === 1 ? "" : "s"}
+                              </span>
+                              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                                {doneInGroup}/{workingStops.length} Done
+                              </span>
                             </div>
-                            <p className="text-xs text-slate-500">{day.dayOfWeek}</p>
-                          </div>
-                        </div>
 
-                        {/* Territory & Beat Details */}
-                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                          <div className="flex items-center gap-2">
-                            <MapPin size={14} className="text-sky-500 shrink-0" />
-                            <div>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-[10px] uppercase font-bold text-sky-800 bg-sky-100 px-1.5 py-0.5 rounded border border-sky-300">
-                                  Field Visit Territory
-                                </span>
-                                {day.beatName && (
-                                  <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
-                                    {day.beatName}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="font-bold text-slate-900">{day.territoryName}</span>
-                                {day.subArea && (
-                                  <span className="text-slate-600 text-[11px] font-semibold bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
-                                    {day.subArea}
-                                  </span>
-                                )}
-                              </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => openEditDayStopsModal(groupDate, primaryTerritoryId)}
+                                className="inline-flex items-center gap-1.5 text-xs font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 px-3 py-1 rounded-lg shadow-2xs transition-colors"
+                                title="Select multiple Doctors & Retail Chemists for this day"
+                              >
+                                <Users size={12} />
+                                <span>Select Doctors &amp; Chemists</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadExcelSchedule("TODAY", groupDate)}
+                                className="inline-flex items-center gap-1 text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-2.5 py-1 rounded-lg shadow-2xs transition-colors"
+                                title="Download formatted Excel (.xlsx) print sheet for this day"
+                              >
+                                <FileSpreadsheet size={12} />
+                                <span>Excel (Day {groupIdx + 1})</span>
+                              </button>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            {day.entityType === "CHEMIST" ? (
-                              <>
-                                <Store size={15} className="text-purple-600 shrink-0" />
-                                <div>
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-[10px] uppercase font-bold text-purple-600">Planned Chemist</span>
-                                    <span className="bg-purple-100 text-purple-800 font-bold px-1.5 py-0.2 rounded text-[10px] border border-purple-200">
-                                      Retail Chemist
-                                    </span>
-                                  </div>
-                                  <div className="mt-0.5">
-                                    <span className="font-semibold text-slate-900 block">{day.plannedChemistName || "Retail Chemist Visit"}</span>
-                                    {day.chemistAddress && (
-                                      <p className="text-[11px] text-slate-500 truncate max-w-xs">{day.chemistAddress}</p>
+                          <div className="divide-y divide-slate-100">
+                            {groupEntries.map((day) => {
+                              const isDone = day.visitStatus === "DONE" || day.isCompleted;
+                              const isNotDone = day.visitStatus === "NOT_DONE";
+                              const isUpdating = updatingVisitId === day.id;
+
+                              return (
+                                <div
+                                  key={day.id}
+                                  className={`p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-colors ${
+                                    day.isSunday
+                                      ? "bg-slate-50/60 opacity-60"
+                                      : isDone
+                                      ? "bg-emerald-50/20 hover:bg-emerald-50/40"
+                                      : isNotDone
+                                      ? "bg-red-50/20 hover:bg-red-50/40"
+                                      : "hover:bg-sky-50/40"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3 min-w-[220px]">
+                                    {!day.isSunday && (
+                                      <button
+                                        type="button"
+                                        disabled={isUpdating}
+                                        onClick={() => handleToggleVisitStatus(day, isDone ? "PENDING" : "DONE")}
+                                        className="p-1.5 rounded-xl hover:bg-slate-200/60 transition-colors shrink-0 text-slate-400 hover:text-emerald-600"
+                                        title={isDone ? "Call Completed! Click to uncheck" : "Click to mark Call Done"}
+                                      >
+                                        {isDone ? (
+                                          <CheckSquare size={22} className="text-emerald-600" />
+                                        ) : (
+                                          <Square size={22} className="text-slate-400 hover:text-slate-600" />
+                                        )}
+                                      </button>
                                     )}
-                                    {day.chemistMobile && (
-                                      <span className="text-[10px] text-purple-700 font-mono">Ph: {day.chemistMobile}</span>
-                                    )}
-                                  </div>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <Stethoscope size={15} className="text-sky-600 shrink-0" />
-                                <div>
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-[10px] uppercase font-bold text-sky-700">Planned Doctor</span>
-                                    {day.doctorDpsTier && (
-                                      <span className="bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded text-[10px]">
-                                        {day.doctorDpsTier}
+
+                                    <div
+                                      className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center text-center border shrink-0 ${
+                                        day.isSunday
+                                          ? "bg-slate-100 border-slate-200"
+                                          : isDone
+                                          ? "bg-emerald-100 border-emerald-200 text-emerald-800"
+                                          : isNotDone
+                                          ? "bg-red-100 border-red-200 text-red-800"
+                                          : "bg-slate-100 border-slate-200"
+                                      }`}
+                                    >
+                                      <span className="text-[10px] uppercase font-bold text-slate-400">
+                                        {day.dayOfWeek.slice(0, 3)}
                                       </span>
-                                    )}
-                                  </div>
-                                  {day.plannedDoctorName ? (
-                                    <div className="space-y-0.5 mt-0.5">
-                                      <span className="font-semibold text-slate-900 block">{day.plannedDoctorName}</span>
-                                      {day.doctorSpecialty && (
-                                        <span className="text-[11px] text-slate-600 font-medium block">{day.doctorSpecialty}</span>
-                                      )}
-                                      {day.doctorClinicAddress && (
-                                        <p className="text-[11px] text-slate-500 truncate max-w-xs">{day.doctorClinicAddress}</p>
-                                      )}
+                                      <span className="text-base font-bold text-slate-800">
+                                        {day.date.split("-")[2]}
+                                      </span>
+                                    </div>
 
-                                      {/* Medicine Placement Badge when call is done */}
-                                      {day.medicinePlacement && (
-                                        <div className="pt-0.5">
-                                          {day.medicinePlacement.type === "NEAREST_CHEMIST" && (
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-md shadow-2xs">
-                                              <Store size={10} className="text-emerald-600" />
-                                              <span>Nearest Chemist: {day.medicinePlacement.chemistName || "Territory Chemist"}</span>
-                                            </span>
-                                          )}
-                                          {day.medicinePlacement.type === "DOCTOR_DESIGNATED_CHEMIST" && (
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-300 px-2 py-0.5 rounded-md shadow-2xs">
-                                              <Store size={10} className="text-sky-600" />
-                                              <span>Dr. Designated: {day.medicinePlacement.chemistName || "Designated Chemist"}</span>
-                                            </span>
-                                          )}
-                                          {day.medicinePlacement.type === "IN_HOUSE" && (
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-300 px-2 py-0.5 rounded-md shadow-2xs">
-                                              <Building size={10} className="text-purple-600" />
-                                              <span>In-House Clinic / Pharmacy</span>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-sm font-bold text-slate-900">{day.date}</p>
+                                        {day.isSunday ? (
+                                          <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold uppercase">
+                                            Weekly Off
+                                          </span>
+                                        ) : isDone ? (
+                                          <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                                            <CheckCircle size={10} className="text-emerald-600" /> Done
+                                          </span>
+                                        ) : isNotDone ? (
+                                          <span className="inline-flex items-center gap-1 text-[10px] bg-red-100 text-red-800 border border-red-200 px-2 py-0.5 rounded-full font-bold">
+                                            <XCircle size={10} className="text-red-600" /> Not Done
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-bold">
+                                            <Clock size={10} className="text-amber-600" /> Pending
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-slate-500">{day.dayOfWeek}</p>
+                                    </div>
+                                  </div>
+
+                                  {/* Territory & Entity Details */}
+                                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <MapPin size={14} className="text-sky-500 shrink-0" />
+                                      <div>
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="text-[10px] uppercase font-bold text-sky-800 bg-sky-100 px-1.5 py-0.5 rounded border border-sky-300">
+                                            Field Visit Territory
+                                          </span>
+                                          {day.beatName && (
+                                            <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                                              {day.beatName}
                                             </span>
                                           )}
                                         </div>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                          <span className="font-bold text-slate-900">{day.territoryName}</span>
+                                          {day.subArea && (
+                                            <span className="text-slate-600 text-[11px] font-semibold bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                                              {day.subArea}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      {day.entityType === "CHEMIST" ? (
+                                        <>
+                                          <Store size={15} className="text-purple-600 shrink-0" />
+                                          <div>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              <span className="text-[10px] uppercase font-bold text-purple-600">Planned Chemist</span>
+                                              <span className="bg-purple-100 text-purple-800 font-bold px-1.5 py-0.2 rounded text-[10px] border border-purple-200">
+                                                Retail Chemist
+                                              </span>
+                                            </div>
+                                            <div className="mt-0.5">
+                                              <span className="font-semibold text-slate-900 block">{day.plannedChemistName || "Retail Chemist Visit"}</span>
+                                              {day.chemistAddress && (
+                                                <p className="text-[11px] text-slate-500 truncate max-w-xs">{day.chemistAddress}</p>
+                                              )}
+                                              {day.chemistMobile && (
+                                                <span className="text-[10px] text-purple-700 font-mono">Ph: {day.chemistMobile}</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Stethoscope size={15} className="text-sky-600 shrink-0" />
+                                          <div>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              <span className="text-[10px] uppercase font-bold text-sky-700">Planned Doctor</span>
+                                              {day.doctorDpsTier && (
+                                                <span className="bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded text-[10px]">
+                                                  {day.doctorDpsTier}
+                                                </span>
+                                              )}
+                                            </div>
+                                            {day.plannedDoctorName ? (
+                                              <div className="space-y-0.5 mt-0.5">
+                                                <span className="font-semibold text-slate-900 block">{day.plannedDoctorName}</span>
+                                                {day.doctorSpecialty && (
+                                                  <span className="text-[11px] text-slate-600 font-medium block">{day.doctorSpecialty}</span>
+                                                )}
+                                                {day.doctorClinicAddress && (
+                                                  <p className="text-[11px] text-slate-500 truncate max-w-xs">{day.doctorClinicAddress}</p>
+                                                )}
+
+                                                {day.medicinePlacement && (
+                                                  <div className="pt-0.5">
+                                                    {day.medicinePlacement.type === "NEAREST_CHEMIST" && (
+                                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-md shadow-2xs">
+                                                        <Store size={10} className="text-emerald-600" />
+                                                        <span>Nearest Chemist: {day.medicinePlacement.chemistName || "Territory Chemist"}</span>
+                                                      </span>
+                                                    )}
+                                                    {day.medicinePlacement.type === "DOCTOR_DESIGNATED_CHEMIST" && (
+                                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-300 px-2 py-0.5 rounded-md shadow-2xs">
+                                                        <Store size={10} className="text-sky-600" />
+                                                        <span>Dr. Designated: {day.medicinePlacement.chemistName || "Designated Chemist"}</span>
+                                                      </span>
+                                                    )}
+                                                    {day.medicinePlacement.type === "IN_HOUSE" && (
+                                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-300 px-2 py-0.5 rounded-md shadow-2xs">
+                                                        <Building size={10} className="text-purple-600" />
+                                                        <span>In-House Clinic / Pharmacy</span>
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            ) : (
+                                              <span className="text-slate-400 italic">No doctor planned</span>
+                                            )}
+                                          </div>
+                                        </>
                                       )}
                                     </div>
-                                  ) : (
-                                    <span className="text-slate-400 italic">No doctor planned</span>
-                                  )}
+                                  </div>
+
+                                  {/* Badges, Execution Toggles & MR Day Actions */}
+                                  <div className="flex items-center gap-3 justify-between lg:justify-end flex-wrap">
+                                    {!day.isSunday && (
+                                      <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                                        <button
+                                          disabled={isUpdating}
+                                          onClick={() => handleToggleVisitStatus(day, isDone ? "PENDING" : "DONE")}
+                                          className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-bold transition-all ${
+                                            isDone
+                                              ? "bg-emerald-600 text-white shadow-xs"
+                                              : "bg-white text-slate-700 hover:text-emerald-700 hover:bg-emerald-50 border border-slate-200"
+                                          } disabled:opacity-50`}
+                                          title={isDone ? "Click to revert back to Pending" : "Mark visit as Done"}
+                                        >
+                                          <CheckCircle size={12} className={isDone ? "text-white" : "text-emerald-600"} />
+                                          <span>Done</span>
+                                        </button>
+
+                                        <button
+                                          disabled={isUpdating}
+                                          onClick={() => handleToggleVisitStatus(day, isNotDone ? "PENDING" : "NOT_DONE")}
+                                          className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-bold transition-all ${
+                                            isNotDone
+                                              ? "bg-red-600 text-white shadow-xs"
+                                              : "bg-white text-slate-700 hover:text-red-700 hover:bg-red-50 border border-slate-200"
+                                          } disabled:opacity-50`}
+                                          title={isNotDone ? "Click to revert back to Pending" : "Mark visit as Not Done"}
+                                        >
+                                          <XCircle size={12} className={isNotDone ? "text-white" : "text-red-600"} />
+                                          <span>Not Done</span>
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    <div className="text-right text-xs">
+                                      <span className="font-mono text-emerald-600 font-bold block">
+                                        {day.routeEfficiencyScore}% Route
+                                      </span>
+                                      <span
+                                        className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
+                                          day.complianceStatus === "OPTIMAL"
+                                            ? "bg-emerald-100 text-emerald-700"
+                                            : day.complianceStatus === "COMPLIANT"
+                                            ? "bg-sky-100 text-sky-700"
+                                            : "bg-amber-100 text-amber-700"
+                                        }`}
+                                      >
+                                        {day.complianceStatus}
+                                      </span>
+                                    </div>
+
+                                    {/* MR Day Actions: Add Stop, Edit, Delete */}
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        onClick={() => {
+                                          setNewDayDate(day.date);
+                                          setNewDayTerritoryId(day.territoryId);
+                                          setNewDayEntityType("DOCTOR");
+                                          setNewDayDoctorId("");
+                                          setNewDayChemistId("");
+                                          if (day.territoryId) {
+                                            loadDoctorsForTerritory(day.territoryId);
+                                            loadChemistsForTerritory(day.territoryId);
+                                          }
+                                          setSingleDayBeatName(day.beatName || "");
+                                          setAddingDay(true);
+                                        }}
+                                        className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold px-2.5 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors shadow-xs"
+                                        title="Add another doctor or chemist to this day"
+                                      >
+                                        <Plus size={13} /> Add Stop
+                                      </button>
+                                      <button
+                                        onClick={() => openDayEditor(day)}
+                                        className="flex items-center gap-1 text-xs bg-white text-slate-700 border border-slate-300 font-bold px-2.5 py-1.5 rounded-lg hover:bg-sky-50 hover:border-sky-300 transition-colors shadow-xs"
+                                        title="Edit stop details (territory, doctor/chemist entity, notes)"
+                                      >
+                                        <Edit3 size={13} /> Edit
+                                      </button>
+                                      <button
+                                        onClick={() => setDeletingDay(day)}
+                                        className="flex items-center gap-1 text-xs bg-white text-red-600 border border-red-200 font-bold px-2 py-1.5 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors shadow-xs"
+                                        title="Delete this visit entry from schedule"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </div>
+                                  </div>
                                 </div>
-                              </>
-                            )}
+                              );
+                            })}
                           </div>
                         </div>
-
-                        {/* Badges, Execution Toggles & MR Day Actions */}
-                        <div className="flex items-center gap-3 justify-between lg:justify-end flex-wrap">
-                          {!day.isSunday && (
-                            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
-                              <button
-                                disabled={isUpdating}
-                                onClick={() => handleToggleVisitStatus(day, isDone ? "PENDING" : "DONE")}
-                                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-bold transition-all ${
-                                  isDone
-                                    ? "bg-emerald-600 text-white shadow-xs"
-                                    : "bg-white text-slate-700 hover:text-emerald-700 hover:bg-emerald-50 border border-slate-200"
-                                } disabled:opacity-50`}
-                                title={isDone ? "Click to revert back to Pending" : "Mark visit as Done"}
-                              >
-                                <CheckCircle size={12} className={isDone ? "text-white" : "text-emerald-600"} />
-                                <span>Done</span>
-                              </button>
-
-                              <button
-                                disabled={isUpdating}
-                                onClick={() => handleToggleVisitStatus(day, isNotDone ? "PENDING" : "NOT_DONE")}
-                                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-bold transition-all ${
-                                  isNotDone
-                                    ? "bg-red-600 text-white shadow-xs"
-                                    : "bg-white text-slate-700 hover:text-red-700 hover:bg-red-50 border border-slate-200"
-                                } disabled:opacity-50`}
-                                title={isNotDone ? "Click to revert back to Pending" : "Mark visit as Not Done"}
-                              >
-                                <XCircle size={12} className={isNotDone ? "text-white" : "text-red-600"} />
-                                <span>Not Done</span>
-                              </button>
-                            </div>
-                          )}
-
-                          <div className="text-right text-xs">
-                            <span className="font-mono text-emerald-600 font-bold block">
-                              {day.routeEfficiencyScore}% Route
-                            </span>
-                            <span
-                              className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                                day.complianceStatus === "OPTIMAL"
-                                  ? "bg-emerald-100 text-emerald-700"
-                                  : day.complianceStatus === "COMPLIANT"
-                                  ? "bg-sky-100 text-sky-700"
-                                  : "bg-amber-100 text-amber-700"
-                              }`}
-                            >
-                              {day.complianceStatus}
-                            </span>
-                          </div>
-
-                          {/* MR Day Actions: Add Stop to Day, Edit Day & Delete Day */}
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => {
-                                setNewDayDate(day.date);
-                                setNewDayTerritoryId(day.territoryId);
-                                setNewDayEntityType("DOCTOR");
-                                setNewDayDoctorId("");
-                                setNewDayChemistId("");
-                                if (day.territoryId) {
-                                  loadDoctorsForTerritory(day.territoryId);
-                                  loadChemistsForTerritory(day.territoryId);
-                                }
-                                setSingleDayBeatName(day.beatName || "");
-                                setAddingDay(true);
-                              }}
-                              className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold px-2.5 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors shadow-xs"
-                              title="Add another doctor or chemist to this day"
-                            >
-                              <Plus size={13} /> Add Stop
-                            </button>
-                            <button
-                              onClick={() => openDayEditor(day)}
-                              className="flex items-center gap-1 text-xs bg-white text-slate-700 border border-slate-300 font-bold px-2.5 py-1.5 rounded-lg hover:bg-sky-50 hover:border-sky-300 transition-colors shadow-xs"
-                              title="Edit stop details (territory, doctor/chemist entity, notes)"
-                            >
-                              <Edit3 size={13} /> Edit
-                            </button>
-                            <button
-                              onClick={() => setDeletingDay(day)}
-                              className="flex items-center gap-1 text-xs bg-white text-red-600 border border-red-200 font-bold px-2 py-1.5 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors shadow-xs"
-                              title="Delete this visit entry from schedule"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
 
                   {displayedDays.length === 0 && (
                     <div className="py-12 text-center text-slate-400 text-xs font-semibold">
-                      No visits match the current "{visitFilter}" filter.
+                      No visits match the current &quot;{visitFilter}&quot; filter.
                     </div>
                   )}
                 </div>
@@ -1836,23 +2005,31 @@ export default function TourPlansDashboard() {
                   <div className="flex items-center gap-2">
                     <Sparkles size={16} className="text-sky-600" />
                     <span className="text-xs font-semibold text-slate-700">
-                      Multi-Agent Field Schedule Controls ({new Set(selectedEvaluation.days.map((d) => d.date)).size} days active)
+                      N+1 Field Schedule Controls ({activeDayCount} Day{activeDayCount === 1 ? "" : "s"} Scheduled · Next: Day {activeDayCount + 1})
                     </span>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
-                      onClick={openAppendDayModal}
+                      onClick={() => openAppendDayModal()}
                       className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-colors"
                     >
                       <Plus size={14} />
-                      <span>Append Next Day (Doctors & Chemists)</span>
+                      <span>Add Day {activeDayCount + 1} (Doctors &amp; Chemists)</span>
+                    </button>
+                    <button
+                      onClick={() => handleDownloadExcelSchedule("ALL")}
+                      disabled={excelExporting}
+                      className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-colors disabled:opacity-50"
+                    >
+                      <FileSpreadsheet size={14} />
+                      <span>{excelExporting ? "Exporting..." : "Download Formatted Excel (.xlsx)"}</span>
                     </button>
                     <button
                       onClick={() => setShowDownloadModal(true)}
                       className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-colors"
                     >
                       <Printer size={14} className="text-slate-600" />
-                      <span>Download / Print Field Sheet</span>
+                      <span>Print / Preview Options</span>
                     </button>
                   </div>
                 </div>
@@ -2609,22 +2786,22 @@ export default function TourPlansDashboard() {
         </div>
       )}
 
-      {/* 1-DAY SCHEDULE CREATOR & APPEND MODAL (CLUBBING DOCTORS & CHEMISTS) */}
+      {/* N+1 SCHEDULE CREATOR & MULTI-ENTITY MODAL (MULTIPLE DOCTORS & CHEMISTS) */}
       {showSingleDayModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 border border-slate-200 my-8">
             <div className="flex justify-between items-start border-b border-slate-100 pb-3">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-lg font-bold text-slate-900">
-                    Plan 1-Day Schedule (Doctors & Chemists Clubbed)
+                    Schedule Day {activeDayCount + 1} (N+1) / Edit Day Calls
                   </h3>
                   <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300">
-                    Daily Schedule Multi-Agent
+                    Multiple Doctors &amp; Chemists
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Set up or append a single day field itinerary for {selectedEvaluation?.employeeName || "Representative"}. Doctors and chemists are clubbed together for comprehensive beat coverage.
+                  Select multiple Doctors and multiple Retail Chemists together for {selectedEvaluation?.employeeName || "Representative"} on the chosen date.
                 </p>
               </div>
               <button
@@ -2645,7 +2822,13 @@ export default function TourPlansDashboard() {
                   <input
                     type="date"
                     value={singleDayDate}
-                    onChange={(e) => setSingleDayDate(e.target.value)}
+                    onChange={(e) => {
+                      const chosenDate = e.target.value;
+                      setSingleDayDate(chosenDate);
+                      if (selectedEvaluation?.days.some((d) => d.date === chosenDate && !d.isSunday)) {
+                        preloadExistingStopsForDate(chosenDate, singleDayTerritoryId);
+                      }
+                    }}
                     className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold bg-white focus:outline-sky-500"
                   />
                 </div>
@@ -2693,7 +2876,7 @@ export default function TourPlansDashboard() {
                 />
               </div>
 
-              {/* Clubbed Doctors Selection */}
+              {/* Multiple Doctors Selection */}
               <div className="bg-sky-50/50 border border-sky-100 rounded-xl p-3.5 space-y-2.5">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                   <div className="flex items-center gap-1.5">
@@ -2715,7 +2898,8 @@ export default function TourPlansDashboard() {
                       onClick={() => {
                         const docs = (doctorsByTerritory[singleDayTerritoryId] || []).filter((d) =>
                           d.fullName.toLowerCase().includes(doctorSearchTerm.toLowerCase()) ||
-                          (d.primarySpecialty && d.primarySpecialty.toLowerCase().includes(doctorSearchTerm.toLowerCase()))
+                          (d.primarySpecialty && d.primarySpecialty.toLowerCase().includes(doctorSearchTerm.toLowerCase())) ||
+                          (d.beatName && d.beatName.toLowerCase().includes(doctorSearchTerm.toLowerCase()))
                         );
                         setSingleDayDoctorIds(Array.from(new Set([...singleDayDoctorIds, ...docs.map((d) => d.id)])));
                       }}
@@ -2737,7 +2921,8 @@ export default function TourPlansDashboard() {
                   {(doctorsByTerritory[singleDayTerritoryId] || [])
                     .filter((d) =>
                       d.fullName.toLowerCase().includes(doctorSearchTerm.toLowerCase()) ||
-                      (d.primarySpecialty && d.primarySpecialty.toLowerCase().includes(doctorSearchTerm.toLowerCase()))
+                      (d.primarySpecialty && d.primarySpecialty.toLowerCase().includes(doctorSearchTerm.toLowerCase())) ||
+                      (d.beatName && d.beatName.toLowerCase().includes(doctorSearchTerm.toLowerCase()))
                     )
                     .map((doc) => {
                       const isChecked = singleDayDoctorIds.includes(doc.id);
@@ -2763,6 +2948,11 @@ export default function TourPlansDashboard() {
                           <div className="text-xs flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-bold text-slate-800">{doc.fullName}</span>
+                              {doc.beatName && (
+                                <span className="text-[10px] bg-sky-100 text-sky-800 font-bold px-1.5 rounded">
+                                  {doc.beatName.split(":")[0]}
+                                </span>
+                              )}
                               {doc.dpsTier && (
                                 <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 rounded">
                                   {doc.dpsTier}
@@ -2789,7 +2979,7 @@ export default function TourPlansDashboard() {
                 </div>
               </div>
 
-              {/* Clubbed Chemists Selection */}
+              {/* Multiple Chemists Selection */}
               <div className="bg-purple-50/50 border border-purple-100 rounded-xl p-3.5 space-y-2.5">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                   <div className="flex items-center gap-1.5">
@@ -2811,7 +3001,9 @@ export default function TourPlansDashboard() {
                       onClick={() => {
                         const chems = (chemistsByTerritory[singleDayTerritoryId] || []).filter((c) =>
                           c.name.toLowerCase().includes(chemistSearchTerm.toLowerCase()) ||
-                          (c.address && c.address.toLowerCase().includes(chemistSearchTerm.toLowerCase()))
+                          (c.address && c.address.toLowerCase().includes(chemistSearchTerm.toLowerCase())) ||
+                          (c.subArea && c.subArea.toLowerCase().includes(chemistSearchTerm.toLowerCase())) ||
+                          (c.beatName && c.beatName.toLowerCase().includes(chemistSearchTerm.toLowerCase()))
                         );
                         setSingleDayChemistIds(Array.from(new Set([...singleDayChemistIds, ...chems.map((c) => c.id)])));
                       }}
@@ -2833,7 +3025,9 @@ export default function TourPlansDashboard() {
                   {(chemistsByTerritory[singleDayTerritoryId] || [])
                     .filter((c) =>
                       c.name.toLowerCase().includes(chemistSearchTerm.toLowerCase()) ||
-                      (c.address && c.address.toLowerCase().includes(chemistSearchTerm.toLowerCase()))
+                      (c.address && c.address.toLowerCase().includes(chemistSearchTerm.toLowerCase())) ||
+                      (c.subArea && c.subArea.toLowerCase().includes(chemistSearchTerm.toLowerCase())) ||
+                      (c.beatName && c.beatName.toLowerCase().includes(chemistSearchTerm.toLowerCase()))
                     )
                     .map((chem) => {
                       const isChecked = singleDayChemistIds.includes(chem.id);
@@ -2857,7 +3051,14 @@ export default function TourPlansDashboard() {
                             className="mt-0.5 rounded text-purple-600 focus:ring-purple-500"
                           />
                           <div className="text-xs flex-1">
-                            <span className="font-bold text-slate-800 block">{chem.name}</span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-800">{chem.name}</span>
+                              {(chem.beatName || chem.subArea) && (
+                                <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-1.5 rounded">
+                                  {chem.beatName?.split(":")[0] || chem.subArea}
+                                </span>
+                              )}
+                            </div>
                             {chem.address && (
                               <p className="text-[11px] text-slate-500 truncate max-w-md">{chem.address}</p>
                             )}
@@ -2878,7 +3079,7 @@ export default function TourPlansDashboard() {
               {/* Day Objective / Notes */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Field Call Objective & Notes
+                  Field Call Objective &amp; Notes
                 </label>
                 <textarea
                   rows={2}
@@ -2892,7 +3093,7 @@ export default function TourPlansDashboard() {
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-xs text-emerald-900">
                 <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
                 <span>
-                  <strong>DailyScheduleClubbingAgent:</strong> {singleDayDoctorIds.length} Doctor(s) and {singleDayChemistIds.length} Chemist(s) will be clubbed together on {singleDayDate}.
+                  <strong>N+1 Multi-Stop Selection:</strong> {singleDayDoctorIds.length} Doctor(s) + {singleDayChemistIds.length} Chemist(s) scheduled together for {singleDayDate}.
                 </span>
               </div>
             </div>
@@ -2911,27 +3112,31 @@ export default function TourPlansDashboard() {
                 className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-5 py-2 text-xs font-bold rounded-xl shadow-xs transition-colors disabled:opacity-50"
               >
                 {singleDaySaving ? <RefreshCw size={13} className="animate-spin" /> : <Plus size={14} />}
-                <span>{singleDaySaving ? "Saving Itinerary..." : "Save 1-Day Schedule"}</span>
+                <span>
+                  {singleDaySaving
+                    ? "Saving Schedule..."
+                    : `Save Day Schedule (${singleDayDoctorIds.length} Drs + ${singleDayChemistIds.length} Chems)`}
+                </span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* DOWNLOAD & PRINT FIELD SCHEDULE MODAL */}
+      {/* PRINT-READY EXCEL & FIELD SHEET EXPORT MODAL */}
       {showDownloadModal && selectedEvaluation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-5 border border-slate-200 my-8">
             <div className="flex justify-between items-start border-b border-slate-100 pb-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <Printer size={18} className="text-sky-600" />
+                  <FileSpreadsheet size={18} className="text-emerald-600" />
                   <h3 className="text-lg font-bold text-slate-900">
-                    Field-Ready Schedule Export & Printable Sheet
+                    Print-Ready Excel (.xlsx) &amp; Field Schedule Export
                   </h3>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Export formatted field call sheet equipped with physical verification checkboxes ([ ]) for on-field call completion.
+                  Download an A4 landscape print-formatted Excel (.xlsx) workbook with Day 1..N grouping, Doctors + Chemists, checkboxes ([ ]), In/Out time log, and MR/ASM signature blocks.
                 </p>
               </div>
               <button
@@ -2967,7 +3172,7 @@ export default function TourPlansDashboard() {
                         : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
-                    All Days ({new Set(selectedEvaluation.days.map((d) => d.date)).size} Days)
+                    All N+1 Days ({activeDayCount} Day{activeDayCount === 1 ? "" : "s"})
                   </button>
                 </div>
               </div>
@@ -2987,13 +3192,13 @@ export default function TourPlansDashboard() {
 
             {/* Live Sheet Preview */}
             <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-3">
-              <div className="flex justify-between items-center text-xs border-b border-slate-200 pb-2">
+              <div className="flex justify-between items-center text-xs border-b border-slate-200 pb-2 flex-wrap gap-2">
                 <div>
                   <span className="font-bold text-slate-900">{selectedEvaluation.employeeName}</span>
                   <span className="text-slate-500 ml-2">Territory: {selectedEvaluation.territoryName || "Field Beat"}</span>
                 </div>
-                <span className="bg-sky-100 text-sky-800 font-bold px-2 py-0.5 rounded text-[10px]">
-                  Print-Ready Format with Checkboxes [ ]
+                <span className="bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded text-[10px] border border-emerald-200">
+                  A4 Print-Ready Excel (.xlsx) • Checkboxes [ ] • Signature Block
                 </span>
               </div>
 
@@ -3008,7 +3213,8 @@ export default function TourPlansDashboard() {
                         {entry.visitStatus === "DONE" || entry.isCompleted ? "✓" : ""}
                       </span>
                       <div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-mono text-slate-400">{entry.date}</span>
                           <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded uppercase ${
                             entry.entityType === "CHEMIST" ? "bg-purple-100 text-purple-800" : "bg-sky-100 text-sky-800"
                           }`}>
@@ -3023,7 +3229,7 @@ export default function TourPlansDashboard() {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right text-[11px] text-slate-400 font-mono">
+                    <div className="text-right text-[11px] text-slate-400 font-mono shrink-0">
                       [____:____ AM/PM]
                     </div>
                   </div>
@@ -3034,14 +3240,14 @@ export default function TourPlansDashboard() {
                   : selectedEvaluation.days.filter((d) => !d.isSunday)
                 ).length === 0 && (
                   <div className="p-6 text-center text-xs text-slate-400 italic">
-                    No scheduled visits found for this selection. Use "Plan 1-Day Schedule" to add calls.
+                    No scheduled visits found for this selection. Add Day N+1 calls first.
                   </div>
                 )}
               </div>
 
               <div className="text-[11px] text-slate-500 flex justify-between items-center pt-1">
-                <span>Field signature blocks and verification rows included in exported sheet.</span>
-                <span className="text-slate-400 font-mono">Form Template: SFA-TP-CHK-V2</span>
+                <span>Formatted with A4 Landscape fit-to-1-page width, repeating headers, cell borders &amp; signature footer.</span>
+                <span className="text-slate-400 font-mono">SFA-TP-N1-PRINT</span>
               </div>
             </div>
 
@@ -3053,19 +3259,28 @@ export default function TourPlansDashboard() {
                 Close
               </button>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => handleDownloadExcelSchedule()}
+                  disabled={excelExporting}
+                  className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-bold rounded-xl shadow-xs transition-colors disabled:opacity-50"
+                  title="Download formatted print-ready Excel workbook (.xlsx)"
+                >
+                  <FileSpreadsheet size={15} />
+                  <span>{excelExporting ? "Generating Excel..." : "Download Formatted Excel (.xlsx)"}</span>
+                </button>
                 <button
                   onClick={handleDownloadHtmlSchedule}
-                  className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-bold rounded-xl shadow-xs transition-colors"
-                  title="Download standalone HTML file that works offline and can be saved or opened on phone/laptop"
+                  className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-3.5 py-2 text-xs font-bold rounded-xl shadow-2xs transition-colors"
+                  title="Download standalone HTML file for offline browser viewing"
                 >
                   <Download size={14} />
-                  <span>Download HTML Sheet</span>
+                  <span>HTML Sheet</span>
                 </button>
                 <button
                   onClick={handlePrintSchedule}
                   className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 text-xs font-bold rounded-xl shadow-xs transition-colors"
-                  title="Directly trigger browser print dialog to print or save as PDF"
+                  title="Directly trigger browser print dialog"
                 >
                   <Printer size={14} />
                   <span>Print / Save as PDF</span>

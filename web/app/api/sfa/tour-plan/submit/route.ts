@@ -41,13 +41,27 @@ async function submitTourPlan(req: AuthedRequest) {
       targetApproverId = null;
     }
 
-    // Pre-fetch doctor metadata for beat and subArea population
+    // Pre-fetch doctor and chemist metadata for beat, subArea, and chemist tag population
     const doctorIds = days.map((d) => d.plannedDoctorId).filter(Boolean) as string[];
-    const doctorMeta = await db.doctor.findMany({
-      where: { id: { in: doctorIds } },
-      select: { id: true, beatName: true, subArea: true },
-    });
+    const chemistIds = days.map((d) => d.plannedChemistId).filter(Boolean) as string[];
+
+    const [doctorMeta, chemistMeta] = await Promise.all([
+      doctorIds.length > 0
+        ? db.doctor.findMany({
+            where: { id: { in: doctorIds } },
+            select: { id: true, beatName: true, subArea: true },
+          })
+        : Promise.resolve([]),
+      chemistIds.length > 0
+        ? db.chemist.findMany({
+            where: { id: { in: chemistIds } },
+            select: { id: true, name: true, address: true, beatName: true, subArea: true, mobile: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
     const doctorMap = new Map(doctorMeta.map((d) => [d.id, d]));
+    const chemistMap = new Map(chemistMeta.map((c) => [c.id, c]));
 
     // Unique dates targeted by this submission
     const submittedDates = Array.from(
@@ -75,13 +89,39 @@ async function submitTourPlan(req: AuthedRequest) {
       await tx.tourPlanDay.createMany({
         data: days.map((day) => {
           const doc = day.plannedDoctorId ? doctorMap.get(day.plannedDoctorId) : null;
+          const chem = !day.plannedDoctorId && day.plannedChemistId ? chemistMap.get(day.plannedChemistId) : null;
+
+          if (chem) {
+            const tag = `[Chemist Visit: ${chem.name}]<!--PLANNED_CHEMIST:${JSON.stringify({
+              id: chem.id,
+              name: chem.name,
+              address: chem.address,
+              subArea: chem.subArea,
+              mobile: chem.mobile,
+            })}-->`;
+            return {
+              tourPlanId: plan.id,
+              date: startOfUtcDay(day.date),
+              territoryId: day.territoryId,
+              beatName: day.beatName ?? chem.beatName ?? null,
+              subArea: day.subArea ?? chem.subArea ?? null,
+              plannedDoctorId: null,
+              visitStatus: "PENDING",
+              isCompleted: false,
+              completionNotes: `${tag} ${day.notes || ""}`.trim(),
+            };
+          }
+
           return {
             tourPlanId: plan.id,
             date: startOfUtcDay(day.date),
             territoryId: day.territoryId,
-            beatName: doc?.beatName ?? null,
-            subArea: doc?.subArea ?? null,
-            plannedDoctorId: day.plannedDoctorId,
+            beatName: day.beatName ?? doc?.beatName ?? null,
+            subArea: day.subArea ?? doc?.subArea ?? null,
+            plannedDoctorId: day.plannedDoctorId ?? null,
+            visitStatus: "PENDING",
+            isCompleted: false,
+            completionNotes: day.notes || null,
           };
         }),
       });
