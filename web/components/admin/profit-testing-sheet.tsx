@@ -4,15 +4,20 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Calculator,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Columns,
   Copy,
   Database,
   Download,
+  FileCode2,
+  FileJson,
   FileSpreadsheet,
+  FileText,
   Info,
   Plus,
+  Printer,
   RefreshCw,
   RotateCcw,
   Sparkles,
@@ -29,7 +34,10 @@ import {
   CostBasisMode,
   createBlankTestingRow,
   DEFAULT_PROFIT_TESTING_ASSUMPTIONS,
+  downloadProfitTestingCsv,
   downloadProfitTestingExcel,
+  downloadProfitTestingHtml,
+  downloadProfitTestingJson,
   ProfitTestingAssumptions,
   ProfitTestingRowInput,
   round2,
@@ -65,13 +73,26 @@ export function ProfitTestingSheet() {
   const [catalogLoading, setCatalogLoading] = useState<boolean>(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<boolean>(false);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState<boolean>(false);
+  const [showFormulas, setShowFormulas] = useState<boolean>(false);
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
   const [activePreset, setActivePreset] = useState<"REFERENCE" | "CATALOG" | "BLANK">("REFERENCE");
   const [columnView, setColumnView] = useState<"ALL" | "COMPACT">("ALL");
 
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const topScrollRef = useRef<HTMLDivElement>(null);
   const syncingScrollRef = useRef(false);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target as Node)) {
+        setDownloadMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -135,6 +156,14 @@ export function ProfitTestingSheet() {
     if (assumptions.costBasisMode === "CATALOG_PURCHASE_RATE") return null;
     return computeProfitTestingSheet(
       { ...assumptions, costBasisMode: "CATALOG_PURCHASE_RATE" },
+      rows
+    ).summary;
+  }, [assumptions, rows]);
+
+  const mrpSellingComparison = useMemo(() => {
+    if (assumptions.sellingPriceBasis === "MRP") return null;
+    return computeProfitTestingSheet(
+      { ...assumptions, sellingPriceBasis: "MRP" },
       rows
     ).summary;
   }, [assumptions, rows]);
@@ -216,10 +245,26 @@ export function ProfitTestingSheet() {
 
   const handleDownloadExcel = async () => {
     setExporting(true);
+    setDownloadMenuOpen(false);
     try {
-      await downloadProfitTestingExcel(assumptions, computedRows, summary);
+      await downloadProfitTestingExcel(assumptions, computedRows, summary, catalogComparison);
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleDownloadFormat = async (format: "XLSX" | "CSV" | "HTML" | "JSON" | "PRINT") => {
+    setDownloadMenuOpen(false);
+    if (format === "XLSX") {
+      await handleDownloadExcel();
+    } else if (format === "CSV") {
+      downloadProfitTestingCsv(assumptions, computedRows, summary);
+    } else if (format === "HTML") {
+      downloadProfitTestingHtml(assumptions, computedRows, summary, catalogComparison);
+    } else if (format === "JSON") {
+      downloadProfitTestingJson(assumptions, computedRows, summary, catalogComparison);
+    } else if (format === "PRINT" && typeof window !== "undefined") {
+      window.print();
     }
   };
 
@@ -309,21 +354,104 @@ export function ProfitTestingSheet() {
             <button
               type="button"
               onClick={handleCopySummary}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 border border-white/15 text-white transition flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 border border-white/15 text-white transition flex items-center gap-1.5 print:hidden"
             >
               {copiedSummary ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
               {copiedSummary ? "Copied Summary" : "Copy Summary"}
             </button>
 
-            <button
-              type="button"
-              onClick={handleDownloadExcel}
-              disabled={exporting}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20 transition flex items-center gap-1.5 disabled:opacity-50"
-            >
-              <Download size={14} />
-              {exporting ? "Building .xlsx…" : "Export Formula Excel"}
-            </button>
+            <div className="relative print:hidden" ref={downloadMenuRef}>
+              <div className="inline-flex rounded-xl shadow-lg shadow-emerald-500/20 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadFormat("XLSX")}
+                  disabled={exporting}
+                  className="px-3.5 py-2 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Download size={14} />
+                  {exporting ? "Building .xlsx…" : "Download Excel (.xlsx)"}
+                </button>
+                <button
+                  type="button"
+                  aria-label="More download formats"
+                  aria-expanded={downloadMenuOpen}
+                  onClick={() => setDownloadMenuOpen((prev) => !prev)}
+                  className="px-2.5 py-2 bg-emerald-600 hover:bg-emerald-400 text-slate-950 border-l border-emerald-400/50 transition flex items-center"
+                >
+                  <ChevronDown size={14} />
+                </button>
+              </div>
+
+              {downloadMenuOpen && (
+                <div
+                  role="menu"
+                  aria-label="Download format options"
+                  className="absolute right-0 mt-2 w-64 rounded-2xl bg-white text-slate-900 shadow-2xl border border-slate-200 py-1.5 z-50"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleDownloadFormat("XLSX")}
+                    className="w-full px-3.5 py-2 text-left text-xs hover:bg-emerald-50 flex items-center gap-2.5 transition"
+                  >
+                    <FileSpreadsheet size={15} className="text-emerald-600 shrink-0" />
+                    <div>
+                      <p className="font-bold text-slate-900">Excel Workbook (.xlsx)</p>
+                      <p className="text-[10px] text-slate-500">2 sheets, live formulas &amp; formatted widths</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleDownloadFormat("CSV")}
+                    className="w-full px-3.5 py-2 text-left text-xs hover:bg-sky-50 flex items-center gap-2.5 transition"
+                  >
+                    <FileText size={15} className="text-sky-600 shrink-0" />
+                    <div>
+                      <p className="font-bold text-slate-900">CSV Spreadsheet (.csv)</p>
+                      <p className="text-[10px] text-slate-500">UTF-8 BOM compatible with Excel &amp; Sheets</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleDownloadFormat("HTML")}
+                    className="w-full px-3.5 py-2 text-left text-xs hover:bg-indigo-50 flex items-center gap-2.5 transition"
+                  >
+                    <FileCode2 size={15} className="text-indigo-600 shrink-0" />
+                    <div>
+                      <p className="font-bold text-slate-900">Styled HTML Report (.html)</p>
+                      <p className="text-[10px] text-slate-500">Standalone formatted financial report</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleDownloadFormat("JSON")}
+                    className="w-full px-3.5 py-2 text-left text-xs hover:bg-amber-50 flex items-center gap-2.5 transition"
+                  >
+                    <FileJson size={15} className="text-amber-600 shrink-0" />
+                    <div>
+                      <p className="font-bold text-slate-900">JSON Audit Snapshot (.json)</p>
+                      <p className="text-[10px] text-slate-500">Structured assumptions, rows &amp; summary</p>
+                    </div>
+                  </button>
+                  <div className="my-1 border-t border-slate-100" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleDownloadFormat("PRINT")}
+                    className="w-full px-3.5 py-2 text-left text-xs hover:bg-slate-100 flex items-center gap-2.5 transition"
+                  >
+                    <Printer size={15} className="text-slate-700 shrink-0" />
+                    <div>
+                      <p className="font-bold text-slate-900">Print / Save as PDF</p>
+                      <p className="text-[10px] text-slate-500">Landscape formatted report view</p>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -757,6 +885,43 @@ export function ProfitTestingSheet() {
             } w-full text-xs border-collapse`}
           >
             <thead>
+              <tr className="bg-slate-800 text-sky-300 text-[10px] font-bold uppercase tracking-widest border-b border-slate-700">
+                <th
+                  colSpan={showFull ? 3 : 2}
+                  className="px-3 py-1.5 text-left border-r border-slate-700"
+                >
+                  Item Details
+                </th>
+                <th
+                  colSpan={showFull ? 3 : 2}
+                  className="px-3 py-1.5 text-center border-r border-slate-700"
+                >
+                  Quantities
+                </th>
+                <th colSpan={4} className="px-3 py-1.5 text-center border-r border-slate-700">
+                  Pricing &amp; Cost Basis
+                </th>
+                <th
+                  colSpan={showFull ? 3 : 1}
+                  className="px-3 py-1.5 text-center border-r border-slate-700"
+                >
+                  Sales &amp; Output GST
+                </th>
+                {showFull && (
+                  <th colSpan={2} className="px-3 py-1.5 text-center border-r border-slate-700">
+                    Free Scheme
+                  </th>
+                )}
+                <th
+                  colSpan={showFull ? 3 : 1}
+                  className="px-3 py-1.5 text-center border-r border-slate-700"
+                >
+                  Purchase &amp; Input GST
+                </th>
+                <th colSpan={6} className="px-3 py-1.5 text-center">
+                  Profit &amp; Doctor Economics
+                </th>
+              </tr>
               <tr className="bg-slate-900 text-white text-[11px] uppercase tracking-wider">
                 <th className="px-2 py-3 text-center border-r border-slate-700 sticky left-0 z-20 bg-slate-900 w-[52px] min-w-[52px] max-w-[52px]">
                   No.
@@ -1221,175 +1386,594 @@ export function ProfitTestingSheet() {
         </div>
       </section>
 
-      {/* ── Earnings Summary & How to Use Split Panel ── */}
+      {/* ── High-Standard CFO Earnings Summary & Scenario Console ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Complete Reconciled Earnings Summary */}
+        {/* Left: Executive 4-Section Common-Size P&L + Cash Flow Earnings Summary */}
         <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+          <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 text-white">
             <div>
-              <h2 className="text-base font-display font-bold text-slate-900">Earnings Summary</h2>
-              <p className="text-xs text-slate-500">
-                Line-for-line reconciled GST, ITC credit, other charges, and cash-flow P&amp;L statement
+              <h2 className="text-base sm:text-lg font-display font-bold flex items-center gap-2">
+                <span>Earnings Summary</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/10 text-emerald-300 border border-white/15">
+                  FP&amp;A Statement
+                </span>
+              </h2>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Common-size P&amp;L (% of Sales), ITC cash-flow reconciliation, and break-even economics
               </p>
             </div>
-            <span
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${
-                isPositiveNet ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-              }`}
-            >
-              {isPositiveNet ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-              {isPositiveNet ? "Net Profitable" : "Net Deficit"}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowFormulas((prev) => !prev)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition print:hidden ${
+                  showFormulas
+                    ? "bg-amber-400 text-slate-950 border-amber-300"
+                    : "bg-white/10 hover:bg-white/20 text-slate-200 border-white/20"
+                }`}
+              >
+                {showFormulas ? "Hide Formulas" : "Show Formulas"}
+              </button>
+              <span
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${
+                  isPositiveNet
+                    ? "bg-emerald-500/20 text-emerald-200 border border-emerald-400/30"
+                    : "bg-rose-500/20 text-rose-200 border border-rose-400/30"
+                }`}
+              >
+                {isPositiveNet ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+                {isPositiveNet ? "Net Profitable" : "Net Deficit"}
+              </span>
+            </div>
           </div>
 
-          <div className="divide-y divide-slate-100 text-sm">
+          {/* 4-Tile Realization & Break-Even Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-4 bg-slate-50 border-b border-slate-200">
+            <div className="rounded-2xl bg-white border border-slate-200 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Avg Sell / Billed Strip
+              </p>
+              <p className="text-sm font-extrabold text-slate-900 mt-0.5 tabular-nums">
+                {formatInr(summary.avgSellRatePerBilledStrip)}
+              </p>
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                On {summary.totalBilledQty} billed strips
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white border border-slate-200 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Realized / Total Strip
+              </p>
+              <p className="text-sm font-extrabold text-indigo-700 mt-0.5 tabular-nums">
+                {formatInr(summary.effectiveRealizationPerTotalStrip)}
+              </p>
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                {formatPct(summary.freeDilutionPct)} free qty dilution
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white border border-slate-200 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Net Profit / Strip
+              </p>
+              <p
+                className={`text-sm font-extrabold mt-0.5 tabular-nums ${
+                  summary.netProfitPerTotalStrip >= 0 ? "text-emerald-700" : "text-rose-700"
+                }`}
+              >
+                {formatInr(summary.netProfitPerTotalStrip)}
+              </p>
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                Billed unit: {formatInr(summary.netProfitPerBilledStrip)}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white border border-slate-200 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Break-Even Revenue
+              </p>
+              <p className="text-sm font-extrabold text-slate-900 mt-0.5 tabular-nums">
+                {summary.breakEvenRevenueRequired !== null
+                  ? formatInr(summary.breakEvenRevenueRequired)
+                  : "N/A"}
+              </p>
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                {summary.netProfitEarnings < 0 && summary.sellRateUpliftPctToBreakEven !== null
+                  ? `Needs +${summary.sellRateUpliftPctToBreakEven}% rate/sales`
+                  : "Above break-even"}
+              </p>
+            </div>
+          </div>
+
+          {/* Visual Cost & Margin Waterfall Allocation Bar */}
+          {summary.billedSalesExclGst > 0 && (() => {
+            const totalSpend = Math.max(
+              summary.billedSalesExclGst,
+              summary.billedUnitsCost +
+                summary.freeStripCost +
+                summary.doctorCommission +
+                summary.otherCharges
+            );
+            const wPaid = Math.min(100, (summary.billedUnitsCost / totalSpend) * 100);
+            const wFree = Math.min(100, (summary.freeStripCost / totalSpend) * 100);
+            const wDoc = Math.min(100, (summary.doctorCommission / totalSpend) * 100);
+            const wOther = Math.min(100, (summary.otherCharges / totalSpend) * 100);
+            const wProfit =
+              summary.netProfitEarnings > 0
+                ? Math.min(100, (summary.netProfitEarnings / totalSpend) * 100)
+                : 0;
+
+            return (
+              <div className="px-6 py-3.5 bg-white border-b border-slate-100 space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                  <span>Revenue vs Cost &amp; Scheme Allocation</span>
+                  <span className="tabular-nums">
+                    Total Outflow: {formatInr(summary.totalOperatingCost)}
+                  </span>
+                </div>
+                <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden flex">
+                  {wPaid > 0 && (
+                    <div
+                      style={{ width: `${wPaid}%` }}
+                      className="bg-sky-600 h-full"
+                      title={`Paid Stock Cost: ${formatInr(summary.billedUnitsCost)}`}
+                    />
+                  )}
+                  {wFree > 0 && (
+                    <div
+                      style={{ width: `${wFree}%` }}
+                      className="bg-indigo-500 h-full"
+                      title={`Free Strip Cost: ${formatInr(summary.freeStripCost)}`}
+                    />
+                  )}
+                  {wDoc > 0 && (
+                    <div
+                      style={{ width: `${wDoc}%` }}
+                      className="bg-amber-500 h-full"
+                      title={`Doctor Commission: ${formatInr(summary.doctorCommission)}`}
+                    />
+                  )}
+                  {wOther > 0 && (
+                    <div
+                      style={{ width: `${wOther}%` }}
+                      className="bg-slate-600 h-full"
+                      title={`Other Charges: ${formatInr(summary.otherCharges)}`}
+                    />
+                  )}
+                  {wProfit > 0 && (
+                    <div
+                      style={{ width: `${wProfit}%` }}
+                      className="bg-emerald-500 h-full"
+                      title={`Net Profit: ${formatInr(summary.netProfitEarnings)}`}
+                    />
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-semibold text-slate-600">
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-sky-600" /> Billed COGS (
+                    {formatInr(summary.billedUnitsCost)})
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500" /> Free Goods Cost (
+                    {formatInr(summary.freeStripCost)})
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" /> Doctor Comm. (
+                    {formatInr(summary.doctorCommission)})
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-slate-600" /> Other Charges (
+                    {formatInr(summary.otherCharges)})
+                  </span>
+                  {summary.netProfitEarnings >= 0 ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-700 font-bold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" /> Net Profit (
+                      {formatInr(summary.netProfitEarnings)})
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-rose-700 font-bold">
+                      Net Deficit: {formatInr(summary.netProfitEarnings)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Common-Size P&L Header */}
+          <div className="px-6 py-2 bg-slate-100/80 border-b border-slate-200 grid grid-cols-12 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="col-span-7">Financial Statement Line Item</span>
+            <span className="col-span-3 text-right">Amount / %</span>
+            <span className="col-span-2 text-right">% of Sales</span>
+          </div>
+
+          <div className="divide-y divide-slate-100 text-xs sm:text-sm">
             {[
-              { label: "Billed sales excl. GST", val: formatInr(summary.billedSalesExclGst) },
-              { label: `Sales GST collected (${assumptions.salesGstPct}%)`, val: formatInr(summary.salesGstCollected) },
-              { label: "Invoice total incl. GST", val: formatInr(summary.invoiceTotalInclGst), bold: true },
-              { label: "Free value @ PTR (not billed)", val: formatInr(summary.freeValueAtPtr), tone: "indigo" },
-              { label: "Free strip cost", val: formatInr(summary.freeStripCost) },
-              { label: "Purchase cost excl. GST", val: formatInr(summary.purchaseCostExclGst) },
-              { label: `Purchase GST paid (${assumptions.purchaseGstPct}%)`, val: formatInr(summary.purchaseGstPaid), tone: "amber" },
-              { label: "Purchase cash outlay incl. GST", val: formatInr(summary.purchaseCashOutlayInclGst) },
+              { section: "A. Revenue & Output GST" },
+              {
+                label: "Billed sales excl. GST",
+                val: formatInr(summary.billedSalesExclGst),
+                pctSales: summary.billedSalesExclGst > 0 ? "100.0%" : "—",
+                formula: "SUM(K10:Kn)",
+              },
+              {
+                label: `Sales GST collected (${assumptions.salesGstPct}%)`,
+                val: formatInr(summary.salesGstCollected),
+                pctSales:
+                  summary.billedSalesExclGst > 0
+                    ? formatPct((summary.salesGstCollected / summary.billedSalesExclGst) * 100)
+                    : "—",
+                formula: "SUM(L10:Ln)",
+              },
+              {
+                label: "Invoice total incl. GST",
+                val: formatInr(summary.invoiceTotalInclGst),
+                pctSales:
+                  summary.billedSalesExclGst > 0
+                    ? formatPct((summary.invoiceTotalInclGst / summary.billedSalesExclGst) * 100)
+                    : "—",
+                bold: true,
+                formula: "Billed Sales + Sales GST",
+              },
+              { section: "B. Procurement, Free Goods & Input Tax Credit" },
+              {
+                label: "Billed units purchase cost",
+                val: formatInr(summary.billedUnitsCost),
+                pctSales:
+                  summary.billedSalesExclGst > 0
+                    ? formatPct((summary.billedUnitsCost / summary.billedSalesExclGst) * 100)
+                    : "—",
+                formula: "Purchase Cost - Free Cost",
+              },
+              {
+                label: "Free strip cost",
+                val: formatInr(summary.freeStripCost),
+                pctSales:
+                  summary.billedSalesExclGst > 0
+                    ? formatPct((summary.freeStripCost / summary.billedSalesExclGst) * 100)
+                    : "—",
+                formula: "SUM(O10:On)",
+              },
+              {
+                label: "Free value @ PTR (not billed)",
+                val: formatInr(summary.freeValueAtPtr),
+                pctSales:
+                  summary.billedSalesExclGst > 0
+                    ? formatPct((summary.freeValueAtPtr / summary.billedSalesExclGst) * 100)
+                    : "—",
+                tone: "indigo",
+                formula: "SUM(N10:Nn)",
+              },
+              {
+                label: "Purchase cost excl. GST",
+                val: formatInr(summary.purchaseCostExclGst),
+                pctSales:
+                  summary.billedSalesExclGst > 0
+                    ? formatPct((summary.purchaseCostExclGst / summary.billedSalesExclGst) * 100)
+                    : "—",
+                formula: "SUM(P10:Pn)",
+              },
+              {
+                label: `Purchase GST paid (${assumptions.purchaseGstPct}%)`,
+                val: formatInr(summary.purchaseGstPaid),
+                pctSales:
+                  summary.billedSalesExclGst > 0
+                    ? formatPct((summary.purchaseGstPaid / summary.billedSalesExclGst) * 100)
+                    : "—",
+                tone: "amber",
+                formula: "SUM(Q10:Qn)",
+              },
+              {
+                label: "Purchase cash outlay incl. GST",
+                val: formatInr(summary.purchaseCashOutlayInclGst),
+                pctSales:
+                  summary.billedSalesExclGst > 0
+                    ? formatPct((summary.purchaseCashOutlayInclGst / summary.billedSalesExclGst) * 100)
+                    : "—",
+                formula: "Purchase Cost + Purchase GST",
+              },
+              { section: "C. Gross & Operating Earnings (P&L)" },
               {
                 label:
                   assumptions.taxTreatment === "RECOVERABLE_ITC"
                     ? "Gross profit after input GST credit"
                     : "Gross profit after non-recoverable GST",
                 val: formatInr(summary.grossProfitAfterInputGstCredit),
+                pctSales: formatPct(summary.grossMarginPct),
                 bold: true,
                 neg: summary.grossProfitAfterInputGstCredit < 0,
                 highlight: "green",
+                formula: "Billed Sales - Effective Cost",
               },
               {
                 label: `Doctor commission (${formatPct(summary.effectiveDoctorPct)})`,
                 val: formatInr(summary.doctorCommission),
+                pctSales: formatPct(summary.effectiveDoctorPct),
+                formula: "SUM(U10:Un)",
               },
               {
                 label: "Line-item net profit (before other charges)",
                 val: formatInr(summary.lineItemNetProfitBeforeOtherCharges),
+                pctSales:
+                  summary.billedSalesExclGst > 0
+                    ? formatPct(
+                        (summary.lineItemNetProfitBeforeOtherCharges / summary.billedSalesExclGst) * 100
+                      )
+                    : "—",
                 neg: summary.lineItemNetProfitBeforeOtherCharges < 0,
+                formula: "Gross Profit - Doctor Cost",
               },
-              { label: "Less: Other charges", val: formatInr(summary.otherCharges) },
+              {
+                label: "Less: Other charges",
+                val: formatInr(summary.otherCharges),
+                pctSales: formatPct(summary.otherChargesPctOfSales),
+                formula: "=C6 (Key Assumption)",
+              },
               {
                 label: "Net profit / earnings (Final After Other Charges)",
                 val: formatInr(summary.netProfitEarnings),
+                pctSales: formatPct(summary.netMarginPct),
                 bold: true,
                 neg: summary.netProfitEarnings < 0,
                 highlight: isPositiveNet ? "green" : "rose",
+                formula: "Line Net Profit - Other Charges",
               },
               {
                 label: "Net margin (% of Billed Sales)",
                 val: formatPct(summary.netMarginPct),
+                pctSales: "KPI",
                 neg: summary.netMarginPct < 0,
+                formula: "Net Profit / Billed Sales",
               },
               {
                 label: `Return on total cost (${formatInr(summary.totalOperatingCost)})`,
                 val: formatPct(summary.returnOnTotalCostPct),
+                pctSales: "ROI",
                 neg: summary.returnOnTotalCostPct < 0,
+                formula: "Net Profit / Total Operating Cost",
               },
+              { section: "D. Working Capital & GST Settlement" },
               {
                 label: "Cash earnings before input GST credit (Net Profit - ITC)",
                 val: formatInr(summary.cashEarningsBeforeInputGstCredit),
+                pctSales:
+                  summary.billedSalesExclGst > 0
+                    ? formatPct(
+                        (summary.cashEarningsBeforeInputGstCredit / summary.billedSalesExclGst) * 100
+                      )
+                    : "—",
                 bold: true,
                 neg: summary.cashEarningsBeforeInputGstCredit < 0,
+                formula: "Net Profit - Input GST Credit",
               },
               {
                 label: "Input GST credit (Recoverable ITC)",
                 val: formatInr(summary.inputGstCredit),
+                pctSales:
+                  summary.billedSalesExclGst > 0
+                    ? formatPct((summary.inputGstCredit / summary.billedSalesExclGst) * 100)
+                    : "—",
                 tone: "emerald",
+                formula: "Purchase GST (when Recoverable)",
               },
               {
                 label: "Net GST payable / (ITC credit carryforward)",
                 val: formatInr(summary.netGstPosition),
+                pctSales: "—",
                 neg: summary.netGstPosition < 0,
+                formula: "Sales GST - Input GST Credit",
               },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className={`px-6 py-2.5 flex items-center justify-between gap-4 ${
-                  item.highlight === "green"
-                    ? "bg-emerald-50/70"
-                    : item.highlight === "rose"
-                    ? "bg-rose-50/70"
-                    : ""
-                }`}
-              >
-                <span className={`text-xs sm:text-sm ${item.bold ? "font-bold text-slate-900" : "text-slate-600"}`}>
-                  {item.label}
-                </span>
-                <span
-                  className={`font-mono text-xs sm:text-sm tabular-nums whitespace-nowrap shrink-0 ${
-                    item.bold ? "font-extrabold" : "font-semibold"
-                  } ${
-                    item.neg
-                      ? "text-rose-700"
-                      : item.tone === "indigo"
-                      ? "text-indigo-700"
-                      : item.tone === "amber"
-                      ? "text-amber-700"
-                      : item.tone === "emerald"
-                      ? "text-emerald-700"
-                      : "text-slate-900"
+            ].map((item, idx) =>
+              "section" in item ? (
+                <div
+                  key={`sec-${idx}`}
+                  className="px-6 py-2 bg-slate-50/90 text-[10px] font-extrabold uppercase tracking-wider text-indigo-900"
+                >
+                  {item.section}
+                </div>
+              ) : (
+                <div
+                  key={item.label}
+                  className={`px-6 py-2.5 grid grid-cols-12 items-center gap-2 ${
+                    item.highlight === "green"
+                      ? "bg-emerald-50/70"
+                      : item.highlight === "rose"
+                      ? "bg-rose-50/70"
+                      : ""
                   }`}
                 >
-                  {item.val}
-                </span>
-              </div>
-            ))}
+                  <div className="col-span-7 pr-2">
+                    <span className={`${item.bold ? "font-bold text-slate-900" : "text-slate-700"}`}>
+                      {item.label}
+                    </span>
+                    {showFormulas && item.formula && (
+                      <span className="block text-[10px] font-mono text-slate-400 mt-0.5">
+                        ƒx {item.formula}
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={`col-span-3 text-right font-mono tabular-nums whitespace-nowrap ${
+                      item.bold ? "font-extrabold" : "font-semibold"
+                    } ${
+                      item.neg
+                        ? "text-rose-700"
+                        : item.tone === "indigo"
+                        ? "text-indigo-700"
+                        : item.tone === "amber"
+                        ? "text-amber-700"
+                        : item.tone === "emerald"
+                        ? "text-emerald-700"
+                        : "text-slate-900"
+                    }`}
+                  >
+                    {item.val}
+                  </span>
+                  <span className="col-span-2 text-right text-[11px] font-semibold text-slate-500 tabular-nums whitespace-nowrap">
+                    {item.pctSales}
+                  </span>
+                </div>
+              )
+            )}
           </div>
         </section>
 
-        {/* Right: Cost Basis Insight + How to Use */}
+        {/* Right: Multi-Scenario Cost Matrix + How to Use */}
         <section className="lg:col-span-5 space-y-6">
-          {catalogComparison && (
-            <div className="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-emerald-50 p-5 shadow-sm space-y-3">
+          {/* Multi-Scenario Cost & Selling Comparison Matrix */}
+          {(catalogComparison || mrpSellingComparison) && (
+            <div className="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-emerald-50 p-5 shadow-sm space-y-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[10px] font-bold uppercase tracking-wider">
-                    <Sparkles size={11} /> Cost Basis Comparison
+                    <Sparkles size={11} /> Scenario Decision Matrix
                   </span>
                   <h3 className="text-sm font-display font-bold text-slate-900 mt-1.5">
-                    Same Scheme @ Actual Catalog Purchase Rate
+                    PTR Paper Test vs Catalog Cost &amp; MRP Scenarios
                   </h3>
                 </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setAssumptions((prev) => ({
-                      ...prev,
-                      costBasisMode: "CATALOG_PURCHASE_RATE",
-                    }))
-                  }
-                  className="shrink-0 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition"
-                >
-                  Switch to Catalog Cost
-                </button>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                With <strong>PTR</strong> as cost basis and Selling Rate = PTR, giving free goods creates a deficit on
-                paper because free strips cost 100% of PTR. Using your live catalog{" "}
-                <strong>Purchase Rate</strong> for this exact mix yields:
-              </p>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="rounded-xl bg-white border border-slate-200 p-3">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase">Actual Purchase Cost</p>
-                  <p className="text-sm font-extrabold text-slate-900 mt-0.5 tabular-nums whitespace-nowrap">
-                    {formatInr(catalogComparison.purchaseCostExclGst)}
-                  </p>
-                </div>
-                <div className="rounded-xl bg-white border border-slate-200 p-3">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase">Actual Net Profit</p>
-                  <p
-                    className={`text-sm font-extrabold mt-0.5 tabular-nums whitespace-nowrap ${
-                      catalogComparison.netProfitEarnings >= 0 ? "text-emerald-700" : "text-rose-700"
-                    }`}
+                {catalogComparison && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAssumptions((prev) => ({
+                        ...prev,
+                        costBasisMode: "CATALOG_PURCHASE_RATE",
+                      }))
+                    }
+                    className="shrink-0 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition print:hidden"
                   >
-                    {formatInr(catalogComparison.netProfitEarnings)} ({formatPct(catalogComparison.netMarginPct)})
-                  </p>
-                </div>
+                    Switch to Catalog Cost
+                  </button>
+                )}
               </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-900 text-white text-[10px] uppercase">
+                      <th className="px-3 py-2 text-left">Metric</th>
+                      <th className="px-3 py-2 text-right">Current</th>
+                      {catalogComparison && <th className="px-3 py-2 text-right">Catalog Cost</th>}
+                      {mrpSellingComparison && <th className="px-3 py-2 text-right">Sell @ MRP</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    <tr>
+                      <td className="px-3 py-2 font-medium text-slate-600">Billed Sales</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums">
+                        {formatInr(summary.billedSalesExclGst)}
+                      </td>
+                      {catalogComparison && (
+                        <td className="px-3 py-2 text-right font-mono tabular-nums">
+                          {formatInr(catalogComparison.billedSalesExclGst)}
+                        </td>
+                      )}
+                      {mrpSellingComparison && (
+                        <td className="px-3 py-2 text-right font-mono tabular-nums text-indigo-700 font-bold">
+                          {formatInr(mrpSellingComparison.billedSalesExclGst)}
+                        </td>
+                      )}
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 font-medium text-slate-600">Purchase Cost</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums">
+                        {formatInr(summary.purchaseCostExclGst)}
+                      </td>
+                      {catalogComparison && (
+                        <td className="px-3 py-2 text-right font-mono tabular-nums text-emerald-700 font-bold">
+                          {formatInr(catalogComparison.purchaseCostExclGst)}
+                        </td>
+                      )}
+                      {mrpSellingComparison && (
+                        <td className="px-3 py-2 text-right font-mono tabular-nums">
+                          {formatInr(mrpSellingComparison.purchaseCostExclGst)}
+                        </td>
+                      )}
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 font-medium text-slate-600">Gross Profit</td>
+                      <td
+                        className={`px-3 py-2 text-right font-mono font-bold tabular-nums ${
+                          summary.grossProfitAfterInputGstCredit >= 0 ? "text-emerald-700" : "text-rose-700"
+                        }`}
+                      >
+                        {formatInr(summary.grossProfitAfterInputGstCredit)}
+                      </td>
+                      {catalogComparison && (
+                        <td
+                          className={`px-3 py-2 text-right font-mono font-bold tabular-nums ${
+                            catalogComparison.grossProfitAfterInputGstCredit >= 0
+                              ? "text-emerald-700"
+                              : "text-rose-700"
+                          }`}
+                        >
+                          {formatInr(catalogComparison.grossProfitAfterInputGstCredit)}
+                        </td>
+                      )}
+                      {mrpSellingComparison && (
+                        <td
+                          className={`px-3 py-2 text-right font-mono font-bold tabular-nums ${
+                            mrpSellingComparison.grossProfitAfterInputGstCredit >= 0
+                              ? "text-emerald-700"
+                              : "text-rose-700"
+                          }`}
+                        >
+                          {formatInr(mrpSellingComparison.grossProfitAfterInputGstCredit)}
+                        </td>
+                      )}
+                    </tr>
+                    <tr className="bg-slate-50 font-bold">
+                      <td className="px-3 py-2 text-slate-900">Net Profit</td>
+                      <td
+                        className={`px-3 py-2 text-right font-mono tabular-nums ${
+                          summary.netProfitEarnings >= 0 ? "text-emerald-700" : "text-rose-700"
+                        }`}
+                      >
+                        {formatInr(summary.netProfitEarnings)}
+                      </td>
+                      {catalogComparison && (
+                        <td
+                          className={`px-3 py-2 text-right font-mono tabular-nums ${
+                            catalogComparison.netProfitEarnings >= 0 ? "text-emerald-700" : "text-rose-700"
+                          }`}
+                        >
+                          {formatInr(catalogComparison.netProfitEarnings)}
+                        </td>
+                      )}
+                      {mrpSellingComparison && (
+                        <td
+                          className={`px-3 py-2 text-right font-mono tabular-nums ${
+                            mrpSellingComparison.netProfitEarnings >= 0 ? "text-emerald-700" : "text-rose-700"
+                          }`}
+                        >
+                          {formatInr(mrpSellingComparison.netProfitEarnings)}
+                        </td>
+                      )}
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 font-medium text-slate-600">Net Margin %</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums">
+                        {formatPct(summary.netMarginPct)}
+                      </td>
+                      {catalogComparison && (
+                        <td className="px-3 py-2 text-right font-mono font-bold text-emerald-700 tabular-nums">
+                          {formatPct(catalogComparison.netMarginPct)}
+                        </td>
+                      )}
+                      {mrpSellingComparison && (
+                        <td className="px-3 py-2 text-right font-mono tabular-nums">
+                          {formatPct(mrpSellingComparison.netMarginPct)}
+                        </td>
+                      )}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                With <strong>PTR</strong> as cost basis and Selling Rate = PTR, giving free goods creates an
+                accounting deficit because free strips charge 100% of PTR. Switch to{" "}
+                <strong>Catalog Purchase Rate</strong> for actual factory profitability.
+              </p>
             </div>
           )}
 
@@ -1441,9 +2025,9 @@ export function ProfitTestingSheet() {
                   5
                 </span>
                 <span>
-                  Check <strong>Net profit / earnings</strong> for P&amp;L after ITC and{" "}
-                  <strong>Cash earnings before input GST credit</strong> for upfront working capital impact. Use{" "}
-                  <strong>Compact Fit View</strong> anytime to view core P&amp;L numbers without horizontal scrolling.
+                  Review <strong>Net profit / earnings</strong> (with % of sales &amp; ROI),{" "}
+                  <strong>Cash earnings before input GST credit</strong>, and exported Excel formulas (no leading{" "}
+                  <code>=</code> XML artifacts).
                 </span>
               </li>
             </ol>

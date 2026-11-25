@@ -6,6 +6,9 @@ import "@testing-library/jest-dom";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ProfitTestingSheet } from "../components/admin/profit-testing-sheet";
 import {
+  buildProfitTestingCsv,
+  buildProfitTestingHtml,
+  buildProfitTestingJson,
   buildReferenceSheetRows,
   buildRowsFromCatalogProducts,
   computeProfitTestingSheet,
@@ -102,6 +105,13 @@ describe("Profit Testing Sheet calculation engine & UI", () => {
     expect(summary.inputGstCredit).toBe(467.07);
     expect(summary.cashEarningsBeforeInputGstCredit).toBe(-7326.39);
     expect(summary.netGstPosition).toBe(-467.07);
+    expect(summary.billedUnitsCost).toBe(6227.6);
+    expect(summary.grossMarginPct).toBe(-50);
+    expect(summary.avgSellRatePerBilledStrip).toBe(88.97);
+    expect(summary.effectiveRealizationPerTotalStrip).toBe(59.31);
+    expect(summary.freeDilutionPct).toBe(33.33);
+    expect(summary.breakEvenRevenueRequired).toBe(14801.75);
+    expect(summary.sellRateUpliftPctToBreakEven).toBe(137.7);
   });
 
   it("computes positive net profit under Catalog Purchase Rate cost basis and respects Sales GST & NON_RECOVERABLE mode", () => {
@@ -165,8 +175,15 @@ describe("Profit Testing Sheet calculation engine & UI", () => {
     // Only the 7 active reference rows render by default (no empty rows 8, 9, 10)
     expect(screen.queryByLabelText("Item name row 8")).not.toBeInTheDocument();
 
-    // Reference sheet initial net profit displayed
+    // Reference sheet initial net profit & upgraded CFO Earnings Summary blocks displayed
     expect(screen.getByTestId("summary-net-profit-hero")).toHaveTextContent("(₹6,859.32)");
+    expect(screen.getByText("Break-Even Revenue")).toBeInTheDocument();
+    expect(screen.getByText("Scenario Decision Matrix")).toBeInTheDocument();
+
+    // Toggle Excel formula audit display inside Earnings Summary
+    const toggleFormulaBtn = screen.getByRole("button", { name: /Show Formulas/i });
+    fireEvent.click(toggleFormulaBtn);
+    expect(screen.getByRole("button", { name: /Hide Formulas/i })).toBeInTheDocument();
 
     // Switch cost basis from PTR to Catalog Purchase Rate
     fireEvent.change(screen.getByLabelText("Cost Basis"), {
@@ -193,5 +210,68 @@ describe("Profit Testing Sheet calculation engine & UI", () => {
     expect(screen.queryByText("Sales GST")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /All 23 Sheet Columns/i }));
     expect(screen.getByText("Sales GST")).toBeInTheDocument();
+
+    // Multi-format download menu (Excel, CSV, HTML, JSON, Print/PDF)
+    const createObjectURLSpy = jest.fn(() => "blob:mock");
+    const revokeObjectURLSpy = jest.fn();
+    Object.defineProperty(URL, "createObjectURL", { writable: true, value: createObjectURLSpy });
+    Object.defineProperty(URL, "revokeObjectURL", { writable: true, value: revokeObjectURLSpy });
+    const printSpy = jest.spyOn(window, "print").mockImplementation(() => {});
+
+    fireEvent.click(screen.getByRole("button", { name: /More download formats/i }));
+    expect(screen.getByRole("menuitem", { name: /Excel Workbook/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /CSV Spreadsheet/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Styled HTML Report/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /JSON Audit Snapshot/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Print \/ Save as PDF/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("menuitem", { name: /CSV Spreadsheet/i }));
+    expect(createObjectURLSpy).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: /More download formats/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Print \/ Save as PDF/i }));
+    expect(printSpy).toHaveBeenCalledTimes(1);
+    printSpy.mockRestore();
+  });
+
+  it("generates formatted CSV, HTML, and JSON exports cleanly", () => {
+    const rows = buildReferenceSheetRows([]);
+    const { computedRows, summary } = computeProfitTestingSheet(
+      DEFAULT_PROFIT_TESTING_ASSUMPTIONS,
+      rows
+    );
+    const catalogComp = computeProfitTestingSheet(
+      { ...DEFAULT_PROFIT_TESTING_ASSUMPTIONS, costBasisMode: "CATALOG_PURCHASE_RATE" },
+      rows
+    ).summary;
+
+    const csv = buildProfitTestingCsv(DEFAULT_PROFIT_TESTING_ASSUMPTIONS, computedRows, summary);
+    expect(csv.startsWith("\uFEFF")).toBe(true);
+    expect(csv).toContain("Metaclav-CV");
+    expect(csv).toContain("Earnings Summary");
+    expect(csv).toContain("-6859.32");
+
+    const html = buildProfitTestingHtml(
+      DEFAULT_PROFIT_TESTING_ASSUMPTIONS,
+      computedRows,
+      summary,
+      catalogComp
+    );
+    expect(html).toContain("<!DOCTYPE html>");
+    expect(html).toContain("Profit Testing Sheet");
+    expect(html).toContain("Catalog Purchase Rate Comparison");
+    expect(html).toContain("(₹6,859.32)");
+
+    const json = JSON.parse(
+      buildProfitTestingJson(
+        DEFAULT_PROFIT_TESTING_ASSUMPTIONS,
+        computedRows,
+        summary,
+        catalogComp
+      )
+    );
+    expect(json.rows).toHaveLength(7);
+    expect(json.summary.netProfitEarnings).toBe(-6859.32);
+    expect(json.catalogPurchaseRateComparison.netProfitEarnings).toBe(622.23);
   });
 });
