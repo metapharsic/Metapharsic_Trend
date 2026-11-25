@@ -18,10 +18,14 @@ interface VisitDetail {
   endedAt: string | null;
   durationMinutes: number | null;
   boxesPlaced: number | null;
+  cqsScore?: number | null;
+  receptiveness?: string | null;
+  followUpDate?: string | null;
   photoUrl: string | null;
   doctor: { id: string; fullName: string; clinicAddress: string | null; mobile?: string | null; whatsApp?: string | null } | null;
-  chemist: { id: string; name: string; address: string | null; mobile?: string | null } | null;
+  chemist: { id: string; name: string; address: string | null; mobile?: string | null; licenseNo?: string | null } | null;
   lead: unknown | null;
+  samples?: { id: string; quantity: number; product: { id: string; name: string } }[];
 }
 
 function timeStr(iso: string) {
@@ -107,14 +111,46 @@ export function VisitDetailModal({ visitId, onClose }: { visitId: string; onClos
               )}
 
               <p className="text-xs text-slate-600"><span className="font-bold">Purpose:</span> {visit.purpose}</p>
-              {visit.boxesPlaced !== null && (
-                <p className="text-xs text-slate-600"><span className="font-bold">Boxes placed:</span> {visit.boxesPlaced}</p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                {visit.cqsScore !== null && visit.cqsScore !== undefined && (
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold">
+                    CQS: {visit.cqsScore.toFixed(1)}
+                  </span>
+                )}
+                {visit.receptiveness && (
+                  <span className="px-2 py-0.5 rounded-md bg-sky-50 border border-sky-200 text-sky-800 font-semibold">
+                    Receptiveness: {visit.receptiveness}
+                  </span>
+                )}
+                {visit.boxesPlaced !== null && (
+                  <span className="px-2 py-0.5 rounded-md bg-purple-50 border border-purple-200 text-purple-800 font-semibold">
+                    Boxes placed: {visit.boxesPlaced}
+                  </span>
+                )}
+                {visit.followUpDate && (
+                  <span className="px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 font-semibold">
+                    Follow-up: {new Date(visit.followUpDate).toLocaleDateString("en-IN")}
+                  </span>
+                )}
+              </div>
+
+              {visit.samples && visit.samples.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Samples Distributed</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {visit.samples.map((s) => (
+                      <span key={s.id} className="text-xs px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold">
+                        {s.product.name} × {s.quantity}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               )}
 
-              {!visit.locationUnavailable && (
+              {!visit.locationUnavailable && (visit.latitude !== 0 || visit.longitude !== 0) ? (
                 <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <MapPin size={13} />
-                  <span>{visit.latitude.toFixed(5)}, {visit.longitude.toFixed(5)}</span>
+                  <MapPin size={13} className="text-emerald-600" />
+                  <span>GPS Verified: {visit.latitude.toFixed(5)}, {visit.longitude.toFixed(5)}</span>
                   <a
                     href={`https://www.google.com/maps?q=${visit.latitude},${visit.longitude}`}
                     target="_blank" rel="noopener noreferrer"
@@ -122,6 +158,11 @@ export function VisitDetailModal({ visitId, onClose }: { visitId: string; onClos
                   >
                     View on map
                   </a>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5">
+                  <MapPin size={13} />
+                  <span>GPS Unavailable (Manual Checkout)</span>
                 </div>
               )}
 

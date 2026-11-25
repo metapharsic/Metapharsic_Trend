@@ -274,6 +274,13 @@ export default function SimulatorDashboard() {
             <span>Campaign Intelligence</span>
           </Link>
           <Link
+            href="/admin/profit-testing"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-sm"
+          >
+            <Calculator size={14} />
+            <span>Profit Testing Sheet</span>
+          </Link>
+          <Link
             href="/admin/ptr-calculator"
             className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-sm"
           >

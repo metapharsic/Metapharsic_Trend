@@ -12,6 +12,8 @@ export interface InvoicingFilterParams {
   date?: string; // YYYY-MM-DD
   month?: string; // YYYY-MM
   quarter?: string; // e.g. "Q1", "Q2", "Q3", "Q4" or "2026-Q4"
+  from?: string; // YYYY-MM-DD
+  to?: string; // YYYY-MM-DD
   year?: number;
   territoryId?: string;
   subArea?: string;
@@ -60,12 +62,22 @@ export interface CadenceBucketSummary {
   pendingOrdersAmount: number;
 }
 
+export interface AgingBucketSummary {
+  current0To15Count: number;
+  current0To15Amount: number;
+  aging16To30Count: number;
+  aging16To30Amount: number;
+  overdue30PlusCount: number;
+  overdue30PlusAmount: number;
+}
+
 export interface InvoicingDashboardResult {
   summary: {
     totalInvoicedAmount: number;
     totalInvoicesCount: number;
     totalPaidAmount: number;
     totalUnpaidAmount: number;
+    collectionRatePct: number;
     totalPendingOrdersCount: number;
     totalPendingOrdersAmount: number;
     cadence: InvoicingCadence;
@@ -73,6 +85,7 @@ export interface InvoicingDashboardResult {
     filterMonth?: string;
     filterQuarter?: string;
   };
+  agingSummary: AgingBucketSummary;
   cadenceBreakdowns: CadenceBucketSummary[];
   areaBreakdowns: AreaInvoiceBreakdown[];
   personBreakdowns: PersonInvoiceBreakdown[];
@@ -95,6 +108,19 @@ export class InvoicingService {
    */
   public static getCadenceDateRange(params: InvoicingFilterParams): { gte?: Date; lte?: Date } {
     const year = params.year || new Date().getFullYear();
+
+    if (params.from || params.to) {
+      const range: { gte?: Date; lte?: Date } = {};
+      if (params.from) {
+        const start = new Date(`${params.from}T00:00:00.000Z`);
+        if (!Number.isNaN(start.getTime())) range.gte = start;
+      }
+      if (params.to) {
+        const end = new Date(`${params.to}T23:59:59.999Z`);
+        if (!Number.isNaN(end.getTime())) range.lte = end;
+      }
+      if (range.gte || range.lte) return range;
+    }
 
     if (params.cadence === "DAILY" && params.date) {
       const start = new Date(`${params.date}T00:00:00.000Z`);
@@ -286,10 +312,19 @@ export class InvoicingService {
       orderBy: { createdAt: "desc" },
     });
 
-    // ── 3. Compute Summary Metrics ──
+    // ── 3. Compute Summary & Unpaid Aging Metrics ──
     let totalInvoicedAmount = 0;
     let totalPaidAmount = 0;
     let totalUnpaidAmount = 0;
+    const nowMs = Date.now();
+    const agingSummary: AgingBucketSummary = {
+      current0To15Count: 0,
+      current0To15Amount: 0,
+      aging16To30Count: 0,
+      aging16To30Amount: 0,
+      overdue30PlusCount: 0,
+      overdue30PlusAmount: 0,
+    };
 
     for (const inv of allInvoices) {
       const amt = Number(inv.amount || 0);
@@ -298,6 +333,17 @@ export class InvoicingService {
         totalPaidAmount += amt;
       } else {
         totalUnpaidAmount += amt;
+        const ageDays = Math.max(0, Math.floor((nowMs - new Date(inv.createdAt).getTime()) / (24 * 60 * 60 * 1000)));
+        if (ageDays <= 15) {
+          agingSummary.current0To15Count += 1;
+          agingSummary.current0To15Amount += amt;
+        } else if (ageDays <= 30) {
+          agingSummary.aging16To30Count += 1;
+          agingSummary.aging16To30Amount += amt;
+        } else {
+          agingSummary.overdue30PlusCount += 1;
+          agingSummary.overdue30PlusAmount += amt;
+        }
       }
     }
 
@@ -534,12 +580,20 @@ export class InvoicingService {
 
     const cadenceBreakdowns = Array.from(cadenceMap.values()).sort((a, b) => b.bucketKey.localeCompare(a.bucketKey));
 
+    const collectionRatePct =
+      totalInvoicedAmount > 0 ? Math.round((totalPaidAmount / totalInvoicedAmount) * 1000) / 10 : 0;
+
+    agingSummary.current0To15Amount = Math.round(agingSummary.current0To15Amount * 100) / 100;
+    agingSummary.aging16To30Amount = Math.round(agingSummary.aging16To30Amount * 100) / 100;
+    agingSummary.overdue30PlusAmount = Math.round(agingSummary.overdue30PlusAmount * 100) / 100;
+
     return {
       summary: {
         totalInvoicedAmount: Math.round(totalInvoicedAmount * 100) / 100,
         totalInvoicesCount: allInvoices.length,
         totalPaidAmount: Math.round(totalPaidAmount * 100) / 100,
         totalUnpaidAmount: Math.round(totalUnpaidAmount * 100) / 100,
+        collectionRatePct,
         totalPendingOrdersCount: pendingOrders.length,
         totalPendingOrdersAmount: Math.round(totalPendingOrdersAmount * 100) / 100,
         cadence,
@@ -547,6 +601,7 @@ export class InvoicingService {
         filterMonth: params.month,
         filterQuarter: params.quarter,
       },
+      agingSummary,
       cadenceBreakdowns,
       areaBreakdowns,
       personBreakdowns,

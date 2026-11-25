@@ -5,6 +5,7 @@ import { ok, created, badRequest, notFound, unauthorized, apiError } from "@/lib
 import { z } from "zod";
 import { postAutoLedger, SYSTEM_ACCOUNT_CODES } from "@/lib/ledger";
 import { CreditAgentsService } from "@/services/credit-agents.service";
+import { CacheService } from "@/services/cache.service";
 
 const LogCollectionSchema = z.object({
   chemistId: z.string().uuid(),
@@ -145,6 +146,7 @@ async function logCollection(req: AuthedRequest) {
       return c;
     });
 
+    CacheService.invalidate("invoices_totals_");
     return created({ collection });
   } catch (err) {
     console.error("[POST /api/mr/collections]", err);

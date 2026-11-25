@@ -7,12 +7,20 @@ import { bestSchemeFor, round2 } from "@/lib/scheme";
 import { outstandingBalance, canPlaceOrder } from "@/lib/credit";
 import { computeInvoiceTotals } from "@/lib/gst";
 import { postAutoLedger, SYSTEM_ACCOUNT_CODES } from "@/lib/ledger";
+import { CacheService } from "@/services/cache.service";
 
 
 async function getOrders(req: AuthedRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status") ?? undefined;
+    const search = searchParams.get("search")?.trim() || undefined;
+    const territoryId = searchParams.get("territoryId")?.trim() || undefined;
+    const requestedEmployeeId = searchParams.get("employeeId")?.trim() || undefined;
+    const from = searchParams.get("from")?.trim() || undefined;
+    const to = searchParams.get("to")?.trim() || undefined;
+    const unbilledOnly = searchParams.get("unbilledOnly") === "true";
+
     const { page, limit } = PaginationSchema.parse({
       page: searchParams.get("page") ?? 1,
       limit: searchParams.get("limit") ?? 20,
@@ -37,11 +45,45 @@ async function getOrders(req: AuthedRequest) {
       const employee = await db.employee.findUnique({ where: { userId: req.user.sub } });
       if (!employee) return unauthorized("Employee record not found");
       employeeFilter = employee.id;
+    } else if (requestedEmployeeId) {
+      employeeFilter = requestedEmployeeId;
     }
 
-    const where = {
-      ...(status ? { status: status as any } : {}),
+    const createdAtFilter: { gte?: Date; lte?: Date } = {};
+    if (from) {
+      const d = new Date(`${from}T00:00:00.000Z`);
+      if (!Number.isNaN(d.getTime())) createdAtFilter.gte = d;
+    }
+    if (to) {
+      const d = new Date(`${to}T23:59:59.999Z`);
+      if (!Number.isNaN(d.getTime())) createdAtFilter.lte = d;
+    }
+
+    const baseScopeWhere: any = {
       ...(employeeFilter ? { employeeId: employeeFilter } : {}),
+      ...(territoryId ? { chemist: { territoryId } } : {}),
+      ...(createdAtFilter.gte || createdAtFilter.lte ? { createdAt: createdAtFilter } : {}),
+      ...(unbilledOnly ? { invoice: null, status: { not: "CANCELLED" } } : {}),
+      ...(search
+        ? {
+            OR: [
+              { id: { contains: search, mode: "insensitive" as const } },
+              { chemist: { name: { contains: search, mode: "insensitive" as const } } },
+              { chemist: { subArea: { contains: search, mode: "insensitive" as const } } },
+              { chemist: { beatName: { contains: search, mode: "insensitive" as const } } },
+              { distributor: { name: { contains: search, mode: "insensitive" as const } } },
+              { doctor: { fullName: { contains: search, mode: "insensitive" as const } } },
+              { invoice: { invoiceNo: { contains: search, mode: "insensitive" as const } } },
+              { employee: { firstName: { contains: search, mode: "insensitive" as const } } },
+              { employee: { lastName: { contains: search, mode: "insensitive" as const } } },
+            ],
+          }
+        : {}),
+    };
+
+    const where = {
+      ...baseScopeWhere,
+      ...(status ? { status: status as any } : {}),
     };
 
     const [orders, total, statusGroups] = await Promise.all([
@@ -78,14 +120,14 @@ async function getOrders(req: AuthedRequest) {
           },
           distributor: { select: { id: true, name: true } },
           items: { include: { product: { select: { id: true, name: true, sku: true } } } },
-          invoice: { select: { invoiceNo: true, amount: true, paid: true } },
+          invoice: { select: { id: true, invoiceNo: true, amount: true, grandTotal: true, paid: true } },
         },
       }),
       db.order.count({ where }),
       // Status tallies must reflect the full scope, not just the current page.
       db.order.groupBy({
         by: ["status"],
-        where: employeeFilter ? { employeeId: employeeFilter } : {},
+        where: baseScopeWhere,
         _count: { _all: true },
       }),
     ]);
@@ -335,6 +377,7 @@ async function createOrder(req: AuthedRequest) {
       return { order: createdOrder, invoice: createdInvoice };
     });
 
+    CacheService.invalidate("invoices_totals_");
     return created({ order, invoice, appliedSchemes });
   } catch (err) {
     if (err instanceof Error && err.message.startsWith("Insufficient stock")) {

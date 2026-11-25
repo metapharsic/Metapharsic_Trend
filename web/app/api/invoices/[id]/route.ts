@@ -303,7 +303,7 @@ async function updateInvoice(
         return inv;
       });
 
-      CacheService.invalidate("invoices-totals");
+      CacheService.invalidate("invoices_totals_");
       return ok({ invoice: updated });
     }
 
@@ -342,7 +342,7 @@ async function updateInvoice(
       return inv;
     });
 
-    CacheService.invalidate("invoices-totals");
+    CacheService.invalidate("invoices_totals_");
     return ok({ invoice: updated });
   } catch (err) {
     console.error("[PUT /api/invoices/[id]]", err);
@@ -384,7 +384,7 @@ async function deleteInvoice(
       }
     });
 
-    CacheService.invalidate("invoices-totals");
+    CacheService.invalidate("invoices_totals_");
     return ok({ message: "Invoice deleted successfully" });
   } catch (err) {
     console.error("[DELETE /api/invoices/[id]]", err);

@@ -223,7 +223,14 @@ export function AdminPtrCalculator() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href="/admin/profit-testing"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/30 transition"
+            >
+              <Calculator size={13} />
+              <span>Profit Testing Sheet</span>
+            </a>
             <button
               type="button"
               onClick={() => setShowAgentConsole((prev) => !prev)}

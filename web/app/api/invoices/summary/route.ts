@@ -11,6 +11,8 @@ async function getInvoicingSummary(req: AuthedRequest) {
     const date = searchParams.get("date") || undefined;
     const month = searchParams.get("month") || undefined;
     const quarter = searchParams.get("quarter") || undefined;
+    const from = searchParams.get("from") || undefined;
+    const to = searchParams.get("to") || undefined;
     const year = searchParams.get("year") ? parseInt(searchParams.get("year")!, 10) : undefined;
     const territoryId = searchParams.get("territoryId") || undefined;
     const subArea = searchParams.get("subArea") || undefined;
@@ -30,6 +32,8 @@ async function getInvoicingSummary(req: AuthedRequest) {
       date,
       month,
       quarter,
+      from,
+      to,
       year,
       territoryId,
       subArea,

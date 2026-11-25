@@ -164,11 +164,14 @@ describe("Admin Invoice Editing Privileges & Multi-Threaded Wire Test Suite", ()
       expect(updatedInvoice.partyName).toBe("Admin Verified Hospital Outlet");
 
       // Verify double-entry ledger updated
-      const ledgerEntries = await testDb.ledgerTransaction.findMany({
+      const ledgerTxns = await testDb.ledgerTransaction.findMany({
         where: { sourceType: "INVOICE", sourceId: testInvoiceId },
+        include: { entries: { include: { account: true } } },
       });
-      expect(ledgerEntries.length).toBeGreaterThan(0);
-      const arEntry = ledgerEntries.find((l) => l.accountCode === "1100");
+      expect(ledgerTxns.length).toBeGreaterThan(0);
+      const arEntry = ledgerTxns
+        .flatMap((t) => t.entries)
+        .find((l) => l.account.code === "1100");
       expect(Number(arEntry?.debit)).toBe(1008);
     });
   });

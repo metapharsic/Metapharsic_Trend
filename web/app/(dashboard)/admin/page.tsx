@@ -2,12 +2,13 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { BarChart3, KeyRound, Calculator, Zap, } from "lucide-react";
+import { BarChart3, KeyRound, Calculator, Zap, FileSpreadsheet } from "lucide-react";
 import { ExecutiveKpiDashboard } from "@/components/executive-kpi-dashboard";
 import { AdminUserPasswords } from "@/components/admin/admin-user-passwords";
 import { AdminPtrCalculator } from "@/components/admin/admin-ptr-calculator";
+import { ProfitTestingSheet } from "@/components/admin/profit-testing-sheet";
 
-type AdminTab = "kpis" | "ptr-calculator" | "passwords";
+type AdminTab = "kpis" | "ptr-calculator" | "profit-testing" | "passwords";
 
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>("ptr-calculator");
@@ -41,6 +42,18 @@ export default function AdminDashboardPage() {
         </button>
 
         <button
+          onClick={() => setActiveTab("profit-testing")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+            activeTab === "profit-testing"
+              ? "bg-emerald-600 text-white shadow-sm"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+          }`}
+        >
+          <FileSpreadsheet size={15} />
+          <span>Profit Testing Sheet</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab("passwords")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${
             activeTab === "passwords"
@@ -71,6 +84,8 @@ export default function AdminDashboardPage() {
       )}
 
       {activeTab === "ptr-calculator" && <AdminPtrCalculator />}
+
+      {activeTab === "profit-testing" && <ProfitTestingSheet />}
 
       {activeTab === "passwords" && <AdminUserPasswords />}
     </div>

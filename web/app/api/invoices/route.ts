@@ -118,6 +118,7 @@ async function getInvoices(req: AuthedRequest) {
     const q = searchParams.get("q")?.trim() || undefined;
     const customer = searchParams.get("customer")?.trim() || undefined;
     const paidParam = searchParams.get("paid");
+    const overdueOnly = searchParams.get("overdueOnly") === "true";
     const from = searchParams.get("from") || undefined;
     const to = searchParams.get("to") || undefined;
     const territoryId = searchParams.get("territoryId") || undefined;
@@ -188,6 +189,10 @@ async function getInvoices(req: AuthedRequest) {
 
     if (paidParam === "true" || paidParam === "false") {
       filters.push({ paid: paidParam === "true" });
+    }
+    if (overdueOnly) {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      filters.push({ paid: false, createdAt: { lt: thirtyDaysAgo } });
     }
 
     const createdAt: Prisma.DateTimeFilter = {};
@@ -325,7 +330,7 @@ async function getInvoices(req: AuthedRequest) {
     });
 
     // High-performance caching for totals across all matching invoices
-    const cacheKey = `invoices_totals_${req.user.role}_${req.user.sub}_${q || ""}_${customer || ""}_${paidParam || ""}_${from || ""}_${to || ""}_${cadence || ""}_${dateParam || ""}_${monthParam || ""}_${quarterParam || ""}_${territoryId || ""}_${subArea || ""}_${employeeId || ""}`;
+    const cacheKey = `invoices_totals_${req.user.role}_${req.user.sub}_${q || ""}_${customer || ""}_${paidParam || ""}_${overdueOnly ? "1" : "0"}_${from || ""}_${to || ""}_${cadence || ""}_${dateParam || ""}_${monthParam || ""}_${quarterParam || ""}_${territoryId || ""}_${subArea || ""}_${employeeId || ""}`;
     const totals = await CacheService.getOrCompute(
       cacheKey,
       async () => {

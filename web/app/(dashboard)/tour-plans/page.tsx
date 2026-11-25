@@ -236,8 +236,7 @@ export default function TourPlansDashboard() {
 
         if (evals.length > 0) {
           if (!selectedPlanId || !evals.some((e) => e.id === selectedPlanId)) {
-            const firstPopulated = evals.find((e) => e.days.length > 0);
-            setSelectedPlanId((firstPopulated ?? evals[0]).id);
+            setSelectedPlanId(evals[0].id);
           }
         } else {
           setSelectedPlanId(null);
@@ -427,11 +426,10 @@ export default function TourPlansDashboard() {
         <tr style="border-bottom: 1px solid #e2e8f0; ${isDone ? "background-color: #f0fdf4;" : ""}">
           <td style="padding: 10px 8px; text-align: center; font-weight: bold; width: 40px;">${i + 1}</td>
           <td style="padding: 10px 8px; text-align: center; width: 70px;">
-            <span style="display: inline-block; padding: 2px 6px; font-size: 10px; font-weight: bold; border-radius: 4px; ${
-              isChem
-                ? "background: #f3e8ff; color: #6b21a8; border: 1px solid #d8b4fe;"
-                : "background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc;"
-            }">
+            <span style="display: inline-block; padding: 2px 6px; font-size: 10px; font-weight: bold; border-radius: 4px; ${isChem
+            ? "background: #f3e8ff; color: #6b21a8; border: 1px solid #d8b4fe;"
+            : "background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc;"
+          }">
               ${isChem ? "CHEMIST" : "DOCTOR"}
             </span>
           </td>
@@ -441,14 +439,12 @@ export default function TourPlansDashboard() {
           </td>
           <td style="padding: 10px 8px; font-size: 12px; color: #334155;">${loc}</td>
           <td style="padding: 10px 8px; text-align: center; width: 90px;">
-            <div style="width: 22px; height: 22px; border: 2px solid #334155; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; margin: 0 auto; ${
-              isDone ? "background: #059669; color: white; border-color: #059669;" : "background: white;"
-            }">
+            <div style="width: 22px; height: 22px; border: 2px solid #334155; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; margin: 0 auto; ${isDone ? "background: #059669; color: white; border-color: #059669;" : "background: white;"
+          }">
               ${isDone ? "✓" : ""}
             </div>
-            <div style="font-size: 9px; font-weight: bold; color: ${
-              isDone ? "#059669" : "#64748b"
-            }; margin-top: 2px;">
+            <div style="font-size: 9px; font-weight: bold; color: ${isDone ? "#059669" : "#64748b"
+          }; margin-top: 2px;">
               ${isDone ? "COMPLETED" : "CALL DONE [ ]"}
             </div>
           </td>
@@ -456,11 +452,10 @@ export default function TourPlansDashboard() {
             ___ : ___ In<br>___ : ___ Out
           </td>
           <td style="padding: 10px 8px; font-size: 11px; color: #475569; width: 140px;">
-            ${
-              d.completionNotes
-                ? d.completionNotes.replace(/<!--.*?-->/g, "").trim()
-                : '<span style="color: #cbd5e1;">[ Rx / Sample / Stock Notes ]</span>'
-            }
+            ${d.completionNotes
+            ? d.completionNotes.replace(/<!--.*?-->/g, "").trim()
+            : '<span style="color: #cbd5e1;">[ Rx / Sample / Stock Notes ]</span>'
+          }
           </td>
           <td style="padding: 10px 8px; width: 100px; text-align: center; border-left: 1px dashed #cbd5e1;">
             <span style="font-size: 9px; color: #94a3b8;">Stamp / Sign</span>
@@ -552,9 +547,8 @@ export default function TourPlansDashboard() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `MR_Field_Schedule_${selectedEvaluation.employeeName.replace(/\s+/g, "_")}_${
-      targetDate || selectedEvaluation.month
-    }.html`;
+    a.download = `MR_Field_Schedule_${selectedEvaluation.employeeName.replace(/\s+/g, "_")}_${targetDate || selectedEvaluation.month
+      }.html`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -583,7 +577,7 @@ export default function TourPlansDashboard() {
       .then((res) => {
         if (res.data?.success) setFieldReadiness(res.data.data);
       })
-      .catch(() => {});
+      .catch(() => { });
 
     // Inspect URL query params for ?tab=DAILY_SCHEDULE&date=YYYY-MM-DD
     if (typeof window !== "undefined") {
@@ -978,11 +972,10 @@ export default function TourPlansDashboard() {
         <div className="flex items-center gap-6">
           <button
             onClick={() => setActiveTab("OVERVIEW")}
-            className={`pb-3 font-semibold text-sm transition-colors border-b-2 flex items-center gap-2 ${
-              activeTab === "OVERVIEW"
-                ? "border-sky-600 text-sky-600"
-                : "border-transparent text-slate-500 hover:text-slate-700"
-            }`}
+            className={`pb-3 font-semibold text-sm transition-colors border-b-2 flex items-center gap-2 ${activeTab === "OVERVIEW"
+              ? "border-sky-600 text-sky-600"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
           >
             <span>Tour Plans ({plans.length})</span>
             {plans.length === 1 && (
@@ -993,11 +986,10 @@ export default function TourPlansDashboard() {
           </button>
           <button
             onClick={() => setActiveTab("DAILY_SCHEDULE")}
-            className={`pb-3 font-semibold text-sm transition-colors border-b-2 flex items-center gap-2 ${
-              activeTab === "DAILY_SCHEDULE"
-                ? "border-sky-600 text-sky-600"
-                : "border-transparent text-slate-500 hover:text-slate-700"
-            }`}
+            className={`pb-3 font-semibold text-sm transition-colors border-b-2 flex items-center gap-2 ${activeTab === "DAILY_SCHEDULE"
+              ? "border-sky-600 text-sky-600"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
           >
             <span>Field Call Schedule (N+1)</span>
             <span className="bg-sky-100 text-sky-700 text-xs px-2.5 py-0.5 rounded-full font-bold">
@@ -1165,98 +1157,97 @@ export default function TourPlansDashboard() {
                           </span>
                         </div>
                       </td>
-                    <td className="px-6 py-4 font-semibold text-emerald-600">
-                      {evalData?.summary.averageRouteEfficiency ?? 85}%
-                    </td>
-                    <td className="px-6 py-4 font-semibold text-slate-700">
-                      {evalData?.summary.complianceScore ?? 90}%
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase
-                        ${
-                          plan.status === "APPROVED"
-                            ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                            : plan.status === "REJECTED"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-amber-100 text-amber-700"
-                        }`}
-                      >
-                        {isAdmin && plan.status === "APPROVED"
-                          ? "EXECUTIVE AUTHORIZED"
-                          : plan.status.replace("_", " ")}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      {plan.status === "APPROVED" ? (
-                        <button
-                          onClick={() => openWhatsAppModal(plan)}
-                          className="inline-flex items-center gap-1.5 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-lg transition-colors font-bold text-xs shadow-xs"
-                          title="Send Approved Roadmap to Metapharsic-MR Group"
+                      <td className="px-6 py-4 font-semibold text-emerald-600">
+                        {evalData?.summary.averageRouteEfficiency ?? 85}%
+                      </td>
+                      <td className="px-6 py-4 font-semibold text-slate-700">
+                        {evalData?.summary.complianceScore ?? 90}%
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase
+                        ${plan.status === "APPROVED"
+                              ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                              : plan.status === "REJECTED"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-amber-100 text-amber-700"
+                            }`}
                         >
-                          <Share2 size={13} className="text-emerald-600" />
-                          Metapharsic-MR Group
-                        </button>
-                      ) : (
+                          {isAdmin && plan.status === "APPROVED"
+                            ? "EXECUTIVE AUTHORIZED"
+                            : plan.status.replace("_", " ")}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right space-x-2">
+                        {plan.status === "APPROVED" ? (
+                          <button
+                            onClick={() => openWhatsAppModal(plan)}
+                            className="inline-flex items-center gap-1.5 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-lg transition-colors font-bold text-xs shadow-xs"
+                            title="Send Approved Roadmap to Metapharsic-MR Group"
+                          >
+                            <Share2 size={13} className="text-emerald-600" />
+                            Metapharsic-MR Group
+                          </button>
+                        ) : (
+                          <button
+                            disabled
+                            className="inline-flex items-center gap-1.5 text-slate-400 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg font-medium text-xs opacity-60 cursor-not-allowed"
+                            title="Tour Plan must be approved before sending to Metapharsic-MR Group"
+                          >
+                            <Share2 size={13} />
+                            Group (Pending Approval)
+                          </button>
+                        )}
+
                         <button
-                          disabled
-                          className="inline-flex items-center gap-1.5 text-slate-400 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg font-medium text-xs opacity-60 cursor-not-allowed"
-                          title="Tour Plan must be approved before sending to Metapharsic-MR Group"
+                          onClick={() => {
+                            setSelectedPlanId(plan.id);
+                            setActiveTab("DAILY_SCHEDULE");
+                          }}
+                          className="inline-flex items-center gap-1.5 text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-300 px-3 py-1.5 rounded-lg transition-colors font-bold text-xs shadow-xs"
+                          title="Open Field Call Schedule (N+1) for this representative"
                         >
-                          <Share2 size={13} />
-                          Group (Pending Approval)
+                          <CalendarDays size={13} className="text-sky-600" />
+                          <span>Schedule ({scheduledDaysCount}d N+1)</span>
                         </button>
-                      )}
 
-                      <button
-                        onClick={() => {
-                          setSelectedPlanId(plan.id);
-                          setActiveTab("DAILY_SCHEDULE");
-                        }}
-                        className="inline-flex items-center gap-1.5 text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-300 px-3 py-1.5 rounded-lg transition-colors font-bold text-xs shadow-xs"
-                        title="Open Field Call Schedule (N+1) for this representative"
-                      >
-                        <CalendarDays size={13} className="text-sky-600" />
-                        <span>Schedule ({scheduledDaysCount}d N+1)</span>
-                      </button>
+                        {isManager && plan.status === "PENDING_ASM" && (
+                          <>
+                            <button
+                              disabled={busyId === plan.id}
+                              onClick={() => decide(plan.id, "approve")}
+                              className="text-emerald-600 hover:bg-emerald-50 px-3 py-1.5 rounded-lg transition-colors font-semibold text-xs border border-emerald-200 disabled:opacity-50"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              disabled={busyId === plan.id}
+                              onClick={() => decide(plan.id, "reject")}
+                              className="text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors font-semibold text-xs border border-red-200 disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
 
-                      {isManager && plan.status === "PENDING_ASM" && (
-                        <>
+                        {/* Delete Plan Action: Admin/MD can delete ANY plan (even for MRs); MR can delete DRAFT */}
+                        {(isAdmin || (role === "MR" && plan.status === "DRAFT")) && (
                           <button
                             disabled={busyId === plan.id}
-                            onClick={() => decide(plan.id, "approve")}
-                            className="text-emerald-600 hover:bg-emerald-50 px-3 py-1.5 rounded-lg transition-colors font-semibold text-xs border border-emerald-200 disabled:opacity-50"
+                            onClick={() => setDeletingPlan(plan)}
+                            className="inline-flex items-center gap-1 text-red-600 hover:bg-red-50 border border-red-200 px-2.5 py-1.5 rounded-lg transition-colors font-semibold text-xs shadow-xs"
+                            title={isAdmin ? "Admin Override: Delete Tour Plan" : "Delete Draft Tour Plan"}
                           >
-                            Approve
+                            <Trash2 size={13} className="text-red-600" />
+                            <span>Delete</span>
                           </button>
-                          <button
-                            disabled={busyId === plan.id}
-                            onClick={() => decide(plan.id, "reject")}
-                            className="text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors font-semibold text-xs border border-red-200 disabled:opacity-50"
-                          >
-                            Reject
-                          </button>
-                        </>
-                      )}
-
-                      {/* Delete Plan Action: Admin/MD can delete ANY plan (even for MRs); MR can delete DRAFT */}
-                      {(isAdmin || (role === "MR" && plan.status === "DRAFT")) && (
-                        <button
-                          disabled={busyId === plan.id}
-                          onClick={() => setDeletingPlan(plan)}
-                          className="inline-flex items-center gap-1 text-red-600 hover:bg-red-50 border border-red-200 px-2.5 py-1.5 rounded-lg transition-colors font-semibold text-xs shadow-xs"
-                          title={isAdmin ? "Admin Override: Delete Tour Plan" : "Delete Draft Tour Plan"}
-                        >
-                          <Trash2 size={13} className="text-red-600" />
-                          <span>Delete</span>
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -1404,11 +1395,10 @@ export default function TourPlansDashboard() {
               <button
                 disabled={selectedEvaluation.status !== "APPROVED"}
                 onClick={() => openWhatsAppModal(selectedEvaluation)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-xs transition-colors shadow-xs ${
-                  selectedEvaluation.status === "APPROVED"
-                    ? "text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 cursor-pointer"
-                    : "text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-60"
-                }`}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-xs transition-colors shadow-xs ${selectedEvaluation.status === "APPROVED"
+                  ? "text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 cursor-pointer"
+                  : "text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-60"
+                  }`}
                 title={
                   selectedEvaluation.status === "APPROVED"
                     ? "Send approved tour roadmap to Metapharsic-MR Group"
@@ -1420,13 +1410,12 @@ export default function TourPlansDashboard() {
               </button>
 
               <span
-                className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
-                  selectedEvaluation.status === "APPROVED"
-                    ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                    : selectedEvaluation.status === "REJECTED"
+                className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${selectedEvaluation.status === "APPROVED"
+                  ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                  : selectedEvaluation.status === "REJECTED"
                     ? "bg-red-100 text-red-700"
                     : "bg-amber-100 text-amber-700"
-                }`}
+                  }`}
               >
                 {isAdmin && selectedEvaluation.status === "APPROVED"
                   ? "EXECUTIVE AUTHORIZED"
@@ -1477,9 +1466,8 @@ export default function TourPlansDashboard() {
             return (
               <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl p-5 shadow-md border border-slate-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex items-center gap-3.5">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold shrink-0 ${
-                    isApproved ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-sky-500/20 text-sky-400 border border-sky-500/30"
-                  }`}>
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold shrink-0 ${isApproved ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-sky-500/20 text-sky-400 border border-sky-500/30"
+                    }`}>
                     <CalendarDays size={22} />
                   </div>
                   <div>
@@ -1487,9 +1475,8 @@ export default function TourPlansDashboard() {
                       <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
                         Field Schedule Summary ({targetDateStr})
                       </span>
-                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
-                        isApproved ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40" : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                      }`}>
+                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${isApproved ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40" : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                        }`}>
                         {isApproved ? "✓ Approved" : "Pending Approval"}
                       </span>
                     </div>
@@ -1611,41 +1598,37 @@ export default function TourPlansDashboard() {
                     <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold">
                       <button
                         onClick={() => setVisitFilter("ALL")}
-                        className={`px-2.5 py-1 rounded-lg transition-all ${
-                          visitFilter === "ALL"
-                            ? "bg-white text-slate-900 shadow-xs font-bold"
-                            : "text-slate-600 hover:text-slate-900"
-                        }`}
+                        className={`px-2.5 py-1 rounded-lg transition-all ${visitFilter === "ALL"
+                          ? "bg-white text-slate-900 shadow-xs font-bold"
+                          : "text-slate-600 hover:text-slate-900"
+                          }`}
                       >
                         All ({allDays.length})
                       </button>
                       <button
                         onClick={() => setVisitFilter("DONE")}
-                        className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
-                          visitFilter === "DONE"
-                            ? "bg-emerald-600 text-white shadow-xs font-bold"
-                            : "text-emerald-700 hover:bg-white/60"
-                        }`}
+                        className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${visitFilter === "DONE"
+                          ? "bg-emerald-600 text-white shadow-xs font-bold"
+                          : "text-emerald-700 hover:bg-white/60"
+                          }`}
                       >
                         <CheckCircle size={12} /> Done ({doneCount})
                       </button>
                       <button
                         onClick={() => setVisitFilter("NOT_DONE")}
-                        className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
-                          visitFilter === "NOT_DONE"
-                            ? "bg-red-600 text-white shadow-xs font-bold"
-                            : "text-red-700 hover:bg-white/60"
-                        }`}
+                        className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${visitFilter === "NOT_DONE"
+                          ? "bg-red-600 text-white shadow-xs font-bold"
+                          : "text-red-700 hover:bg-white/60"
+                          }`}
                       >
                         <XCircle size={12} /> Not Done ({notDoneCount})
                       </button>
                       <button
                         onClick={() => setVisitFilter("PENDING")}
-                        className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
-                          visitFilter === "PENDING"
-                            ? "bg-amber-500 text-white shadow-xs font-bold"
-                            : "text-amber-800 hover:bg-white/60"
-                        }`}
+                        className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${visitFilter === "PENDING"
+                          ? "bg-amber-500 text-white shadow-xs font-bold"
+                          : "text-amber-800 hover:bg-white/60"
+                          }`}
                       >
                         <Clock size={12} /> Pending ({pendingCount})
                       </button>
@@ -1723,15 +1706,14 @@ export default function TourPlansDashboard() {
                               return (
                                 <div
                                   key={day.id}
-                                  className={`p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-colors ${
-                                    day.isSunday
-                                      ? "bg-slate-50/60 opacity-60"
-                                      : isDone
+                                  className={`p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-colors ${day.isSunday
+                                    ? "bg-slate-50/60 opacity-60"
+                                    : isDone
                                       ? "bg-emerald-50/20 hover:bg-emerald-50/40"
                                       : isNotDone
-                                      ? "bg-red-50/20 hover:bg-red-50/40"
-                                      : "hover:bg-sky-50/40"
-                                  }`}
+                                        ? "bg-red-50/20 hover:bg-red-50/40"
+                                        : "hover:bg-sky-50/40"
+                                    }`}
                                 >
                                   <div className="flex items-center gap-3 min-w-[220px]">
                                     {!day.isSunday && (
@@ -1751,15 +1733,14 @@ export default function TourPlansDashboard() {
                                     )}
 
                                     <div
-                                      className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center text-center border shrink-0 ${
-                                        day.isSunday
-                                          ? "bg-slate-100 border-slate-200"
-                                          : isDone
+                                      className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center text-center border shrink-0 ${day.isSunday
+                                        ? "bg-slate-100 border-slate-200"
+                                        : isDone
                                           ? "bg-emerald-100 border-emerald-200 text-emerald-800"
                                           : isNotDone
-                                          ? "bg-red-100 border-red-200 text-red-800"
-                                          : "bg-slate-100 border-slate-200"
-                                      }`}
+                                            ? "bg-red-100 border-red-200 text-red-800"
+                                            : "bg-slate-100 border-slate-200"
+                                        }`}
                                     >
                                       <span className="text-[10px] uppercase font-bold text-slate-400">
                                         {day.dayOfWeek.slice(0, 3)}
@@ -1903,11 +1884,10 @@ export default function TourPlansDashboard() {
                                         <button
                                           disabled={isUpdating}
                                           onClick={() => handleToggleVisitStatus(day, isDone ? "PENDING" : "DONE")}
-                                          className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-bold transition-all ${
-                                            isDone
-                                              ? "bg-emerald-600 text-white shadow-xs"
-                                              : "bg-white text-slate-700 hover:text-emerald-700 hover:bg-emerald-50 border border-slate-200"
-                                          } disabled:opacity-50`}
+                                          className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-bold transition-all ${isDone
+                                            ? "bg-emerald-600 text-white shadow-xs"
+                                            : "bg-white text-slate-700 hover:text-emerald-700 hover:bg-emerald-50 border border-slate-200"
+                                            } disabled:opacity-50`}
                                           title={isDone ? "Click to revert back to Pending" : "Mark visit as Done"}
                                         >
                                           <CheckCircle size={12} className={isDone ? "text-white" : "text-emerald-600"} />
@@ -1917,11 +1897,10 @@ export default function TourPlansDashboard() {
                                         <button
                                           disabled={isUpdating}
                                           onClick={() => handleToggleVisitStatus(day, isNotDone ? "PENDING" : "NOT_DONE")}
-                                          className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-bold transition-all ${
-                                            isNotDone
-                                              ? "bg-red-600 text-white shadow-xs"
-                                              : "bg-white text-slate-700 hover:text-red-700 hover:bg-red-50 border border-slate-200"
-                                          } disabled:opacity-50`}
+                                          className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-bold transition-all ${isNotDone
+                                            ? "bg-red-600 text-white shadow-xs"
+                                            : "bg-white text-slate-700 hover:text-red-700 hover:bg-red-50 border border-slate-200"
+                                            } disabled:opacity-50`}
                                           title={isNotDone ? "Click to revert back to Pending" : "Mark visit as Not Done"}
                                         >
                                           <XCircle size={12} className={isNotDone ? "text-white" : "text-red-600"} />
@@ -1935,20 +1914,33 @@ export default function TourPlansDashboard() {
                                         {day.routeEfficiencyScore}% Route
                                       </span>
                                       <span
-                                        className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                                          day.complianceStatus === "OPTIMAL"
-                                            ? "bg-emerald-100 text-emerald-700"
-                                            : day.complianceStatus === "COMPLIANT"
+                                        className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${day.complianceStatus === "OPTIMAL"
+                                          ? "bg-emerald-100 text-emerald-700"
+                                          : day.complianceStatus === "COMPLIANT"
                                             ? "bg-sky-100 text-sky-700"
                                             : "bg-amber-100 text-amber-700"
-                                        }`}
+                                          }`}
                                       >
                                         {day.complianceStatus}
                                       </span>
                                     </div>
 
-                                    {/* MR Day Actions: Add Stop, Edit, Delete */}
-                                    <div className="flex items-center gap-1.5">
+                                    {/* MR Day Actions: Complete Call, Add Stop, Edit, Delete */}
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {!day.isSunday && !isDone && (day.plannedDoctorId || day.plannedChemistId) && (
+                                        <button
+                                          onClick={() => {
+                                            const qs = day.entityType === "CHEMIST" && day.plannedChemistId
+                                              ? `chemistId=${day.plannedChemistId}&name=${encodeURIComponent(day.plannedChemistName || "Chemist")}&tourPlanDayId=${day.id}`
+                                              : `doctorId=${day.plannedDoctorId}&name=${encodeURIComponent(day.plannedDoctorName || "Doctor")}&tourPlanDayId=${day.id}`;
+                                            router.push(`/mr/calls/new?${qs}`);
+                                          }}
+                                          className="flex items-center gap-1 text-xs bg-sky-600 text-white font-bold px-2.5 py-1.5 rounded-lg hover:bg-sky-700 transition-colors shadow-xs"
+                                          title="Open Complete Call checkout with GPS tracking for this stop"
+                                        >
+                                          <CheckCircle2 size={13} /> Complete Call
+                                        </button>
+                                      )}
                                       <button
                                         onClick={() => {
                                           setNewDayDate(day.date);
@@ -2070,11 +2062,10 @@ export default function TourPlansDashboard() {
                       setEditChemistId("");
                       if (editTerritoryId) loadDoctorsForTerritory(editTerritoryId);
                     }}
-                    className={`flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold border transition-all ${
-                      editEntityType === "DOCTOR"
-                        ? "bg-sky-50 text-sky-700 border-sky-400 ring-2 ring-sky-100"
-                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                    }`}
+                    className={`flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold border transition-all ${editEntityType === "DOCTOR"
+                      ? "bg-sky-50 text-sky-700 border-sky-400 ring-2 ring-sky-100"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      }`}
                   >
                     <Stethoscope size={14} className={editEntityType === "DOCTOR" ? "text-sky-600" : "text-slate-400"} />
                     <span>Doctor Visit</span>
@@ -2086,11 +2077,10 @@ export default function TourPlansDashboard() {
                       setEditDoctorId("");
                       if (editTerritoryId) loadChemistsForTerritory(editTerritoryId);
                     }}
-                    className={`flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold border transition-all ${
-                      editEntityType === "CHEMIST"
-                        ? "bg-purple-50 text-purple-700 border-purple-400 ring-2 ring-purple-100"
-                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                    }`}
+                    className={`flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold border transition-all ${editEntityType === "CHEMIST"
+                      ? "bg-purple-50 text-purple-700 border-purple-400 ring-2 ring-purple-100"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      }`}
                   >
                     <Store size={14} className={editEntityType === "CHEMIST" ? "text-purple-600" : "text-slate-400"} />
                     <span>Chemist Visit</span>
@@ -2251,11 +2241,10 @@ export default function TourPlansDashboard() {
                   {/* Option 1: Nearest Chemist */}
                   <div
                     onClick={() => setPlacementType("NEAREST_CHEMIST")}
-                    className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                      placementType === "NEAREST_CHEMIST"
-                        ? "bg-purple-50/60 border-purple-500 ring-2 ring-purple-100"
-                        : "bg-white border-slate-200 hover:border-slate-300"
-                    }`}
+                    className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${placementType === "NEAREST_CHEMIST"
+                      ? "bg-purple-50/60 border-purple-500 ring-2 ring-purple-100"
+                      : "bg-white border-slate-200 hover:border-slate-300"
+                      }`}
                   >
                     <input
                       type="radio"
@@ -2277,11 +2266,10 @@ export default function TourPlansDashboard() {
                   {/* Option 2: Doctor Designated Chemist */}
                   <div
                     onClick={() => setPlacementType("DOCTOR_DESIGNATED_CHEMIST")}
-                    className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                      placementType === "DOCTOR_DESIGNATED_CHEMIST"
-                        ? "bg-purple-50/60 border-purple-500 ring-2 ring-purple-100"
-                        : "bg-white border-slate-200 hover:border-slate-300"
-                    }`}
+                    className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${placementType === "DOCTOR_DESIGNATED_CHEMIST"
+                      ? "bg-purple-50/60 border-purple-500 ring-2 ring-purple-100"
+                      : "bg-white border-slate-200 hover:border-slate-300"
+                      }`}
                   >
                     <input
                       type="radio"
@@ -2303,11 +2291,10 @@ export default function TourPlansDashboard() {
                   {/* Option 3: In-House Clinic Pharmacy */}
                   <div
                     onClick={() => setPlacementType("IN_HOUSE")}
-                    className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                      placementType === "IN_HOUSE"
-                        ? "bg-purple-50/60 border-purple-500 ring-2 ring-purple-100"
-                        : "bg-white border-slate-200 hover:border-slate-300"
-                    }`}
+                    className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${placementType === "IN_HOUSE"
+                      ? "bg-purple-50/60 border-purple-500 ring-2 ring-purple-100"
+                      : "bg-white border-slate-200 hover:border-slate-300"
+                      }`}
                   >
                     <input
                       type="radio"
@@ -2446,11 +2433,10 @@ export default function TourPlansDashboard() {
                       setNewDayChemistId("");
                       if (newDayTerritoryId) loadDoctorsForTerritory(newDayTerritoryId);
                     }}
-                    className={`flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold border transition-all ${
-                      newDayEntityType === "DOCTOR"
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-400 ring-2 ring-emerald-100"
-                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                    }`}
+                    className={`flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold border transition-all ${newDayEntityType === "DOCTOR"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-400 ring-2 ring-emerald-100"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      }`}
                   >
                     <Stethoscope size={14} className={newDayEntityType === "DOCTOR" ? "text-emerald-600" : "text-slate-400"} />
                     <span>Doctor Visit</span>
@@ -2462,11 +2448,10 @@ export default function TourPlansDashboard() {
                       setNewDayDoctorId("");
                       if (newDayTerritoryId) loadChemistsForTerritory(newDayTerritoryId);
                     }}
-                    className={`flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold border transition-all ${
-                      newDayEntityType === "CHEMIST"
-                        ? "bg-purple-50 text-purple-700 border-purple-400 ring-2 ring-purple-100"
-                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                    }`}
+                    className={`flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold border transition-all ${newDayEntityType === "CHEMIST"
+                      ? "bg-purple-50 text-purple-700 border-purple-400 ring-2 ring-purple-100"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      }`}
                   >
                     <Store size={14} className={newDayEntityType === "CHEMIST" ? "text-purple-600" : "text-slate-400"} />
                     <span>Chemist Visit</span>
@@ -2737,13 +2722,12 @@ export default function TourPlansDashboard() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 font-semibold">Status:</span>
-                <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                  deletingPlan.status === "APPROVED"
-                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                    : deletingPlan.status === "REJECTED"
+                <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${deletingPlan.status === "APPROVED"
+                  ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                  : deletingPlan.status === "REJECTED"
                     ? "bg-red-100 text-red-700"
                     : "bg-amber-100 text-amber-700"
-                }`}>
+                  }`}>
                   {isAdmin && deletingPlan.status === "APPROVED" ? "EXECUTIVE AUTHORIZED" : deletingPlan.status}
                 </span>
               </div>
@@ -2929,9 +2913,8 @@ export default function TourPlansDashboard() {
                       return (
                         <label
                           key={doc.id}
-                          className={`flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors ${
-                            isChecked ? "bg-sky-50" : "hover:bg-slate-50"
-                          }`}
+                          className={`flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors ${isChecked ? "bg-sky-50" : "hover:bg-slate-50"
+                            }`}
                         >
                           <input
                             type="checkbox"
@@ -2972,10 +2955,10 @@ export default function TourPlansDashboard() {
 
                   {(!doctorsByTerritory[singleDayTerritoryId] ||
                     doctorsByTerritory[singleDayTerritoryId].length === 0) && (
-                    <div className="p-3 text-center text-xs text-slate-400">
-                      {singleDayTerritoryId ? "No doctors found in territory." : "Select a territory first."}
-                    </div>
-                  )}
+                      <div className="p-3 text-center text-xs text-slate-400">
+                        {singleDayTerritoryId ? "No doctors found in territory." : "Select a territory first."}
+                      </div>
+                    )}
                 </div>
               </div>
 
@@ -3034,9 +3017,8 @@ export default function TourPlansDashboard() {
                       return (
                         <label
                           key={chem.id}
-                          className={`flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors ${
-                            isChecked ? "bg-purple-50" : "hover:bg-slate-50"
-                          }`}
+                          className={`flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors ${isChecked ? "bg-purple-50" : "hover:bg-slate-50"
+                            }`}
                         >
                           <input
                             type="checkbox"
@@ -3069,10 +3051,10 @@ export default function TourPlansDashboard() {
 
                   {(!chemistsByTerritory[singleDayTerritoryId] ||
                     chemistsByTerritory[singleDayTerritoryId].length === 0) && (
-                    <div className="p-3 text-center text-xs text-slate-400">
-                      {singleDayTerritoryId ? "No chemists found in territory." : "Select a territory first."}
-                    </div>
-                  )}
+                      <div className="p-3 text-center text-xs text-slate-400">
+                        {singleDayTerritoryId ? "No chemists found in territory." : "Select a territory first."}
+                      </div>
+                    )}
                 </div>
               </div>
 
@@ -3155,22 +3137,20 @@ export default function TourPlansDashboard() {
                   <button
                     type="button"
                     onClick={() => setDownloadMode("TODAY")}
-                    className={`px-3 py-1 rounded-lg transition-all ${
-                      downloadMode === "TODAY"
-                        ? "bg-white text-slate-900 shadow-xs font-bold"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
+                    className={`px-3 py-1 rounded-lg transition-all ${downloadMode === "TODAY"
+                      ? "bg-white text-slate-900 shadow-xs font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                      }`}
                   >
                     Target Date ({targetPrintDate})
                   </button>
                   <button
                     type="button"
                     onClick={() => setDownloadMode("ALL")}
-                    className={`px-3 py-1 rounded-lg transition-all ${
-                      downloadMode === "ALL"
-                        ? "bg-white text-slate-900 shadow-xs font-bold"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
+                    className={`px-3 py-1 rounded-lg transition-all ${downloadMode === "ALL"
+                      ? "bg-white text-slate-900 shadow-xs font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                      }`}
                   >
                     All N+1 Days ({activeDayCount} Day{activeDayCount === 1 ? "" : "s"})
                   </button>
@@ -3215,9 +3195,8 @@ export default function TourPlansDashboard() {
                       <div>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-[10px] font-mono text-slate-400">{entry.date}</span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded uppercase ${
-                            entry.entityType === "CHEMIST" ? "bg-purple-100 text-purple-800" : "bg-sky-100 text-sky-800"
-                          }`}>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded uppercase ${entry.entityType === "CHEMIST" ? "bg-purple-100 text-purple-800" : "bg-sky-100 text-sky-800"
+                            }`}>
                             {entry.entityType || "DOCTOR"}
                           </span>
                           <span className="font-bold text-slate-800">
@@ -3239,10 +3218,10 @@ export default function TourPlansDashboard() {
                   ? selectedEvaluation.days.filter((d) => d.date === targetPrintDate)
                   : selectedEvaluation.days.filter((d) => !d.isSunday)
                 ).length === 0 && (
-                  <div className="p-6 text-center text-xs text-slate-400 italic">
-                    No scheduled visits found for this selection. Add Day N+1 calls first.
-                  </div>
-                )}
+                    <div className="p-6 text-center text-xs text-slate-400 italic">
+                      No scheduled visits found for this selection. Add Day N+1 calls first.
+                    </div>
+                  )}
               </div>
 
               <div className="text-[11px] text-slate-500 flex justify-between items-center pt-1">
@@ -3309,10 +3288,10 @@ function KpiTile({
     tone === "warn"
       ? "bg-amber-100 text-amber-600"
       : tone === "good"
-      ? "bg-emerald-100 text-emerald-600"
-      : tone === "sky"
-      ? "bg-sky-100 text-sky-600"
-      : "bg-teal-100 text-teal-600";
+        ? "bg-emerald-100 text-emerald-600"
+        : tone === "sky"
+          ? "bg-sky-100 text-sky-600"
+          : "bg-teal-100 text-teal-600";
 
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-between">

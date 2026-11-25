@@ -17,4 +17,4 @@ async function handler(_req: AuthedRequest) {
   }
 }
 
-export const GET = withAuth(handler, [Role.MR]);
+export const GET = withAuth(handler, [Role.MR, Role.ASM, Role.RM, Role.ZSM, Role.NSM, Role.MD, Role.ADMIN]);

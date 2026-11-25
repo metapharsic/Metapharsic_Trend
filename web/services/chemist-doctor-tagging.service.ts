@@ -10,8 +10,18 @@ export interface PrescribedDoctorSummary {
   subArea?: string | null;
   beatName?: string | null;
   mobile?: string | null;
+  whatsApp?: string | null;
+  phone?: string | null;
   matchReason?: string;
   isHistoricalPrescriber?: boolean;
+}
+
+function sanitizeDoctorPhone(mobile?: string | null, whatsApp?: string | null): string | null {
+  const raw = mobile || whatsApp || null;
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, "");
+  if (!digits || digits === "9848011223" || /^(\d)\1{9}$/.test(digits.slice(-10))) return null;
+  return raw;
 }
 
 export interface PrescribedDoctorsResult {
@@ -88,6 +98,7 @@ export class ChemistDoctorTaggingService {
           subArea: true,
           beatName: true,
           mobile: true,
+          whatsApp: true,
         },
         orderBy: { fullName: "asc" },
       });
@@ -117,6 +128,7 @@ export class ChemistDoctorTaggingService {
           subArea: true,
           beatName: true,
           mobile: true,
+          whatsApp: true,
         },
         orderBy: { fullName: "asc" },
       });
@@ -142,6 +154,7 @@ export class ChemistDoctorTaggingService {
           subArea: true,
           beatName: true,
           mobile: true,
+          whatsApp: true,
         },
         orderBy: { fullName: "asc" },
         take: 50,
@@ -152,9 +165,10 @@ export class ChemistDoctorTaggingService {
       }
     }
 
-    // Format results with historical prescriber flag
+    // Format results with historical prescriber flag and sanitized contact number
     const formattedDoctors: PrescribedDoctorSummary[] = candidateDoctors.map((d) => ({
       ...d,
+      phone: sanitizeDoctorPhone(d.mobile, d.whatsApp),
       isHistoricalPrescriber: historicalDoctorIds.has(d.id),
       matchReason:
         matchType === "EXACT_SUBAREA"

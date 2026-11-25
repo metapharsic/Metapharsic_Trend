@@ -231,13 +231,22 @@ export default function CallHistoryPage() {
     if (!editing) return;
     if (!editPurpose.trim()) return setEditError("Purpose is required.");
 
-    // Mandatory phone number validation even on updates
+    // Optional phone validation — allow blank, validate only when typed
     const cleanDigits = editPhone.replace(/\D/g, "");
-    if (!editPhone.trim() || cleanDigits.length < 10) {
-      return setEditError("Doctor/Chemist contact phone number is mandatory (minimum 10 digits).");
+    if (editPhone.trim()) {
+      if (cleanDigits.length < 10) {
+        return setEditError("Entered phone number must have at least 10 digits.");
+      }
+      if (cleanDigits === "9848011223" || /^(\d)\1{9}$/.test(cleanDigits.slice(-10))) {
+        return setEditError("Please enter a valid contact phone number (placeholder/dummy digits are not allowed).");
+      }
     }
-    if (cleanDigits === "9848011223") {
-      return setEditError("Please enter a valid contact phone number (default placeholder 9848011223 is not allowed).");
+
+    if (editDuration !== "" && (Number(editDuration) < 0 || Number(editDuration) > 600 || !Number.isInteger(Number(editDuration)))) {
+      return setEditError("Duration must be a whole number between 0 and 600 minutes.");
+    }
+    if (editBoxesPlaced !== "" && (Number(editBoxesPlaced) < 0 || !Number.isInteger(Number(editBoxesPlaced)))) {
+      return setEditError("Boxes placed must be a non-negative whole number.");
     }
 
     setSaving(true);
@@ -245,13 +254,13 @@ export default function CallHistoryPage() {
     try {
       const payload: any = {
         purpose: editPurpose.trim(),
-        phone: cleanDigits,
+        ...(cleanDigits ? { phone: cleanDigits } : {}),
         feedback: editFeedback.trim() || undefined,
-        durationMinutes: editDuration ? Number(editDuration) : undefined,
-        boxesPlaced: editBoxesPlaced ? Number(editBoxesPlaced) : undefined,
+        durationMinutes: editDuration !== "" ? Number(editDuration) : undefined,
+        boxesPlaced: editBoxesPlaced !== "" ? Number(editBoxesPlaced) : undefined,
       };
 
-      // Silently pass background GPS coordinates if open (not shown to MR)
+      // Silently pass real GPS coordinates if available
       if (backgroundGps && (backgroundGps.lat !== 0 || backgroundGps.lon !== 0)) {
         payload.latitude = backgroundGps.lat;
         payload.longitude = backgroundGps.lon;
@@ -265,10 +274,10 @@ export default function CallHistoryPage() {
                 ...v,
                 purpose: editPurpose.trim(),
                 feedback: editFeedback.trim() || null,
-                durationMinutes: editDuration ? Number(editDuration) : null,
-                boxesPlaced: editBoxesPlaced ? Number(editBoxesPlaced) : null,
-                doctor: v.doctor ? { ...v.doctor, mobile: cleanDigits } : null,
-                chemist: v.chemist ? { ...v.chemist, mobile: cleanDigits } : null,
+                durationMinutes: editDuration !== "" ? Number(editDuration) : null,
+                boxesPlaced: editBoxesPlaced !== "" ? Number(editBoxesPlaced) : null,
+                doctor: v.doctor && cleanDigits ? { ...v.doctor, mobile: cleanDigits } : v.doctor,
+                chemist: v.chemist && cleanDigits ? { ...v.chemist, mobile: cleanDigits } : v.chemist,
               }
             : v
         )
@@ -940,18 +949,18 @@ export default function CallHistoryPage() {
             <div className="px-5 pb-5 pt-1 space-y-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
-                  <span>Contact Phone Number *</span>
-                  <span className="text-[10px] text-rose-600 font-bold bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">MANDATORY</span>
+                  <span>Contact Phone Number (Optional)</span>
+                  <span className="text-[10px] text-slate-500 font-semibold bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">OPTIONAL</span>
                 </label>
                 <input
                   type="tel"
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
-                  placeholder="Enter 10-digit mobile number *"
+                  placeholder="Optional 10-digit mobile number"
                   maxLength={15}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
-                <p className="text-[10px] text-slate-400 mt-0.5">Mandatory for all doctor and chemist visits.</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Leave blank if unavailable, or enter 10 digits to update the contact card.</p>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Purpose *</label>
@@ -966,6 +975,8 @@ export default function CallHistoryPage() {
                 <input
                   type="number"
                   inputMode="numeric"
+                  min={0}
+                  max={600}
                   value={editDuration}
                   onChange={(e) => setEditDuration(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
@@ -976,6 +987,8 @@ export default function CallHistoryPage() {
                 <input
                   type="number"
                   inputMode="numeric"
+                  min={0}
+                  max={10000}
                   value={editBoxesPlaced}
                   onChange={(e) => setEditBoxesPlaced(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"

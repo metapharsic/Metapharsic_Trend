@@ -7,6 +7,7 @@ import { bestSchemeFor, round2 } from "@/lib/scheme";
 import { computeInvoiceTotals } from "@/lib/gst";
 import { postAutoLedger, reverseAutoLedger, SYSTEM_ACCOUNT_CODES } from "@/lib/ledger";
 import { canTransitionOrder } from "@/lib/order-workflow";
+import { CacheService } from "@/services/cache.service";
 
 // Orders are only editable/deletable before dispatch — once SHIPPED or
 // DELIVERED the invoice is a real, physically-fulfilled transaction and
@@ -329,6 +330,7 @@ async function updateOrderItemsInner(req: AuthedRequest, id: string, body: unkno
     return order;
   });
 
+  CacheService.invalidate("invoices_totals_");
   return ok({ order: updated });
 }
 
@@ -383,6 +385,7 @@ async function deleteOrder(
 
       await tx.order.delete({ where: { id } });
     });
+    CacheService.invalidate("invoices_totals_");
     return ok({ message: "Order deleted" });
   } catch (err) {
     console.error("[DELETE /api/orders/[id]]", err);

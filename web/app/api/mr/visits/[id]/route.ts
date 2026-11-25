@@ -1,10 +1,12 @@
 import { db } from "@/lib/db";
+import { Role } from "@prisma/client";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, forbidden, notFound, apiError, badRequest } from "@/lib/api-response";
 import { photoUrl } from "@/lib/upload";
 import { UpdateVisitSchema } from "@/lib/validators";
 import { CallComplianceAgentsService } from "@/services/call-compliance-agents.service";
 
+const MANAGER_ROLES: Role[] = [Role.ADMIN, Role.MD, Role.ASM, Role.RM, Role.ZSM, Role.NSM];
 
 async function handler(
   req: AuthedRequest,
@@ -15,17 +17,28 @@ async function handler(
     const visit = await db.visit.findUnique({
       where: { id },
       include: {
-        employee: { select: { id: true, userId: true } },
-        doctor: { select: { id: true, fullName: true, clinicAddress: true, mobile: true, whatsApp: true } },
-        chemist: { select: { id: true, name: true, address: true, mobile: true } },
+        employee: { select: { id: true, userId: true, firstName: true, lastName: true } },
+        doctor: { select: { id: true, fullName: true, clinicAddress: true, mobile: true, whatsApp: true, beatName: true, subArea: true } },
+        chemist: { select: { id: true, name: true, address: true, mobile: true, licenseNo: true, dlStatus: true, beatName: true, subArea: true } },
         lead: true,
+        samples: {
+          include: {
+            product: { select: { id: true, name: true, sku: true, packSize: true } },
+          },
+        },
+        gifts: {
+          include: {
+            giftCatalog: { select: { id: true, name: true } },
+          },
+        },
+        competitorLogs: true,
       },
     });
 
     if (!visit) return notFound("Visit not found");
 
-    // MRs can only view their own visits
-    if (visit.employee?.userId !== req.user.sub) return forbidden();
+    const isManager = MANAGER_ROLES.includes(req.user.role as Role);
+    if (!isManager && visit.employee?.userId !== req.user.sub) return forbidden();
 
     return ok({
       visit: {
@@ -54,7 +67,8 @@ async function updateHandler(
       },
     });
     if (!visit) return notFound("Visit not found");
-    if (visit.employee?.userId !== req.user.sub) return forbidden();
+    const isManager = MANAGER_ROLES.includes(req.user.role as Role);
+    if (!isManager && visit.employee?.userId !== req.user.sub) return forbidden();
 
     const body = await req.json();
     const parsed = UpdateVisitSchema.safeParse(body);
@@ -62,19 +76,22 @@ async function updateHandler(
 
     const { phone, latitude, longitude, ...visitFields } = parsed.data;
 
-    // Handle Phone verification & sync if provided during update
-    if (phone) {
-      const phoneValidation = CallComplianceAgentsService.verifyMandatoryPhone(phone);
-      if (phoneValidation.isValid) {
-        CallComplianceAgentsService.syncEntityContactNumber({
+    // Optional phone validation — only validates and syncs when provided cleanly
+    if (phone !== undefined) {
+      const phoneValidation = CallComplianceAgentsService.verifyOptionalPhone(phone);
+      if (!phoneValidation.isValid) {
+        return badRequest(phoneValidation.error || "Invalid phone number");
+      }
+      if (!phoneValidation.isEmpty && phoneValidation.cleanPhone) {
+        await CallComplianceAgentsService.syncEntityContactNumber({
           doctorId: visit.doctorId,
           chemistId: visit.chemistId,
           phone: phoneValidation.cleanPhone,
-        }).catch((e) => console.error("[CallCompliance] Update phone sync error:", e));
+        });
       }
     }
 
-    // Handle Silent Background GPS Telemetry
+    // Handle Silent Background GPS Telemetry accurately without clobbering existing fix when absent
     const gpsTelemetry = CallComplianceAgentsService.processSilentGpsTelemetry({
       latitude,
       longitude,
@@ -109,7 +126,8 @@ async function deleteHandler(
       include: { employee: { select: { userId: true } }, samples: true },
     });
     if (!visit) return notFound("Visit not found");
-    if (visit.employee?.userId !== req.user.sub) return forbidden();
+    const isManager = MANAGER_ROLES.includes(req.user.role as Role);
+    if (!isManager && visit.employee?.userId !== req.user.sub) return forbidden();
 
     await db.$transaction(async (tx) => {
       // Restore sample stock consumed by this visit before removing it.
@@ -129,6 +147,6 @@ async function deleteHandler(
   }
 }
 
-export const GET = withAuth(handler, "MR");
-export const PUT = withAuth(updateHandler, "MR");
-export const DELETE = withAuth(deleteHandler, "MR");
+export const GET = withAuth(handler, [Role.MR, Role.ASM, Role.MD, Role.ADMIN]);
+export const PUT = withAuth(updateHandler, [Role.MR, Role.ASM, Role.MD, Role.ADMIN]);
+export const DELETE = withAuth(deleteHandler, [Role.MR, Role.ASM, Role.MD, Role.ADMIN]);

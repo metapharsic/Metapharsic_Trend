@@ -93,6 +93,11 @@ const COST_CHAIN_ALLOWLIST: { file: string; match: string; why: string }[] = [
     match: "Number(item.product?.ptr || item.price || 0) * (item.quantity || 0)",
     why: "Per-MR/day order-value lookup used only to display booked order value in the report; not a cost basis.",
   },
+  {
+    file: "services/invoicing.service.ts",
+    match: "Number(it.price || it.product.ptr || it.product.price)",
+    why: "Billing line price fallback for GST tax invoice generation when batch-invoicing orders; not a cost or profit basis.",
+  },
 ];
 
 /** Every .ts/.tsx under the scanned roots, excluding tests and pricing itself. */

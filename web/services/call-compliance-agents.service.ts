@@ -13,7 +13,16 @@ import { db } from "@/lib/db";
 export interface PhoneValidationResult {
   isValid: boolean;
   cleanPhone: string;
+  isEmpty?: boolean;
   error?: string;
+}
+
+function isDummyOrRepeatedPhone(digitsOnly: string): boolean {
+  if (digitsOnly === "9848011223") return true;
+  const last10 = digitsOnly.slice(-10);
+  if (last10 === "9848011223") return true;
+  if (/^(\d)\1{9}$/.test(last10)) return true; // 0000000000, 1111111111, etc.
+  return false;
 }
 
 export interface GpsTelemetryResult {
@@ -56,11 +65,11 @@ export class CallComplianceAgentsService {
     const formatted = digitsOnly.length === 10 ? digitsOnly : digitsOnly.slice(-10);
 
     // Reject hardcoded placeholder number
-    if (digitsOnly === "9848011223" || formatted === "9848011223") {
+    if (isDummyOrRepeatedPhone(digitsOnly)) {
       return {
         isValid: false,
         cleanPhone: "",
-        error: "Please enter a valid doctor/chemist contact phone number (default placeholder 9848011223 is not allowed).",
+        error: "Please enter a valid doctor/chemist contact phone number (default placeholder 9848011223 or repeated dummy digits are not allowed).",
       };
     }
 
@@ -68,6 +77,22 @@ export class CallComplianceAgentsService {
       isValid: true,
       cleanPhone: formatted,
     };
+  }
+
+  /**
+   * Optional phone verification: blank/empty input is valid (isEmpty: true).
+   * Non-empty input must have at least 10 valid digits and must not be placeholder/dummy.
+   */
+  static verifyOptionalPhone(phoneInput: unknown): PhoneValidationResult {
+    if (phoneInput === undefined || phoneInput === null || (typeof phoneInput === "string" && phoneInput.trim() === "")) {
+      return {
+        isValid: true,
+        cleanPhone: "",
+        isEmpty: true,
+      };
+    }
+    const result = this.verifyMandatoryPhone(phoneInput);
+    return { ...result, isEmpty: false };
   }
 
   /**

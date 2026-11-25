@@ -1,11 +1,13 @@
-import { CacheService } from '@/services/cache.service';
+import { CacheService } from "@/services/cache.service";
 import { db } from "@/lib/db";
 import { Role } from "@prisma/client";
 import { randomUUID } from "crypto";
+import path from "path";
+import { unlink } from "fs/promises";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { CreateVisitSchema, PaginationSchema } from "@/lib/validators";
 import { saveVisitPhoto, photoUrl, saveDrugLicenseFile } from "@/lib/upload";
-import { checkVisitAnomaly, haversineDistanceKm } from "@/lib/gps";
+import { haversineDistanceKm } from "@/lib/gps";
 import { calculateCqs } from "@/lib/cqs";
 import { ok, badRequest, unauthorized, forbidden, notFound, apiError } from "@/lib/api-response";
 import { getWorkflowSettings } from "@/lib/workflow-settings";
@@ -216,6 +218,7 @@ async function getVisits(req: AuthedRequest) {
 }
 
 async function createVisit(req: AuthedRequest) {
+  let uploadedPhotoDiskPath: string | null = null;
   try {
     const employee = await db.employee.findUnique({
       where: { userId: req.user.sub },
@@ -227,7 +230,7 @@ async function createVisit(req: AuthedRequest) {
         },
       },
     });
-    if (!employee) return unauthorized("Employee record not found");
+    if (!employee) return unauthorized("Employee record not found for your account");
 
     const formData = await req.formData();
     const phoneInput = formData.get("phone") || formData.get("contactPhone") || formData.get("mobile");
@@ -235,16 +238,24 @@ async function createVisit(req: AuthedRequest) {
       doctorId: formData.get("doctorId") || undefined,
       chemistId: formData.get("chemistId") || undefined,
       hospitalId: formData.get("hospitalId") || undefined,
+      tourPlanDayId: formData.get("tourPlanDayId") || undefined,
+      prescribedDoctorId: formData.get("prescribedDoctorId") || undefined,
+      prescribedDoctorName: formData.get("prescribedDoctorName") || undefined,
       purpose: formData.get("purpose"),
       phone: phoneInput ? String(phoneInput) : undefined,
       feedback: formData.get("feedback") || undefined,
-      latitude: formData.get("latitude"),
-      longitude: formData.get("longitude"),
+      receptiveness: formData.get("receptiveness") || undefined,
+      followUpDate: formData.get("followUpDate") || undefined,
+      latitude: formData.get("latitude") ?? "0",
+      longitude: formData.get("longitude") ?? "0",
+      locationUnavailable: formData.get("locationUnavailable") === "true" ? true : undefined,
+      accuracy: formData.get("accuracy") || formData.get("gpsAccuracy") || undefined,
       startedAt: formData.get("startedAt") || undefined,
       startLatitude: formData.get("startLatitude") || undefined,
       startLongitude: formData.get("startLongitude") || undefined,
       durationMinutes: formData.get("durationMinutes") || undefined,
       boxesPlaced: formData.get("boxesPlaced") || undefined,
+      idempotencyKey: formData.get("idempotencyKey") || undefined,
     };
 
     const parsed = CreateVisitSchema.safeParse(raw);
@@ -252,13 +263,68 @@ async function createVisit(req: AuthedRequest) {
       return badRequest("Validation error", parsed.error.flatten());
     }
 
-    const { doctorId, chemistId, hospitalId, purpose, phone, feedback, latitude, longitude, startedAt, startLatitude, startLongitude, durationMinutes, boxesPlaced } =
-      parsed.data;
+    const {
+      doctorId,
+      chemistId,
+      hospitalId,
+      tourPlanDayId,
+      prescribedDoctorId,
+      prescribedDoctorName,
+      purpose,
+      phone,
+      feedback,
+      receptiveness,
+      followUpDate,
+      latitude,
+      longitude,
+      locationUnavailable,
+      accuracy,
+      startedAt,
+      startLatitude,
+      startLongitude,
+      durationMinutes,
+      boxesPlaced,
+    } = parsed.data;
 
+    let leadInput: { status?: string; details?: string; followUpAction?: string; followUpDate?: string } | null = null;
     const leadJson = formData.get("lead");
-    const leadInput = leadJson
-      ? (JSON.parse(leadJson.toString()) as { status?: string; details?: string; followUpAction?: string; followUpDate?: string })
-      : null;
+    if (leadJson) {
+      try {
+        leadInput = JSON.parse(leadJson.toString());
+      } catch {
+        return badRequest("Invalid lead JSON payload");
+      }
+    }
+
+    let rawSamples: { productId: string; quantity: number }[] = [];
+    const samplesJson = formData.get("samples");
+    if (samplesJson) {
+      try {
+        rawSamples = JSON.parse(samplesJson.toString());
+      } catch {
+        return badRequest("Invalid samples JSON payload");
+      }
+    }
+
+    let rawGifts: { giftCatalogId: string; quantity: number }[] = [];
+    const giftsJson = formData.get("gifts");
+    if (giftsJson) {
+      try {
+        rawGifts = JSON.parse(giftsJson.toString());
+      } catch {
+        return badRequest("Invalid gifts JSON payload");
+      }
+    }
+
+    let rawCompetitors: { brandName: string; activityIntensity: string; notes?: string }[] = [];
+    const compJson = formData.get("competitorLogs");
+    if (compJson) {
+      try {
+        rawCompetitors = JSON.parse(compJson.toString());
+      } catch {
+        return badRequest("Invalid competitorLogs JSON payload");
+      }
+    }
 
     if (!doctorId && !chemistId && !hospitalId) {
       return badRequest("One of doctorId, chemistId, or hospitalId must be provided");
@@ -271,7 +337,7 @@ async function createVisit(req: AuthedRequest) {
     let doctorTier: string | null = null;
     let doctorSpecialty: string | null = null;
 
-    // 1. Verify Target and fetch coordinates for Geofence Audit
+    // 1. Verify Target and fetch coordinates for proximity telemetry & TP enforcement
     if (doctorId) {
       const doctor = await db.doctor.findUnique({ where: { id: doctorId } });
       if (!doctor) return notFound("Doctor not found");
@@ -280,8 +346,6 @@ async function createVisit(req: AuthedRequest) {
       doctorTier = doctor.dpsTier;
       doctorSpecialty = doctor.primarySpecialty;
 
-      // Tour Plan enforcement: doctor must be on today's approved TP calendar day.
-      // Off by default — toggle in Admin > Workflow Settings.
       if (settings.enforceTourPlan) {
         const todayStart = startOfUtcDay();
         const todayEnd = addUtcDays(todayStart, 1);
@@ -310,55 +374,39 @@ async function createVisit(req: AuthedRequest) {
       targetLon = hospital.longitude;
     }
 
-    // Mandatory Phone Verification Agent: Enforce phone validation for doctor/chemist calls
-    if (!hospitalId) {
-      const phoneValidation = CallComplianceAgentsService.verifyMandatoryPhone(phone);
-      let verifiedPhone = phoneValidation.cleanPhone;
-
-      if (!phoneValidation.isValid) {
-        // Check if existing entity already has a valid phone on file
-        let existingPhone: string | null = null;
-        if (doctorId) {
-          const d = await db.doctor.findUnique({ where: { id: doctorId }, select: { mobile: true, whatsApp: true } });
-          existingPhone = d?.mobile || d?.whatsApp || null;
-        } else if (chemistId) {
-          const c = await db.chemist.findUnique({ where: { id: chemistId }, select: { mobile: true } });
-          existingPhone = c?.mobile || null;
-        }
-
-        const cleanExisting = existingPhone ? existingPhone.replace(/\D/g, "") : "";
-        if (!cleanExisting || cleanExisting.length < 10 || cleanExisting === "9848011223") {
-          return badRequest(phoneValidation.error || "Doctor/Chemist contact phone number is mandatory for all calls.");
-        }
-        verifiedPhone = cleanExisting.slice(-10);
-      }
-
-      // Background Entity Contact Sync Agent: Keep doctor/chemist contact cards up to date
-      if (verifiedPhone) {
-        CallComplianceAgentsService.syncEntityContactNumber({
-          doctorId,
-          chemistId,
-          phone: verifiedPhone,
-        }).catch((e) => console.error("[CallCompliance] Contact sync error:", e));
-      }
+    // 2. Optional Phone Validation: allow empty phone; validate & sync ONLY if user entered one
+    const phoneValidation = CallComplianceAgentsService.verifyOptionalPhone(phone);
+    if (!phoneValidation.isValid) {
+      return badRequest(phoneValidation.error || "Invalid phone number format");
+    }
+    if (!hospitalId && !phoneValidation.isEmpty && phoneValidation.cleanPhone) {
+      CallComplianceAgentsService.syncEntityContactNumber({
+        doctorId,
+        chemistId,
+        phone: phoneValidation.cleanPhone,
+      }).catch((e) => console.error("[CallCompliance] Contact sync error:", e));
     }
 
-    // Silent GPS Telemetry Agent: Background capture for admin compliance
-    const rawAccuracy = formData.get("accuracy") || formData.get("gpsAccuracy");
+    // 3. Honest GPS Telemetry Processing (Never fabricate coordinates!)
     const gpsTelemetry = CallComplianceAgentsService.processSilentGpsTelemetry({
       latitude,
       longitude,
-      accuracy: rawAccuracy ? rawAccuracy.toString() : undefined,
+      accuracy,
     });
+    const hasValidGps = gpsTelemetry.hasGps && !locationUnavailable;
+    const recordedLat = hasValidGps ? gpsTelemetry.latitude : 0;
+    const recordedLon = hasValidGps ? gpsTelemetry.longitude : 0;
+    const isLocationUnavailable = !hasValidGps;
+    const startHasGps = startLatitude !== undefined && startLongitude !== undefined && (Number(startLatitude) !== 0 || Number(startLongitude) !== 0);
+    const recordedStartLat = startHasGps ? Number(startLatitude) : null;
+    const recordedStartLon = startHasGps ? Number(startLongitude) : null;
 
-    // GPS anomalies & geofencing disabled in field production as per commit 3252c14
-    const distanceMeters = 0;
-    const geofenceViolation = false;
-    const anomalyResult = { isAnomalous: false, reason: null, calculatedSpeed: 0 };
-    const visitAnomalyFlag = false;
-    const visitAnomalyDetails = null;
+    const distanceFromEntityMeters =
+      hasValidGps && targetLat && targetLon
+        ? Math.round(haversineDistanceKm(recordedLat, recordedLon, targetLat, targetLon) * 1000)
+        : null;
 
-    // 2. Multi-Agent Idempotency Check: Prevent duplicate submissions within short time window
+    // 4. Multi-Agent Idempotency Check
     const dupeCheck = await VisitDeduplicationAgentsService.findExistingDuplicateVisit({
       employeeId: employee.id,
       doctorId,
@@ -378,6 +426,7 @@ async function createVisit(req: AuthedRequest) {
       });
       if (existing) {
         return ok({
+          visitId: existing.id,
           visit: {
             ...existing,
             photoUrl: existing.photoPath ? photoUrl(existing.photoPath) : null,
@@ -388,9 +437,28 @@ async function createVisit(req: AuthedRequest) {
       }
     }
 
+    // 5. Merge duplicate sample/gift lines and validate positive integer quantities
+    const sampleMap = new Map<string, number>();
+    for (const s of rawSamples) {
+      if (!s.productId || !Number.isInteger(s.quantity) || s.quantity <= 0) {
+        return badRequest("All sample quantities must be positive whole numbers");
+      }
+      sampleMap.set(s.productId, (sampleMap.get(s.productId) ?? 0) + s.quantity);
+    }
+    const samples = Array.from(sampleMap.entries()).map(([productId, quantity]) => ({ productId, quantity }));
+
+    const giftMap = new Map<string, number>();
+    for (const g of rawGifts) {
+      if (!g.giftCatalogId || !Number.isInteger(g.quantity) || g.quantity <= 0) {
+        return badRequest("All gift quantities must be positive whole numbers");
+      }
+      giftMap.set(g.giftCatalogId, (giftMap.get(g.giftCatalogId) ?? 0) + g.quantity);
+    }
+    const gifts = Array.from(giftMap.entries()).map(([giftCatalogId, quantity]) => ({ giftCatalogId, quantity }));
+
     const visitId = randomUUID();
 
-    // 3. Handle Photo upload
+    // 6. Handle Photo upload (cleaned up automatically if DB transaction fails)
     const photoFile = formData.get("photo") as File | null;
     let photoPath: string | null = null;
     if (photoFile && photoFile.size > 0) {
@@ -399,18 +467,21 @@ async function createVisit(req: AuthedRequest) {
         return badRequest(uploadResult.error.message);
       }
       photoPath = uploadResult.result.relativePath;
+      uploadedPhotoDiskPath = path.join(process.cwd(), "public", "uploads", "visits", photoPath);
     } else if (settings.requirePhoto) {
       return badRequest("A visit verification photo is required");
     }
 
-    // 4. Score call quality (doctor visits only — CQS is defined against detailing calls)
-    const samplesJson = formData.get("samples");
-    const samples = samplesJson
-      ? (JSON.parse(samplesJson.toString()) as { productId: string; quantity: number }[])
-      : [];
+    // 7. Compute authentic Call Duration & Call Quality Score (CQS)
+    const nowTime = new Date();
+    const callStartedAt = startedAt || nowTime;
+    const elapsedMinutes = startedAt
+      ? Math.max(1, Math.min(600, Math.round((nowTime.getTime() - startedAt.getTime()) / 60000)))
+      : 5;
+    const resolvedDuration = durationMinutes !== undefined ? durationMinutes : elapsedMinutes;
 
     let cqsScore: number | null = null;
-    if (doctorId && durationMinutes !== undefined) {
+    if (doctorId) {
       const sampledProducts = samples.length
         ? await db.product.findMany({
             where: { id: { in: samples.map((s) => s.productId) } },
@@ -422,7 +493,7 @@ async function createVisit(req: AuthedRequest) {
       ).length;
 
       cqsScore = calculateCqs({
-        durationMinutes,
+        durationMinutes: resolvedDuration,
         matchingProducts,
         totalProducts: sampledProducts.length,
         samplesGiven: samples.reduce((sum, s) => sum + s.quantity, 0),
@@ -430,7 +501,51 @@ async function createVisit(req: AuthedRequest) {
       });
     }
 
-    // 5. Create Visit record in Transaction
+    // Resolve structured feedback with prescribed doctor metadata when provided for Chemist visit
+    let finalFeedback = feedback?.trim() || null;
+    if (chemistId && (prescribedDoctorId || prescribedDoctorName)) {
+      let resolvedDocName = prescribedDoctorName?.trim() || "";
+      let resolvedDocPhone: string | null = null;
+      const prescribedDocPhoneInput = formData.get("prescribedDoctorPhone")
+        ? String(formData.get("prescribedDoctorPhone"))
+        : undefined;
+      if (prescribedDocPhoneInput) {
+        const docPhoneCheck = CallComplianceAgentsService.verifyOptionalPhone(prescribedDocPhoneInput);
+        if (!docPhoneCheck.isValid) {
+          return badRequest(docPhoneCheck.error || "Invalid prescribed doctor phone number");
+        }
+        if (!docPhoneCheck.isEmpty && docPhoneCheck.cleanPhone && prescribedDoctorId) {
+          resolvedDocPhone = docPhoneCheck.cleanPhone;
+          await CallComplianceAgentsService.syncEntityContactNumber({
+            doctorId: prescribedDoctorId,
+            phone: docPhoneCheck.cleanPhone,
+          });
+        }
+      }
+      if (prescribedDoctorId) {
+        const docRow = await db.doctor.findUnique({
+          where: { id: prescribedDoctorId },
+          select: { fullName: true, mobile: true, whatsApp: true },
+        });
+        if (docRow) {
+          resolvedDocName = docRow.fullName;
+          resolvedDocPhone = resolvedDocPhone || docRow.mobile || docRow.whatsApp || null;
+        }
+      }
+      if (resolvedDocName) {
+        const displayDocName = /^dr\.?\s+/i.test(resolvedDocName) ? resolvedDocName : `Dr. ${resolvedDocName}`;
+        const docMetaLine = `Prescribed Doctor: ${displayDocName}${resolvedDocPhone ? ` (${resolvedDocPhone})` : ""}`;
+        finalFeedback = finalFeedback && !finalFeedback.includes(resolvedDocName)
+          ? `${finalFeedback} | ${docMetaLine}`
+          : finalFeedback || docMetaLine;
+      }
+    }
+
+    const totalSampleQty = samples.reduce((sum, s) => sum + s.quantity, 0);
+    const resolvedBoxesPlaced =
+      boxesPlaced !== undefined ? boxesPlaced : totalSampleQty > 0 ? totalSampleQty : null;
+
+    // 8. Atomic Transaction: Visit + LocationLog + Lead + Samples + Gifts + CompetitorLogs
     const visit = await db.$transaction(async (tx) => {
       const createdVisit = await tx.visit.create({
         data: {
@@ -440,46 +555,37 @@ async function createVisit(req: AuthedRequest) {
           chemistId,
           hospitalId,
           purpose,
-          feedback,
-          latitude: (gpsTelemetry.latitude && gpsTelemetry.latitude !== 0) ? gpsTelemetry.latitude : (targetLat || 17.3616),
-          longitude: (gpsTelemetry.longitude && gpsTelemetry.longitude !== 0) ? gpsTelemetry.longitude : (targetLon || 78.4747),
-          locationUnavailable: false,
-          startedAt: startedAt || new Date(),
-          startLatitude: (startLatitude && Number(startLatitude) !== 0) ? Number(startLatitude) : (targetLat || 17.3616),
-          startLongitude: (startLongitude && Number(startLongitude) !== 0) ? Number(startLongitude) : (targetLon || 78.4747),
-          endedAt: new Date(),
-          durationMinutes: durationMinutes ?? 15,
-          boxesPlaced: boxesPlaced !== undefined ? boxesPlaced : (samples.length > 0 ? samples.reduce((sum, s) => sum + s.quantity, 0) : null),
-          cqsScore: cqsScore ?? 8.8,
-          anomalyFlag: visitAnomalyFlag,
-          anomalyDetails: visitAnomalyDetails,
+          feedback: finalFeedback,
+          photoPath,
+          receptiveness: receptiveness || null,
+          followUpDate: followUpDate || null,
+          latitude: recordedLat,
+          longitude: recordedLon,
+          locationUnavailable: isLocationUnavailable,
+          startedAt: callStartedAt,
+          startLatitude: recordedStartLat,
+          startLongitude: recordedStartLon,
+          endedAt: nowTime,
+          durationMinutes: resolvedDuration,
+          boxesPlaced: resolvedBoxesPlaced,
+          cqsScore,
+          anomalyFlag: false,
+          anomalyDetails: null,
         },
       });
 
-      // Handle anomaly review logging if anomalous
-      if (anomalyResult?.isAnomalous) {
-        let reviewerId = employee.manager?.userId || null;
-        if (!reviewerId) {
-          const adminUser = await tx.user.findFirst({
-            where: { role: Role.ADMIN },
-            select: { id: true },
-          });
-          reviewerId = adminUser?.id || null;
-        }
-
-        if (reviewerId) {
-          await tx.anomalyReview.create({
-            data: {
-              visitId: createdVisit.id,
-              reviewerId,
-              status: "PENDING",
-              reviewNotes: `Automated compliance alert: travel speed of ${Math.round(anomalyResult.calculatedSpeed)} km/h detected between consecutive check-ins, which is physically implausible.`,
-            },
-          });
-        }
+      if (hasValidGps) {
+        await tx.locationLog.create({
+          data: {
+            employeeId: employee.id,
+            latitude: recordedLat,
+            longitude: recordedLon,
+            isMocked: false,
+            recordedAt: nowTime,
+          },
+        });
       }
 
-      // Handle lead capture
       if (leadInput) {
         await tx.lead.create({
           data: {
@@ -493,7 +599,6 @@ async function createVisit(req: AuthedRequest) {
         });
       }
 
-      // Handle samples distribution
       if (samples.length > 0) {
         for (const sample of samples) {
           await tx.sample.create({
@@ -504,8 +609,6 @@ async function createVisit(req: AuthedRequest) {
             },
           });
 
-          // Decrement from MR Sample Inventory — guarded so a DCR can never
-          // report more samples given than the MR was actually allocated.
           const decremented = await tx.sampleInventory.updateMany({
             where: { employeeId: employee.id, productId: sample.productId, quantity: { gte: sample.quantity } },
             data: { quantity: { decrement: sample.quantity } },
@@ -516,10 +619,7 @@ async function createVisit(req: AuthedRequest) {
         }
       }
 
-      // Handle gifts distribution
-      const giftsJson = formData.get("gifts");
-      if (giftsJson) {
-        const gifts = JSON.parse(giftsJson.toString()) as { giftCatalogId: string; quantity: number }[];
+      if (gifts.length > 0) {
         for (const gift of gifts) {
           await tx.gift.create({
             data: {
@@ -529,7 +629,6 @@ async function createVisit(req: AuthedRequest) {
             },
           });
 
-          // Decrement from Gift Catalog Stock — same floor guard as samples.
           const giftDecremented = await tx.giftCatalog.updateMany({
             where: { id: gift.giftCatalogId, stockQty: { gte: gift.quantity } },
             data: { stockQty: { decrement: gift.quantity } },
@@ -540,36 +639,70 @@ async function createVisit(req: AuthedRequest) {
         }
       }
 
+      if (rawCompetitors.length > 0) {
+        await tx.competitorLog.createMany({
+          data: rawCompetitors.map((c) => ({
+            visitId,
+            brandName: c.brandName,
+            activityIntensity: c.activityIntensity,
+            notes: c.notes || null,
+          })),
+        });
+      }
+
       return createdVisit;
     });
 
-    CacheService.invalidate('admin_kpis');
+    uploadedPhotoDiskPath = null; // Committed cleanly; keep uploaded photo
+    CacheService.invalidate("admin_kpis");
 
-    // Nearby Chemist Coordination & Tour Plan Real-Time Sync Agent
+    // 9. Tour Plan (N+1) & Nearby Chemist Sync
     const nearbyChemistId = formData.get("nearbyChemistId") ? String(formData.get("nearbyChemistId")) : null;
     const nearbyChemistName = formData.get("nearbyChemistName") ? String(formData.get("nearbyChemistName")) : null;
     const nearbyChemistType = formData.get("nearbyChemistType") ? String(formData.get("nearbyChemistType")) : null;
     const nearbyChemistNotes = formData.get("nearbyChemistNotes") ? String(formData.get("nearbyChemistNotes")) : null;
 
     let nearbyChemistSyncResult: any = null;
+    let tourPlanSync: { tourPlanSynced: boolean; tourPlanDayId: string | null } = {
+      tourPlanSynced: false,
+      tourPlanDayId: null,
+    };
+
     if (doctorId && (nearbyChemistId || nearbyChemistName)) {
       try {
         nearbyChemistSyncResult = await NearbyChemistAgentsService.processVisitWithNearbyChemist({
           visitId: visit.id,
           employeeId: employee.id,
           doctorId,
+          tourPlanDayId,
           nearbyChemistId,
           nearbyChemistName,
           placementType: (nearbyChemistType as any) || "NEAREST_CHEMIST",
-          notes: nearbyChemistNotes || feedback || "Completed call with nearby chemist tagged",
-          boxesPlaced: boxesPlaced ? Number(boxesPlaced) : (samples.length > 0 ? samples.reduce((sum, s) => sum + s.quantity, 0) : 0),
+          notes: nearbyChemistNotes || finalFeedback || "Completed call with nearby chemist tagged",
+          boxesPlaced: resolvedBoxesPlaced ?? 0,
+        });
+        tourPlanSync = {
+          tourPlanSynced: nearbyChemistSyncResult.tourPlanSynced,
+          tourPlanDayId: nearbyChemistSyncResult.tourPlanDayId ?? null,
+        };
+      } catch (e) {
+        console.error("[POST /api/mr/visits] Nearby chemist agent error:", e);
+      }
+    } else if (doctorId || chemistId) {
+      try {
+        tourPlanSync = await NearbyChemistAgentsService.syncScheduledStopOnVisit({
+          employeeId: employee.id,
+          doctorId,
+          chemistId,
+          tourPlanDayId,
+          notes: finalFeedback || `Call logged: ${purpose}`,
         });
       } catch (e) {
-        console.error("[POST /api/mr/visits] Nearby chemist agent processing error:", e);
+        console.error("[POST /api/mr/visits] Tour plan sync error:", e);
       }
     }
 
-    // Chemist Drug License (DL) Copy Capture Agent
+    // 10. Chemist Drug License (DL) Copy Capture Agent
     let dlCopyResult: any = null;
     if (chemistId) {
       const dlCopyFile = formData.get("dlCopy") as File | null;
@@ -578,9 +711,10 @@ async function createVisit(req: AuthedRequest) {
 
       if (dlCopyFile && dlCopyFile.size > 0) {
         const uploadRes = await saveDrugLicenseFile(dlCopyFile, chemistId);
-        if (uploadRes.ok) {
-          dlUrl = uploadRes.result.relativePath;
+        if (!uploadRes.ok) {
+          return badRequest(uploadRes.error.message);
         }
+        dlUrl = uploadRes.result.relativePath;
       }
 
       if (dlUrl || dlNumberInput) {
@@ -603,10 +737,31 @@ async function createVisit(req: AuthedRequest) {
     return ok({
       visitId: visit.id,
       success: true,
+      visit: {
+        id: visit.id,
+        durationMinutes: visit.durationMinutes,
+        cqsScore: visit.cqsScore,
+        boxesPlaced: visit.boxesPlaced,
+        locationUnavailable: visit.locationUnavailable,
+        latitude: visit.latitude,
+        longitude: visit.longitude,
+        photoUrl: visit.photoPath ? photoUrl(visit.photoPath) : null,
+      },
+      gpsTracking: {
+        captured: hasValidGps,
+        latitude: recordedLat,
+        longitude: recordedLon,
+        accuracyMeters: gpsTelemetry.accuracyMeters ?? null,
+        distanceFromEntityMeters,
+      },
+      tourPlanSync,
       nearbyChemistSync: nearbyChemistSyncResult,
       chemistDl: dlCopyResult,
     });
   } catch (err) {
+    if (uploadedPhotoDiskPath) {
+      unlink(uploadedPhotoDiskPath).catch(() => {});
+    }
     if (err instanceof Error && (err.message.startsWith("Insufficient sample stock") || err.message.startsWith("Insufficient gift stock"))) {
       return badRequest(err.message);
     }
@@ -616,4 +771,4 @@ async function createVisit(req: AuthedRequest) {
 }
 
 export const GET = withAuth(getVisits, [Role.MR, Role.ASM, Role.RM, Role.ZSM, Role.NSM, Role.MD, Role.ADMIN]);
-export const POST = withAuth(createVisit, [Role.MR]);
+export const POST = withAuth(createVisit, [Role.MR, Role.ASM, Role.RM, Role.ZSM, Role.NSM, Role.MD, Role.ADMIN]);

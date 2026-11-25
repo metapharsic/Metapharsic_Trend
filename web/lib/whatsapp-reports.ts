@@ -963,6 +963,93 @@ export function formatAdminExecutiveBriefWhatsAppDigest(data: AdminExecutiveDige
 }
 
 /**
+ * Compact EOD midnight summary sent to each MR (Mon–Sat 23:58 IST).
+ * ~20 lines max. Shows only what matters: calls, sales, collections + grade.
+ * Warnings shown only when there is an actual problem (non-zero count).
+ */
+export function formatEodMidnightCompactReport(report: any): string {
+  const dcr       = report.dcrSummary        || {};
+  const comm      = report.commercialSummary || {};
+  const colls     = comm.collections         || {};
+  const routing   = report.routingSummary    || {};
+  const hrms      = report.expenseHrmsSummary || {};
+
+  const grade     = report.councilEvaluation?.overallGrade  || "B";
+  const score     = report.councilEvaluation?.councilScore  || 0;
+  const gradeTag  = grade === "A+" ? "🏆" : grade === "A" ? "⭐" : grade === "B" ? "✅" : "⚠️";
+
+  const totalCalls   = dcr.totalVisits    || 0;
+  const docCalls     = dcr.doctorVisits   || 0;
+  const chemCalls    = dcr.chemistVisits  || 0;
+  const avgCqs       = dcr.avgCqsScore    != null ? `${dcr.avgCqsScore}/10` : "—";
+  const samples      = dcr.samplesDistributedQty || 0;
+  const boxes        = dcr.totalBoxesPlaced      || 0;
+
+  const orders       = comm.totalOrdersCount  || 0;
+  const sales        = comm.totalRevenuePtr   || 0;
+  const collected    = colls.totalCollected   || 0;
+  const receipts     = colls.recordsCount     || 0;
+
+  const mockGps      = routing.gpsMockFlagsCount || 0;
+  const anomalies    = dcr.visits?.filter((v: any) => v.anomalyFlag)?.length || 0;
+
+  // IST date short label
+  const istDate = new Date().toLocaleDateString("en-IN", {
+    day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
+  });
+
+  const lines: string[] = [
+    `📊 *EOD Report — ${report.fullName}*`,
+    `📅 ${istDate}  |  ${gradeTag} Grade *${grade}* (${score}/100)`,
+    ``,
+    `🩺 *Calls Today*`,
+    `  Doctors  : *${docCalls}*  |  Chemists : *${chemCalls}*  |  Total: *${totalCalls}*`,
+  ];
+
+  if (avgCqs !== "—") lines.push(`  Avg CQS  : *${avgCqs}*`);
+  if (samples > 0)     lines.push(`  Samples  : *${samples} units*`);
+  if (boxes > 0)       lines.push(`  Boxes    : *${boxes} placed*`);
+
+  lines.push(
+    ``,
+    `💰 *Sales*`,
+    `  Orders   : *${orders}*  |  Value : *${fmtCurrency(sales)}*`,
+  );
+
+  if (comm.skuBreakdown?.length > 0) {
+    const top = comm.skuBreakdown[0];
+    lines.push(`  Top SKU  : ${top.productName} — *${top.units} units* (${fmtCurrency(top.revenuePtr)})`);
+  }
+
+  lines.push(
+    ``,
+    `💵 *Collections*`,
+    `  Collected: *${fmtCurrency(collected)}*  |  Receipts: *${receipts}*`,
+  );
+
+  if (colls.receipts?.length > 0) {
+    colls.receipts.slice(0, 3).forEach((r: any) => {
+      lines.push(`  └ ${r.chemistName}: ${fmtCurrency(r.amount)}`);
+    });
+  }
+
+  // Risks — only if real problems
+  const risks: string[] = [];
+  if (totalCalls === 0)   risks.push("Zero calls logged today");
+  if (orders     === 0)   risks.push("No orders booked today");
+  if (mockGps    > 0)     risks.push(`⚡ ${mockGps} mock-GPS alert(s) detected`);
+  if (anomalies  > 0)     risks.push(`${anomalies} GPS/timing anomaly flag(s)`);
+
+  if (risks.length > 0) {
+    lines.push(``, `⚠️ *Flags:*`);
+    risks.forEach(r => lines.push(`  • ${r}`));
+  }
+
+  lines.push(``, `_Trend MR — Multi-Agent Audit Engine_`);
+  return lines.join("\n");
+}
+
+/**
  * Builds a dedicated Historical Intelligence WhatsApp Dispatch Report on demand.
  */
 export function formatHistoricalWhatsAppReport(

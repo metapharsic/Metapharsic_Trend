@@ -530,13 +530,26 @@ export const INITIAL_MODULES_DATA = [
     description: "Commercial discount simulator, gross margins, free goods, and live DB publishing",
   },
   {
+    code: "NAV_PROFIT_TESTING_SHEET",
+    label: "Profit Testing Sheet",
+    href: "/admin/profit-testing",
+    icon: "FileSpreadsheet",
+    category: "Analytics & Marketing",
+    categoryOrder: 5,
+    sortOrder: 4,
+    roles: [Role.ADMIN, Role.MD, Role.NSM, Role.ASM, Role.FINANCE, Role.MARKETING],
+    isArtifact: true,
+    moduleType: "ARTIFACT",
+    description: "Interactive line-by-line Profit Testing Sheet with free qty, GST credit, cash outlay, and doctor %",
+  },
+  {
     code: "NAV_MARKETING_INTELLIGENCE",
     label: "Marketing & Campaign Intelligence",
     href: "/marketing",
     icon: "BarChart3",
     category: "Analytics & Marketing",
     categoryOrder: 5,
-    sortOrder: 4,
+    sortOrder: 5,
     roles: [Role.ADMIN, Role.MD, Role.NSM, Role.ZSM, Role.RM, Role.ASM, Role.MARKETING],
     isArtifact: false,
     moduleType: "MODULE",
@@ -841,6 +854,36 @@ export class ModulesService {
         where: includeInactive ? undefined : { isActive: true },
         orderBy: [{ categoryOrder: "asc" }, { sortOrder: "asc" }],
       });
+    } else {
+      // Surface newly added built-in sidebar entries in-memory without mutating existing DB rows.
+      const existingAll = includeInactive
+        ? rows
+        : await prismaClient.appModule.findMany({ select: { code: true } });
+      const existingCodes = new Set(existingAll.map((r) => r.code));
+      const extras = INITIAL_MODULES_DATA.filter((m) => !existingCodes.has(m.code)).map((m) => ({
+        id: `builtin-${m.code}`,
+        code: m.code,
+        label: m.label,
+        href: m.href,
+        icon: m.icon,
+        category: m.category,
+        categoryOrder: m.categoryOrder,
+        sortOrder: m.sortOrder,
+        roles: m.roles,
+        labelByRole: (m as any).labelByRole ?? null,
+        isArtifact: m.isArtifact,
+        moduleType: m.moduleType,
+        badge: null,
+        isActive: true,
+        description: m.description,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      }));
+      if (extras.length > 0) {
+        rows = [...rows, ...extras].sort(
+          (a, b) => a.categoryOrder - b.categoryOrder || a.sortOrder - b.sortOrder
+        );
+      }
     }
 
     return rows;

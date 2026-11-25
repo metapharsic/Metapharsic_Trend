@@ -89,6 +89,7 @@ async function getMrDashboard(req: AuthedRequest) {
           tourPlan: { employeeId: employee.id, status: TourPlanStatus.APPROVED },
         },
         include: { plannedDoctor: { select: { id: true, fullName: true, dpsTier: true } } },
+        orderBy: { createdAt: "asc" },
       }),
       db.visit.findMany({
         where: { employeeId: employee.id, createdAt: { gte: today, lt: tomorrow } },
@@ -224,17 +225,69 @@ async function getMrDashboard(req: AuthedRequest) {
       }),
     ]);
 
-    // A planned call counts as completed only when that specific doctor was visited today.
+    // A planned call counts as completed when that specific Doctor or Chemist was visited today
+    // or marked DONE directly in the N+1 tour plan.
     const visitedDoctorIdsToday = new Set(
       visitsToday.map((v) => v.doctorId).filter(Boolean) as string[]
     );
+    const visitedChemistIdsToday = new Set(
+      visitsToday.map((v) => v.chemistId).filter(Boolean) as string[]
+    );
+
+    const parsePlannedChemistMeta = (notes?: string | null): { id: string; name: string } | null => {
+      if (!notes) return null;
+      const m = notes.match(/<!--PLANNED_CHEMIST:(.*?)-->/);
+      if (!m) return null;
+      try {
+        const parsed = JSON.parse(m[1]);
+        return parsed?.id ? { id: parsed.id, name: parsed.name || "Retail Chemist" } : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const plannedStopItems = plannedDays
+      .map((d) => {
+        if (d.plannedDoctor) {
+          const isVisited =
+            d.isCompleted ||
+            d.visitStatus === "DONE" ||
+            visitedDoctorIdsToday.has(d.plannedDoctor.id);
+          return {
+            tourPlanDayId: d.id,
+            type: "DOCTOR" as const,
+            doctorId: d.plannedDoctor.id,
+            chemistId: null as string | null,
+            name: d.plannedDoctor.fullName,
+            tier: d.plannedDoctor.dpsTier,
+            completed: isVisited,
+          };
+        }
+        const chemMeta = parsePlannedChemistMeta(d.completionNotes);
+        if (chemMeta) {
+          const isVisited =
+            d.isCompleted ||
+            d.visitStatus === "DONE" ||
+            visitedChemistIdsToday.has(chemMeta.id);
+          return {
+            tourPlanDayId: d.id,
+            type: "CHEMIST" as const,
+            doctorId: null as string | null,
+            chemistId: chemMeta.id,
+            name: chemMeta.name,
+            tier: "CHEMIST",
+            completed: isVisited,
+          };
+        }
+        return null;
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+
     const plannedDoctorIds = plannedDays
       .map((d) => d.plannedDoctor?.id)
       .filter(Boolean) as string[];
-    const completedPlanned = plannedDoctorIds.filter((id) => visitedDoctorIdsToday.has(id));
-    const pendingPlanned = plannedDays.filter(
-      (d) => d.plannedDoctor && !visitedDoctorIdsToday.has(d.plannedDoctor.id)
-    );
+    const completedPlanned = plannedStopItems.filter((item) => item.completed);
+    const pendingPlanned = plannedStopItems.filter((item) => !item.completed);
 
     const salesToday = orderItemsToday.reduce(
       (sum, item) => sum + Number(item.price) * item.quantity,
@@ -308,11 +361,14 @@ async function getMrDashboard(req: AuthedRequest) {
 
     return ok({
       todaysVisits: {
-        planned: plannedDays.length,
-        list: pendingPlanned.map((d) => ({
-          doctorId: d.plannedDoctor!.id,
-          name: d.plannedDoctor!.fullName,
-          tier: d.plannedDoctor!.dpsTier,
+        planned: plannedStopItems.length,
+        list: pendingPlanned.map((item) => ({
+          tourPlanDayId: item.tourPlanDayId,
+          type: item.type,
+          doctorId: item.doctorId,
+          chemistId: item.chemistId,
+          name: item.name,
+          tier: item.tier,
         })),
       },
       pendingVisits: { count: pendingPlanned.length },

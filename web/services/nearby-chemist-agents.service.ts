@@ -33,6 +33,8 @@ export interface NearbyChemistItem {
   latitude: number;
   longitude: number;
   mobile: string | null;
+  licenseNo?: string | null;
+  dlStatus?: string | null;
   distanceMeters: number;
   distanceKm: number;
   proximityTier: "ADJACENT_CLINIC" | "WALKING_DISTANCE" | "SAME_BEAT" | "TERRITORY_CORRIDOR";
@@ -64,6 +66,7 @@ export interface ProcessCallNearbyChemistParams {
   visitId: string;
   employeeId: string;
   doctorId: string;
+  tourPlanDayId?: string | null;
   nearbyChemistId?: string | null;
   nearbyChemistName?: string | null;
   placementType?: "NEAREST_CHEMIST" | "DOCTOR_DESIGNATED_CHEMIST" | "IN_HOUSE" | null;
@@ -178,6 +181,8 @@ export class NearbyChemistAgentsService {
         latitude: true,
         longitude: true,
         mobile: true,
+        licenseNo: true,
+        dlStatus: true,
       },
     });
 
@@ -218,6 +223,8 @@ export class NearbyChemistAgentsService {
         latitude: c.latitude,
         longitude: c.longitude,
         mobile: c.mobile,
+        licenseNo: c.licenseNo,
+        dlStatus: c.dlStatus,
         distanceMeters: meters,
         distanceKm: km,
         proximityTier,
@@ -248,6 +255,95 @@ export class NearbyChemistAgentsService {
   }
 
   /**
+   * Synchronizes any completed visit (Doctor or Chemist) with today's matching TourPlanDay stop.
+   * Never matches plannedDoctorId: null against a Doctor visit so Chemist stops are never overwritten.
+   */
+  static async syncScheduledStopOnVisit(params: {
+    employeeId: string;
+    doctorId?: string | null;
+    chemistId?: string | null;
+    tourPlanDayId?: string | null;
+    notes?: string | null;
+    medicinePlacement?: {
+      type: "NEAREST_CHEMIST" | "DOCTOR_DESIGNATED_CHEMIST" | "IN_HOUSE";
+      chemistId?: string | null;
+      chemistName?: string | null;
+      notes?: string | null;
+    } | null;
+    customDb?: any;
+  }): Promise<{ tourPlanSynced: boolean; tourPlanDayId: string | null }> {
+    const client = params.customDb || db;
+    const todayStart = startOfUtcDay();
+    const todayEnd = addUtcDays(todayStart, 1);
+
+    let matchingDay: any = null;
+
+    if (params.tourPlanDayId) {
+      const explicitDay = await client.tourPlanDay.findUnique({
+        where: { id: params.tourPlanDayId },
+        include: { tourPlan: { select: { employeeId: true } } },
+      });
+      if (explicitDay && explicitDay.tourPlan?.employeeId === params.employeeId) {
+        const matchesDoctor = params.doctorId && explicitDay.plannedDoctorId === params.doctorId;
+        const matchesChemist =
+          params.chemistId &&
+          explicitDay.plannedDoctorId === null &&
+          (explicitDay.completionNotes || "").includes(`"id":"${params.chemistId}"`);
+        if (matchesDoctor || matchesChemist || (!explicitDay.plannedDoctorId && !(explicitDay.completionNotes || "").includes("PLANNED_CHEMIST"))) {
+          matchingDay = explicitDay;
+        }
+      }
+    }
+
+    if (!matchingDay && params.doctorId) {
+      matchingDay = await client.tourPlanDay.findFirst({
+        where: {
+          tourPlan: { employeeId: params.employeeId },
+          date: { gte: todayStart, lt: todayEnd },
+          plannedDoctorId: params.doctorId,
+        },
+        orderBy: [{ visitStatus: "desc" }, { createdAt: "asc" }],
+      });
+    } else if (!matchingDay && params.chemistId) {
+      const todayChemistRows = await client.tourPlanDay.findMany({
+        where: {
+          tourPlan: { employeeId: params.employeeId },
+          date: { gte: todayStart, lt: todayEnd },
+          plannedDoctorId: null,
+        },
+        orderBy: { createdAt: "asc" },
+      });
+      matchingDay =
+        todayChemistRows.find((r: any) =>
+          (r.completionNotes || "").includes(`"id":"${params.chemistId}"`)
+        ) || null;
+    }
+
+    if (!matchingDay) {
+      return { tourPlanSynced: false, tourPlanDayId: null };
+    }
+
+    // Preserve existing PLANNED_CHEMIST marker if updating a scheduled chemist stop
+    let finalNotes = params.notes || "";
+    if (params.chemistId && (matchingDay.completionNotes || "").includes("<!--PLANNED_CHEMIST:")) {
+      const chemMatch = matchingDay.completionNotes.match(/<!--PLANNED_CHEMIST:.*?-->/);
+      if (chemMatch) {
+        finalNotes = `${finalNotes} ${chemMatch[0]}`.trim();
+      }
+    }
+
+    await TourPlanAgentsService.toggleVisitStatus({
+      dayId: matchingDay.id,
+      status: "DONE",
+      notes: finalNotes || undefined,
+      medicinePlacement: params.medicinePlacement || undefined,
+      customDb: client,
+    });
+
+    return { tourPlanSynced: true, tourPlanDayId: matchingDay.id };
+  }
+
+  /**
    * MULTI-AGENT PIPELINE:
    * Coordinates PrescriptionSyncAgent, TourPlanSyncAgent, and CallQualityAgent
    * when an MR logs a doctor call with a nearby chemist tagged.
@@ -258,7 +354,7 @@ export class NearbyChemistAgentsService {
     const client = params.customDb || db;
     let tourPlanSynced = false;
     let tourPlanDayId: string | null = null;
-    let cqsBonus = 0.5; // Bonus for linking chemist with doctor detailing call
+    const cqsBonus = 0.5;
 
     const placementType = params.placementType || "NEAREST_CHEMIST";
     let chemistName = params.nearbyChemistName || "Nearby Chemist";
@@ -288,58 +384,42 @@ export class NearbyChemistAgentsService {
       }
     }
 
-    // 2. PrescriptionSyncAgent: Update EntityLedger for Doctor-Chemist corridor
-    try {
-      const today = startOfUtcDay();
-      await client.entityLedger.create({
-        data: {
-          employeeId: params.employeeId,
-          doctorId: params.doctorId,
-          chemistId: params.nearbyChemistId || null,
-          promotionType: `CALL_MEDICINE_PLACEMENT_${placementType}`,
-          promotionValue: params.boxesPlaced ? Number(params.boxesPlaced) * 100 : 500,
-          potentialProfit: 150,
-          createdAt: new Date(),
-        },
-      });
-    } catch (err) {
-      console.warn("[PrescriptionSyncAgent] EntityLedger creation optional warning:", err);
+    // 2. PrescriptionSyncAgent: Update EntityLedger only when real commercial/boxes qty placed > 0
+    if (params.boxesPlaced && Number(params.boxesPlaced) > 0) {
+      try {
+        await client.entityLedger.create({
+          data: {
+            employeeId: params.employeeId,
+            doctorId: params.doctorId,
+            chemistId: params.nearbyChemistId || null,
+            promotionType: `CALL_MEDICINE_PLACEMENT_${placementType}`,
+            promotionValue: Number(params.boxesPlaced) * 100,
+            potentialProfit: Number(params.boxesPlaced) * 30,
+            createdAt: new Date(),
+          },
+        });
+      } catch (err) {
+        console.warn("[PrescriptionSyncAgent] EntityLedger creation optional warning:", err);
+      }
     }
 
-    // 3. TourPlanSyncAgent: Synchronize call completion with Today's Tour Plan in real time
+    // 3. TourPlanSyncAgent: Strictly match plannedDoctorId (or explicit tourPlanDayId) without overwriting Chemist rows
     try {
-      const todayStart = startOfUtcDay();
-      const todayEnd = addUtcDays(todayStart, 1);
-
-      // Find if MR has a Tour Plan day scheduled for today with this doctor or territory
-      const matchingDay = await client.tourPlanDay.findFirst({
-        where: {
-          tourPlan: { employeeId: params.employeeId },
-          date: { gte: todayStart, lt: todayEnd },
-          OR: [
-            { plannedDoctorId: params.doctorId },
-            { plannedDoctorId: null },
-          ],
+      const syncResult = await this.syncScheduledStopOnVisit({
+        employeeId: params.employeeId,
+        doctorId: params.doctorId,
+        tourPlanDayId: params.tourPlanDayId,
+        notes: params.notes || `Completed doctor call with nearby chemist tagged: ${chemistName}`,
+        medicinePlacement: {
+          type: placementType,
+          chemistId: params.nearbyChemistId || null,
+          chemistName,
+          notes: params.notes || `Stock placed / Correlated with ${chemistName}`,
         },
-        orderBy: [{ plannedDoctorId: "desc" }, { createdAt: "asc" }],
+        customDb: client,
       });
-
-      if (matchingDay) {
-        tourPlanDayId = matchingDay.id;
-        await TourPlanAgentsService.toggleVisitStatus({
-          dayId: matchingDay.id,
-          status: "DONE",
-          notes: params.notes || `Completed doctor call with nearby chemist tagged: ${chemistName}`,
-          medicinePlacement: {
-            type: placementType,
-            chemistId: params.nearbyChemistId || null,
-            chemistName,
-            notes: params.notes || `Stock placed / Correlated with ${chemistName}`,
-          },
-          customDb: client,
-        });
-        tourPlanSynced = true;
-      }
+      tourPlanSynced = syncResult.tourPlanSynced;
+      tourPlanDayId = syncResult.tourPlanDayId;
     } catch (err) {
       console.error("[TourPlanSyncAgent] Real-time tour plan synchronization error:", err);
     }
@@ -364,7 +444,7 @@ export class NearbyChemistAgentsService {
           "TourPlanSyncAgent",
           "CallQualityAgent",
         ],
-        summary: `Successfully linked call with nearby chemist (${chemistName}) and synchronized real-time Tour Plan execution status.`,
+        summary: `Successfully linked call with nearby chemist (${chemistName}) and synchronized Tour Plan status.`,
       },
     };
   }

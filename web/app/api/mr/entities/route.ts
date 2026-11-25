@@ -14,9 +14,100 @@ function sanitizePhone(phone?: string | null): string | null {
 async function handler(req: AuthedRequest) {
   try {
     const { searchParams } = new URL(req.url);
+    const idParam = searchParams.get("id");
     const search = searchParams.get("search") ?? "";
     const type = searchParams.get("type"); // DOCTOR or CHEMIST
     const territoryId = searchParams.get("territoryId") ?? undefined;
+
+    if (idParam) {
+      const doctor =
+        type !== "CHEMIST"
+          ? await db.doctor.findUnique({
+              where: { id: idParam },
+              select: {
+                id: true,
+                fullName: true,
+                clinicAddress: true,
+                territoryId: true,
+                primarySpecialty: true,
+                mobile: true,
+                whatsApp: true,
+                assistantContact: true,
+                latitude: true,
+                longitude: true,
+                beatName: true,
+                subArea: true,
+                dpsTier: true,
+                territory: { select: { id: true, name: true } },
+              },
+            })
+          : null;
+
+      if (doctor) {
+        const entity = {
+          id: doctor.id,
+          name: doctor.fullName,
+          type: "DOCTOR",
+          address: doctor.clinicAddress,
+          territoryId: doctor.territoryId,
+          territoryName: doctor.territory?.name ?? null,
+          beatName: doctor.beatName ?? null,
+          subArea: doctor.subArea ?? null,
+          primarySpecialty: doctor.primarySpecialty,
+          dpsTier: doctor.dpsTier ?? null,
+          phone: sanitizePhone(doctor.mobile || doctor.whatsApp || doctor.assistantContact),
+          latitude: doctor.latitude,
+          longitude: doctor.longitude,
+        };
+        return ok({ entity, entities: [entity] });
+      }
+
+      const chemist =
+        type !== "DOCTOR"
+          ? await db.chemist.findUnique({
+              where: { id: idParam },
+              select: {
+                id: true,
+                name: true,
+                address: true,
+                territoryId: true,
+                contactPerson: true,
+                mobile: true,
+                licenseNo: true,
+                dlCopyUrl: true,
+                dlStatus: true,
+                latitude: true,
+                longitude: true,
+                beatName: true,
+                subArea: true,
+                territory: { select: { id: true, name: true } },
+              },
+            })
+          : null;
+
+      if (chemist) {
+        const entity = {
+          id: chemist.id,
+          name: chemist.name,
+          type: "CHEMIST",
+          address: chemist.address,
+          territoryId: chemist.territoryId,
+          territoryName: chemist.territory?.name ?? null,
+          beatName: chemist.beatName ?? null,
+          subArea: chemist.subArea ?? null,
+          contactPerson: chemist.contactPerson,
+          phone: sanitizePhone(chemist.mobile),
+          licenseNo: chemist.licenseNo,
+          dlCopyUrl: chemist.dlCopyUrl,
+          dlStatus: chemist.dlStatus || (chemist.dlCopyUrl ? "VERIFIED" : "MISSING"),
+          latitude: chemist.latitude,
+          longitude: chemist.longitude,
+        };
+        return ok({ entity, entities: [entity] });
+      }
+
+      return ok({ entity: null, entities: [] });
+    }
 
     const { page, limit } = PaginationSchema.parse({
       page: searchParams.get("page") ?? 1,
