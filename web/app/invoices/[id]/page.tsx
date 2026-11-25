@@ -622,8 +622,11 @@ function SingleInvoiceCard({
               <p>4. All disputes subject to local jurisdiction only.</p>
             </div>
 
-            <div className="border-t border-slate-200 pt-0.5 text-slate-700 font-mono text-[7px] flex justify-between">
+            <div className="border-t border-slate-200 pt-0.5 text-slate-700 font-mono text-[7px] flex flex-wrap justify-between gap-x-2">
               <span>Booked: <b className="text-slate-950">{bookedBy}</b></span>
+              {order.doctor && (
+                <span>Prescribed By: <b className="text-purple-950">Dr. {order.doctor.fullName}</b></span>
+              )}
               <span>Status: <b className="uppercase text-slate-950">{order.status}</b></span>
             </div>
           </div>

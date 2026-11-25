@@ -167,6 +167,8 @@ export const UpdateOrderStatusSchema = z.object({
 
 export const UpdateOrderItemsSchema = z.object({
   status: z.enum(["PENDING", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED"]).optional(),
+  chemistId: z.string().uuid().optional(),
+  doctorId: z.string().uuid().nullable().optional(),
   items: z.array(
     z.object({
       productId: z.string().uuid(),

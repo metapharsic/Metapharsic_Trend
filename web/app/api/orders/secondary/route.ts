@@ -62,6 +62,20 @@ async function getOrders(req: AuthedRequest) {
               territory: { select: { id: true, name: true } },
             },
           },
+          doctor: {
+            select: {
+              id: true,
+              fullName: true,
+              primarySpecialty: true,
+            },
+          },
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
           distributor: { select: { id: true, name: true } },
           items: { include: { product: { select: { id: true, name: true, sku: true } } } },
           invoice: { select: { invoiceNo: true, amount: true, paid: true } },
@@ -344,7 +358,4 @@ export const GET = withAuth(getOrders, [
   Role.MARKETING,
   Role.HR,
 ]);
-// MR is the first point of contact for a chemist — orders are booked from the
-// field, not injected by managers. ASM/ADMIN can view and advance fulfilment
-// status but never originate a sale themselves.
-export const POST = withAuth(createOrder, [Role.MR]);
+export const POST = withAuth(createOrder, [Role.MR, Role.ASM, Role.ADMIN, Role.MD]);

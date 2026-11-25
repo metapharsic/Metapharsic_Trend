@@ -13,7 +13,7 @@ async function getPrescribedDoctors(req: AuthedRequest) {
     }
 
     const result = await ChemistDoctorTaggingService.getPrescribedDoctorsForChemist(chemistId);
-    return ok({ data: result });
+    return ok(result);
   } catch (err: unknown) {
     console.error("[GET /api/chemists/prescribed-doctors]", err);
     const message = err instanceof Error ? err.message : "Failed to load prescribed doctors";

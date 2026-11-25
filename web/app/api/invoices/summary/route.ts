@@ -1,6 +1,7 @@
 import { Role } from "@prisma/client";
+import { db } from "@/lib/db";
 import { withAuth, AuthedRequest } from "@/lib/with-auth";
-import { ok, apiError } from "@/lib/api-response";
+import { ok, unauthorized, apiError } from "@/lib/api-response";
 import { InvoicingService, InvoicingCadence } from "@/services/invoicing.service";
 
 async function getInvoicingSummary(req: AuthedRequest) {
@@ -13,9 +14,16 @@ async function getInvoicingSummary(req: AuthedRequest) {
     const year = searchParams.get("year") ? parseInt(searchParams.get("year")!, 10) : undefined;
     const territoryId = searchParams.get("territoryId") || undefined;
     const subArea = searchParams.get("subArea") || undefined;
-    const employeeId = searchParams.get("employeeId") || undefined;
+    let employeeId = searchParams.get("employeeId") || undefined;
     const paid = searchParams.get("paid") === "true" ? true : searchParams.get("paid") === "false" ? false : undefined;
     const search = searchParams.get("search") || undefined;
+
+    // Enforce MR personal scope per API contract invariants
+    if (req.user.role === Role.MR) {
+      const emp = await db.employee.findUnique({ where: { userId: req.user.sub }, select: { id: true } });
+      if (!emp) return unauthorized("Employee record not found");
+      employeeId = emp.id;
+    }
 
     const result = await InvoicingService.getInvoicingDashboard({
       cadence,
@@ -30,7 +38,7 @@ async function getInvoicingSummary(req: AuthedRequest) {
       search,
     });
 
-    return ok({ data: result });
+    return ok(result);
   } catch (err: unknown) {
     console.error("[GET /api/invoices/summary]", err);
     const msg = err instanceof Error ? err.message : "Failed to load invoicing summary";

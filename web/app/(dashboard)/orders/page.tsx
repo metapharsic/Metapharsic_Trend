@@ -36,6 +36,7 @@ import {
 import { apiClient } from "@/lib/api-client";
 import { SearchableSelect } from "@/components/searchable-select";
 import { EditInvoiceModal } from "@/components/edit-invoice-modal";
+import { PrescribedDoctorPicker, type PrescribedDoctorOption } from "@/components/prescribed-doctor-picker";
 
 interface OrderItem {
   id: string;
@@ -55,6 +56,16 @@ interface Order {
     subArea?: string | null;
     beatName?: string | null;
     territory?: { id: string; name: string } | null;
+  } | null;
+  doctor?: {
+    id: string;
+    fullName: string;
+    primarySpecialty?: string | null;
+  } | null;
+  employee?: {
+    id: string;
+    firstName: string;
+    lastName: string;
   } | null;
   distributor: { id: string; name: string } | null;
   items: OrderItem[];
@@ -112,6 +123,7 @@ interface InvoiceRow {
       firstName: string;
       lastName: string;
       role?: string | null;
+      user?: { role: string } | null;
     } | null;
     items: OrderItem[];
   } | null;
@@ -295,16 +307,18 @@ export default function OrdersDashboard() {
       .finally(() => setSummaryLoading(false));
   };
 
-  const triggerBatchInvoicing = async (customParams: { territoryId?: string; employeeId?: string; orderIds?: string[] } = {}) => {
+  const triggerBatchInvoicing = async (customParams: { territoryId?: string; subArea?: string; employeeId?: string; orderIds?: string[] } = {}) => {
     setBatchGenerating(true);
     setBatchSuccessMsg(null);
     try {
+      const hasExplicitOrderIds = Boolean(customParams.orderIds && customParams.orderIds.length > 0);
       const payload: Record<string, any> = {
-        cadence: cadence !== "ALL" ? cadence : undefined,
-        date: cadence === "DAILY" ? cadenceDate : undefined,
-        month: cadence === "MONTHLY" ? cadenceMonth : undefined,
-        quarter: cadence === "QUARTERLY" ? cadenceQuarter : undefined,
+        cadence: !hasExplicitOrderIds && cadence !== "ALL" ? cadence : undefined,
+        date: !hasExplicitOrderIds && cadence === "DAILY" ? cadenceDate : undefined,
+        month: !hasExplicitOrderIds && cadence === "MONTHLY" ? cadenceMonth : undefined,
+        quarter: !hasExplicitOrderIds && cadence === "QUARTERLY" ? cadenceQuarter : undefined,
         territoryId: customParams.territoryId || (selectedTerritoryId || undefined),
+        subArea: customParams.subArea || undefined,
         employeeId: customParams.employeeId || (selectedEmployeeId || undefined),
         orderIds: customParams.orderIds || undefined,
       };
@@ -313,6 +327,7 @@ export default function OrdersDashboard() {
       const data = res.data?.data;
       if (data) {
         setBatchSuccessMsg(data.message);
+        load(ordersPage);
         loadInvoices();
         loadInvoicingSummary();
         setTimeout(() => setBatchSuccessMsg(null), 8000);
@@ -336,6 +351,15 @@ export default function OrdersDashboard() {
 
   useEffect(() => {
     setRole(decodeRole());
+    if (typeof window !== "undefined") {
+      const tabParam = new URLSearchParams(window.location.search).get("tab");
+      if (tabParam === "invoices" || tabParam === "orders" || tabParam === "history") {
+        setActiveTab(tabParam);
+      }
+    }
+    loadInvoices();
+    loadInvoicingSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -353,10 +377,9 @@ export default function OrdersDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, invoiceQ, invoiceCustomer, invoicePaid, cadence, cadenceDate, cadenceMonth, cadenceQuarter, selectedTerritoryId, selectedEmployeeId]);
 
-  // MR is the first point of contact for a chemist — only they book orders.
-  // ASM/ADMIN/MD oversee and advance fulfilment status but don't originate sales.
-  const canBook = role === "MR";
+  const isMrOnly = role === "MR";
   const isAdmin = role === "ADMIN" || role === "MD";
+  const canBook = role === "MR" || role === "ASM" || isAdmin;
   const canAdvance = role === "ASM" || isAdmin;
   const canManageInvoices = role === "ASM" || isAdmin || role === "MR";
   // MR is strictly revoked from deleting statutory tax invoices; only Admin/MD/ASM can delete.
@@ -439,21 +462,42 @@ export default function OrdersDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100 flex justify-between items-center bg-gradient-to-r from-emerald-50 to-white">
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100 flex flex-wrap justify-between items-center gap-3 bg-gradient-to-r from-emerald-50 to-white">
         <div>
-          <h1 className="text-2xl font-display font-bold text-slate-900">{canBook ? "My Sales" : "Orders Central"}</h1>
+          <h1 className="text-2xl font-display font-bold text-slate-900">{isMrOnly ? "My Sales" : "Orders & Invoicing Central"}</h1>
           <p className="text-sm text-slate-500 mt-1">
-            {canBook ? "Book orders, generate invoices, track chemist balances" : "Track and manage secondary sales pipeline"}
+            {isMrOnly
+              ? "Book orders with prescribed doctor linkage, generate invoices, track chemist balances"
+              : "Book & manage secondary orders, daily/monthly/quarterly & area/person batch invoicing"}
           </p>
         </div>
-        {canBook && (
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={() => setShowForm(true)}
-            className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-emerald-700 shadow-sm transition-colors flex items-center gap-2"
+            type="button"
+            onClick={() => setActiveTab("invoices")}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors flex items-center gap-2 ${
+              activeTab === "invoices"
+                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                : "bg-indigo-50 text-indigo-800 border-indigo-200 hover:bg-indigo-100"
+            }`}
           >
-            <Plus size={16} /> New Sale
+            <Receipt size={16} />
+            <span>Invoicing Hub</span>
+            {(invoicingSummary?.summary?.totalPendingOrdersCount ?? 0) > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-400 text-slate-950">
+                {invoicingSummary.summary.totalPendingOrdersCount} Pending
+              </span>
+            )}
           </button>
-        )}
+          {canBook && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-emerald-700 shadow-sm transition-colors flex items-center gap-2"
+            >
+              <Plus size={16} /> New Sale
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -467,11 +511,10 @@ export default function OrdersDashboard() {
       <div className="flex gap-2 border-b border-slate-200 pb-px text-sm">
         <button
           onClick={() => setActiveTab("orders")}
-          className={`flex items-center gap-1.5 px-4 py-2.5 font-bold transition-all border-b-2 cursor-pointer ${
-            activeTab === "orders"
+          className={`flex items-center gap-1.5 px-4 py-2.5 font-bold transition-all border-b-2 cursor-pointer ${activeTab === "orders"
               ? "border-emerald-600 text-emerald-700 bg-emerald-50/30"
               : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50/50"
-          }`}
+            }`}
         >
           <ShoppingCart size={15} />
           Sales Orders ({ordersTotal})
@@ -480,11 +523,10 @@ export default function OrdersDashboard() {
           onClick={() => {
             setActiveTab("invoices");
           }}
-          className={`flex items-center gap-1.5 px-4 py-2.5 font-bold transition-all border-b-2 cursor-pointer ${
-            activeTab === "invoices"
+          className={`flex items-center gap-1.5 px-4 py-2.5 font-bold transition-all border-b-2 cursor-pointer ${activeTab === "invoices"
               ? "border-emerald-600 text-emerald-700 bg-emerald-50/30"
               : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50/50"
-          }`}
+            }`}
         >
           <Receipt size={15} />
           Generated Invoices ({invoicePagination?.total ?? invoices.length})
@@ -494,11 +536,10 @@ export default function OrdersDashboard() {
             setActiveTab("history");
             loadHistory();
           }}
-          className={`flex items-center gap-1.5 px-4 py-2.5 font-bold transition-all border-b-2 cursor-pointer ${
-            activeTab === "history"
+          className={`flex items-center gap-1.5 px-4 py-2.5 font-bold transition-all border-b-2 cursor-pointer ${activeTab === "history"
               ? "border-emerald-600 text-emerald-700 bg-emerald-50/30"
               : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50/50"
-          }`}
+            }`}
         >
           <History size={15} />
           Complete History ({history.length})
@@ -548,6 +589,17 @@ export default function OrdersDashboard() {
                           Beat: {order.chemist.beatName}
                         </span>
                       )}
+                      {order.doctor && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-50 text-purple-800 font-semibold text-[10px] border border-purple-200">
+                          <Stethoscope size={9} />
+                          Dr. {order.doctor.fullName}
+                        </span>
+                      )}
+                      {order.employee && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium text-[10px]">
+                          MR: {order.employee.firstName} {order.employee.lastName}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -560,8 +612,18 @@ export default function OrdersDashboard() {
                           {order.invoice.paid ? "Paid" : "Unpaid"}
                         </span>
                       </Link>
+                    ) : canManageInvoices ? (
+                      <button
+                        type="button"
+                        disabled={batchGenerating}
+                        onClick={() => triggerBatchInvoicing({ orderIds: [order.id] })}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-lg transition disabled:opacity-50"
+                      >
+                        <FileCheck size={12} />
+                        Generate Invoice
+                      </button>
                     ) : (
-                      <span className="text-xs text-slate-400">—</span>
+                      <span className="text-xs text-slate-400">Pending</span>
                     )}
                   </td>
                   <td className="px-6 py-4 font-bold text-slate-900">{currency(orderValue(order))}</td>
@@ -659,11 +721,10 @@ export default function OrdersDashboard() {
                 <button
                   type="button"
                   onClick={() => setCadence("ALL")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                    cadence === "ALL"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${cadence === "ALL"
                       ? "bg-slate-900 text-white shadow-xs"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   <Receipt size={13} />
                   All Invoices
@@ -671,11 +732,10 @@ export default function OrdersDashboard() {
                 <button
                   type="button"
                   onClick={() => setCadence("DAILY")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                    cadence === "DAILY"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${cadence === "DAILY"
                       ? "bg-emerald-600 text-white shadow-xs"
                       : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60"
-                  }`}
+                    }`}
                 >
                   <Calendar size={13} />
                   Daily Invoicing
@@ -683,11 +743,10 @@ export default function OrdersDashboard() {
                 <button
                   type="button"
                   onClick={() => setCadence("MONTHLY")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                    cadence === "MONTHLY"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${cadence === "MONTHLY"
                       ? "bg-indigo-600 text-white shadow-xs"
                       : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/60"
-                  }`}
+                    }`}
                 >
                   <CalendarDays size={13} />
                   Monthly Invoicing
@@ -695,11 +754,10 @@ export default function OrdersDashboard() {
                 <button
                   type="button"
                   onClick={() => setCadence("QUARTERLY")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                    cadence === "QUARTERLY"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${cadence === "QUARTERLY"
                       ? "bg-purple-600 text-white shadow-xs"
                       : "bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200/60"
-                  }`}
+                    }`}
                 >
                   <Layers size={13} />
                   Quarterly Invoicing
@@ -711,22 +769,20 @@ export default function OrdersDashboard() {
                 <button
                   type="button"
                   onClick={() => setDimensionView("LIST")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    dimensionView === "LIST"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${dimensionView === "LIST"
                       ? "bg-white text-slate-900 shadow-xs font-bold"
                       : "text-slate-600 hover:text-slate-900"
-                  }`}
+                    }`}
                 >
                   Invoices List
                 </button>
                 <button
                   type="button"
                   onClick={() => setDimensionView("AREA")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
-                    dimensionView === "AREA"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${dimensionView === "AREA"
                       ? "bg-white text-emerald-800 shadow-xs font-bold"
                       : "text-slate-600 hover:text-slate-900"
-                  }`}
+                    }`}
                 >
                   <MapPin size={12} />
                   Area-Wise Invoicing
@@ -734,11 +790,10 @@ export default function OrdersDashboard() {
                 <button
                   type="button"
                   onClick={() => setDimensionView("PERSON")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
-                    dimensionView === "PERSON"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${dimensionView === "PERSON"
                       ? "bg-white text-indigo-800 shadow-xs font-bold"
                       : "text-slate-600 hover:text-slate-900"
-                  }`}
+                    }`}
                 >
                   <Users size={12} />
                   Person-Wise Invoicing
@@ -806,11 +861,10 @@ export default function OrdersDashboard() {
                         key={q}
                         type="button"
                         onClick={() => setCadenceQuarter(q)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
-                          cadenceQuarter === q
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${cadenceQuarter === q
                             ? "bg-purple-700 text-white shadow-xs"
                             : "bg-white text-purple-700 border border-purple-200 hover:bg-purple-100"
-                        }`}
+                          }`}
                       >
                         {q} {q === "Q1" ? "(Jan-Mar)" : q === "Q2" ? "(Apr-Jun)" : q === "Q3" ? "(Jul-Sep)" : "(Oct-Dec)"}
                       </button>
@@ -1040,7 +1094,7 @@ export default function OrdersDashboard() {
                             <button
                               type="button"
                               disabled={batchGenerating}
-                              onClick={() => triggerBatchInvoicing({ territoryId: area.territoryId })}
+                              onClick={() => triggerBatchInvoicing({ territoryId: area.territoryId, subArea: area.subArea || undefined })}
                               className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
                             >
                               <FileCheck size={12} />
@@ -1335,7 +1389,7 @@ export default function OrdersDashboard() {
                                 {inv.order.employee.firstName} {inv.order.employee.lastName}
                               </p>
                               <span className="text-[10px] text-slate-400">
-                                {inv.order.employee.role || "Sales Rep"}
+                                {inv.order.employee.user?.role || inv.order.employee.role || "Sales Rep"}
                               </span>
                             </div>
                           ) : (
@@ -1359,9 +1413,8 @@ export default function OrdersDashboard() {
                           </td>
                         )}
                         <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
-                            inv.paid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                          }`}>
+                          <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${inv.paid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                            }`}>
                             {inv.paid ? "Paid" : "Unpaid"}
                           </span>
                         </td>
@@ -1463,11 +1516,10 @@ export default function OrdersDashboard() {
                     </td>
                     <td className="px-6 py-4 font-semibold text-slate-700">{tx.partyName}</td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
-                        tx.type === "ORDER" ? "bg-blue-100 text-blue-700" :
-                        tx.type === "INVOICE" ? "bg-indigo-100 text-indigo-700" :
-                                                "bg-emerald-100 text-emerald-700"
-                      }`}>
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${tx.type === "ORDER" ? "bg-blue-100 text-blue-700" :
+                          tx.type === "INVOICE" ? "bg-indigo-100 text-indigo-700" :
+                            "bg-emerald-100 text-emerald-700"
+                        }`}>
                         {tx.type}
                       </span>
                     </td>
@@ -1602,10 +1654,6 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
   const [chemistId, setChemistId] = useState("");
   const [distributorId, setDistributorId] = useState("");
   const [doctorId, setDoctorId] = useState("");
-  const [prescribedDoctors, setPrescribedDoctors] = useState<any[]>([]);
-  const [prescribedDoctorLoading, setPrescribedDoctorLoading] = useState(false);
-  const [autoSelectedDoctor, setAutoSelectedDoctor] = useState<any | null>(null);
-  const [isDoctorOptionOpen, setIsDoctorOptionOpen] = useState(false);
   const [items, setItems] = useState<LineItem[]>([{ productId: "", quantity: 1, batchNo: "", expDate: "", freeQty: 0 }]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1617,29 +1665,6 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
     setChemistDropdownOpen(false);
     setChemistSearch("");
     setDoctorId("");
-    setAutoSelectedDoctor(null);
-    setPrescribedDoctors([]);
-    setIsDoctorOptionOpen(false);
-
-    setPrescribedDoctorLoading(true);
-    apiClient
-      .get(`/api/chemists/prescribed-doctors?chemistId=${c.id}`)
-      .then((res) => {
-        const data = res.data?.data;
-        if (data) {
-          const docs = data.doctors || [];
-          setPrescribedDoctors(docs);
-          if (data.autoSelect && data.defaultDoctor) {
-            setDoctorId(data.defaultDoctor.id);
-            setAutoSelectedDoctor(data.defaultDoctor);
-            setIsDoctorOptionOpen(false);
-          } else if (data.multiple) {
-            setIsDoctorOptionOpen(true);
-          }
-        }
-      })
-      .catch((err) => console.error("Failed to load prescribed doctors for chemist:", err))
-      .finally(() => setPrescribedDoctorLoading(false));
   };
 
   useEffect(() => {
@@ -1772,9 +1797,6 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
                   onClick={() => {
                     setChemistId("");
                     setDoctorId("");
-                    setAutoSelectedDoctor(null);
-                    setPrescribedDoctors([]);
-                    setIsDoctorOptionOpen(false);
                     setChemistSearch("");
                     setChemistDropdownOpen(true);
                   }}
@@ -1812,9 +1834,6 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
                         e.stopPropagation();
                         setChemistId("");
                         setDoctorId("");
-                        setAutoSelectedDoctor(null);
-                        setPrescribedDoctors([]);
-                        setIsDoctorOptionOpen(false);
                         setChemistSearch("");
                         setChemistDropdownOpen(true);
                       }}
@@ -1888,9 +1907,8 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
                               onClick={() => {
                                 selectChemist(c);
                               }}
-                              className={`p-2.5 cursor-pointer hover:bg-emerald-50/70 transition flex items-center justify-between text-left ${
-                                isSelected ? "bg-emerald-50 font-semibold" : ""
-                              }`}
+                              className={`p-2.5 cursor-pointer hover:bg-emerald-50/70 transition flex items-center justify-between text-left ${isSelected ? "bg-emerald-50 font-semibold" : ""
+                                }`}
                             >
                               <div className="min-w-0 pr-2">
                                 <p className="text-sm text-slate-900 font-medium truncate">{c.name}</p>
@@ -1931,127 +1949,11 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
         </div>
 
         {/* ── Prescribed Doctor Intelligent Linkage Section ── */}
-        {chemistId && (
-          <div className="space-y-2">
-            {prescribedDoctorLoading ? (
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-purple-50/50 border border-purple-100 text-xs text-purple-700">
-                <RefreshCw size={13} className="animate-spin text-purple-600" />
-                <span>Finding tagged prescribing doctors for selected chemist...</span>
-              </div>
-            ) : autoSelectedDoctor && !isDoctorOptionOpen ? (
-              <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3 flex items-start justify-between shadow-xs">
-                <div className="flex items-start gap-2.5 min-w-0">
-                  <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
-                    <Stethoscope size={16} />
-                  </div>
-                  <div className="min-w-0 text-left">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-bold text-slate-900 truncate">Dr. {autoSelectedDoctor.fullName}</span>
-                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-200 text-emerald-800 uppercase tracking-wider flex items-center gap-0.5">
-                        <CheckCircle2 size={9} /> Auto-Populated
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-600 truncate mt-0.5">
-                      {autoSelectedDoctor.primarySpecialty || "General Medicine"}
-                      {autoSelectedDoctor.clinicAddress ? ` • ${autoSelectedDoctor.clinicAddress}` : ""}
-                    </p>
-                    <p className="text-[10px] text-emerald-700 mt-0.5 font-medium">
-                      ✓ Prescribing doctor tagged to this chemist in {autoSelectedDoctor.subArea || "beat area"}.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsDoctorOptionOpen(true)}
-                  className="text-xs text-emerald-700 hover:text-emerald-900 font-semibold underline shrink-0 ml-2"
-                >
-                  Change Option
-                </button>
-              </div>
-            ) : (
-              <div className="border border-purple-200 bg-purple-50/50 rounded-xl p-3 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
-                    <Stethoscope size={14} className="text-purple-700" />
-                    <span>Prescribed Doctor {prescribedDoctors.length > 1 ? `(${prescribedDoctors.length} Tagged)` : ""}</span>
-                  </label>
-                  {autoSelectedDoctor && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDoctorId(autoSelectedDoctor.id);
-                        setIsDoctorOptionOpen(false);
-                      }}
-                      className="text-[11px] text-purple-700 hover:underline font-semibold"
-                    >
-                      Keep Dr. {autoSelectedDoctor.fullName}
-                    </button>
-                  )}
-                </div>
-
-                {prescribedDoctors.length > 1 ? (
-                  <p className="text-xs text-purple-800">
-                    This chemist is tagged with multiple doctors in their beat. Please select who prescribed these items:
-                  </p>
-                ) : (
-                  <p className="text-xs text-slate-500">
-                    Select a prescribing doctor for this chemist order (or choose counter sale):
-                  </p>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-                  {prescribedDoctors.map((doc) => {
-                    const isSelected = doc.id === doctorId;
-                    return (
-                      <div
-                        key={doc.id}
-                        onClick={() => {
-                          setDoctorId(doc.id);
-                          setAutoSelectedDoctor(doc);
-                          setIsDoctorOptionOpen(false);
-                        }}
-                        className={`p-2.5 rounded-xl cursor-pointer border text-left transition flex items-start justify-between gap-2 ${
-                          isSelected
-                            ? "bg-purple-100/90 border-purple-400 text-purple-950 shadow-xs ring-1 ring-purple-400 font-bold"
-                            : "bg-white hover:bg-purple-50 border-slate-200 text-slate-800"
-                        }`}
-                      >
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold truncate">Dr. {doc.fullName}</p>
-                          <p className="text-[11px] text-slate-500 truncate">{doc.primarySpecialty || "General"}</p>
-                          <p className="text-[10px] text-slate-400 truncate mt-0.5">{doc.clinicAddress || doc.subArea || "Local Clinic"}</p>
-                        </div>
-                        {isSelected ? (
-                          <span className="p-1 rounded-full bg-purple-200 text-purple-900 shrink-0">
-                            <Check size={12} />
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-purple-600 font-semibold px-2 py-0.5 rounded-md hover:bg-purple-100 shrink-0">
-                            Select
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  <div
-                    onClick={() => {
-                      setDoctorId("");
-                      setAutoSelectedDoctor(null);
-                      setIsDoctorOptionOpen(false);
-                    }}
-                    className={`p-2.5 rounded-xl cursor-pointer border text-left transition flex items-center justify-between ${
-                      !doctorId ? "bg-slate-100 border-slate-300 font-bold text-slate-800" : "bg-white hover:bg-slate-50 border-slate-200 text-slate-500"
-                    }`}
-                  >
-                    <span className="text-xs">Counter Sale (No Prescribing Doctor)</span>
-                    {!doctorId && <Check size={14} className="text-slate-600" />}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        <PrescribedDoctorPicker
+          chemistId={chemistId}
+          doctorId={doctorId}
+          onChange={setDoctorId}
+        />
 
         <div>
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -2163,8 +2065,11 @@ function EditOrderModal({
   const [products, setProducts] = useState<Product[]>([]);
   const [items, setItems] = useState<LineItem[]>([]);
   const [orderStatus, setOrderStatus] = useState<string>("PENDING");
+  const [chemistId, setChemistId] = useState<string>("");
   const [chemistName, setChemistName] = useState("");
   const [distributorName, setDistributorName] = useState("");
+  const [doctorId, setDoctorId] = useState<string>("");
+  const [initialDoctor, setInitialDoctor] = useState<PrescribedDoctorOption | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2176,9 +2081,21 @@ function EditOrderModal({
     ])
       .then(([orderRes, productsRes]) => {
         const order = orderRes.data.data.order;
+        setChemistId(order.chemist?.id ?? order.chemistId ?? "");
         setChemistName(order.chemist?.name ?? "—");
         setDistributorName(order.distributor?.name ?? "—");
         setOrderStatus(order.status ?? "PENDING");
+        setDoctorId(order.doctor?.id ?? order.doctorId ?? "");
+        setInitialDoctor(
+          order.doctor
+            ? {
+                id: order.doctor.id,
+                fullName: order.doctor.fullName,
+                clinicAddress: order.doctor.clinicAddress,
+                subArea: order.doctor.subArea,
+              }
+            : null
+        );
         setItems(
           order.items.map((it: any) => ({
             productId: it.product.id,
@@ -2217,6 +2134,7 @@ function EditOrderModal({
     try {
       await apiClient.put(`/api/orders/${orderId}`, {
         status: orderStatus,
+        doctorId: doctorId || null,
         items: validItems.map((it) => ({
           productId: it.productId,
           quantity: it.quantity,
@@ -2276,6 +2194,13 @@ function EditOrderModal({
                 </SearchableSelect>
               </div>
             </div>
+
+            <PrescribedDoctorPicker
+              chemistId={chemistId}
+              doctorId={doctorId}
+              initialDoctor={initialDoctor}
+              onChange={setDoctorId}
+            />
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">

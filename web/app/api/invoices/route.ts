@@ -325,7 +325,7 @@ async function getInvoices(req: AuthedRequest) {
     });
 
     // High-performance caching for totals across all matching invoices
-    const cacheKey = `invoices_totals_${req.user.role}_${req.user.sub}_${q || ""}_${customer || ""}_${paidParam || ""}_${from || ""}_${to || ""}`;
+    const cacheKey = `invoices_totals_${req.user.role}_${req.user.sub}_${q || ""}_${customer || ""}_${paidParam || ""}_${from || ""}_${to || ""}_${cadence || ""}_${dateParam || ""}_${monthParam || ""}_${quarterParam || ""}_${territoryId || ""}_${subArea || ""}_${employeeId || ""}`;
     const totals = await CacheService.getOrCompute(
       cacheKey,
       async () => {

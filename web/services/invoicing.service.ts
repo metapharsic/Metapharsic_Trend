@@ -3,6 +3,7 @@ import { Prisma, OrderStatus } from "@prisma/client";
 import { computeInvoiceTotals } from "@/lib/gst";
 import { postAutoLedger, SYSTEM_ACCOUNT_CODES } from "@/lib/ledger";
 import { profitFor, type ProfitLine } from "@/lib/pricing";
+import { CacheService } from "@/services/cache.service";
 
 export type InvoicingCadence = "ALL" | "DAILY" | "MONTHLY" | "QUARTERLY";
 
@@ -681,6 +682,8 @@ export class InvoicingService {
 
       cumulativeAmount += Number(createdInvoice.amount);
     }
+
+    CacheService.invalidate("invoices_totals_");
 
     const scopeDesc = params.cadence
       ? `cadence: ${params.cadence}`

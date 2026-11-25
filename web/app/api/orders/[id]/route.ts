@@ -231,10 +231,16 @@ async function updateOrderItemsInner(req: AuthedRequest, id: string, body: unkno
     if (parsed.data.status) {
       orderData.status = parsed.data.status;
     }
+    if (parsed.data.chemistId !== undefined) {
+      orderData.chemistId = parsed.data.chemistId;
+    }
+    if (parsed.data.doctorId !== undefined) {
+      orderData.doctorId = parsed.data.doctorId;
+    }
     const order = await tx.order.update({
       where: { id },
       data: orderData,
-      include: { items: { include: { product: { select: { id: true, name: true, sku: true } } } }, chemist: true, distributor: true },
+      include: { items: { include: { product: { select: { id: true, name: true, sku: true } } } }, chemist: true, doctor: true, distributor: true },
     });
     if (existing.invoice) {
       // If already paid, the recorded payment amount is about to go stale

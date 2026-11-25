@@ -2,7 +2,7 @@
 
 import React, { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MapPin, Search, X, Camera, Plus, AlertTriangle, Phone, Store, Building, CheckCircle2, RefreshCw, Sparkles, FileText, FileCheck, Eye, Upload } from "lucide-react";
+import { MapPin, Search, X, Camera, Plus, AlertTriangle, Phone, Store, Building, CheckCircle2, RefreshCw, Sparkles, FileText, FileCheck, Eye, Upload, Stethoscope, Check } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { SearchableSelect } from "@/components/searchable-select";
 
@@ -141,10 +141,26 @@ function NewCallForm() {
   const [customNearbyChemistName, setCustomNearbyChemistName] = useState<string>("");
   const [nearbyPlacementNotes, setNearbyPlacementNotes] = useState<string>("");
 
-  // Load nearby chemists whenever a DOCTOR is selected
+  // Prescribed Doctors State (Auto-populated when CHEMIST is selected)
+  interface PrescribedDocOption {
+    id: string;
+    fullName: string;
+    primarySpecialty?: string | null;
+    clinicAddress?: string | null;
+    subArea?: string | null;
+  }
+  const [chemistDoctors, setChemistDoctors] = useState<PrescribedDocOption[]>([]);
+  const [loadingChemistDoctors, setLoadingChemistDoctors] = useState(false);
+  const [selectedChemistDoctor, setSelectedChemistDoctor] = useState<PrescribedDocOption | null>(null);
+  const [isChemistDoctorOptionOpen, setIsChemistDoctorOptionOpen] = useState(false);
+
+  // Load nearby chemists whenever a DOCTOR is selected, or prescribed doctors whenever a CHEMIST is selected
   useEffect(() => {
     if (selected && selected.type === "DOCTOR") {
       setLoadingNearbyChemists(true);
+      setChemistDoctors([]);
+      setSelectedChemistDoctor(null);
+      setIsChemistDoctorOptionOpen(false);
       apiClient
         .get("/api/mr/nearby-chemists", {
           params: { doctorId: selected.id, latitude: gps.lat, longitude: gps.lon },
@@ -158,9 +174,36 @@ function NewCallForm() {
         })
         .catch((err) => console.error("Failed to load nearby chemists:", err))
         .finally(() => setLoadingNearbyChemists(false));
+    } else if (selected && selected.type === "CHEMIST") {
+      setNearbyChemists([]);
+      setSelectedNearbyChemistId("");
+      setLoadingChemistDoctors(true);
+      setChemistDoctors([]);
+      setSelectedChemistDoctor(null);
+      setIsChemistDoctorOptionOpen(false);
+      apiClient
+        .get(`/api/chemists/prescribed-doctors?chemistId=${selected.id}`)
+        .then((res) => {
+          const d = res.data?.data;
+          if (d) {
+            const docs: PrescribedDocOption[] = d.doctors || [];
+            setChemistDoctors(docs);
+            if (d.autoSelect && d.defaultDoctor) {
+              setSelectedChemistDoctor(d.defaultDoctor);
+              setIsChemistDoctorOptionOpen(false);
+            } else if (d.multiple) {
+              setIsChemistDoctorOptionOpen(true);
+            }
+          }
+        })
+        .catch((err) => console.error("Failed to load prescribed doctors for chemist:", err))
+        .finally(() => setLoadingChemistDoctors(false));
     } else {
       setNearbyChemists([]);
       setSelectedNearbyChemistId("");
+      setChemistDoctors([]);
+      setSelectedChemistDoctor(null);
+      setIsChemistDoctorOptionOpen(false);
     }
   }, [selected?.id, selected?.type]);
 
@@ -410,7 +453,11 @@ function NewCallForm() {
     else formData.append("chemistId", selected.id);
     formData.append("phone", cleanDigits);
     formData.append("purpose", purpose);
-    if (feedback) formData.append("feedback", feedback);
+    const enrichedFeedback =
+      selected.type === "CHEMIST" && selectedChemistDoctor
+        ? `${feedback ? feedback + " | " : ""}Prescribed Doctor: Dr. ${selectedChemistDoctor.fullName}`
+        : feedback;
+    if (enrichedFeedback) formData.append("feedback", enrichedFeedback);
     const finalLat = (gps.lat && gps.lat !== 0) ? gps.lat : (selected.latitude || 17.3616);
     const finalLon = (gps.lon && gps.lon !== 0) ? gps.lon : (selected.longitude || 78.4747);
 
@@ -701,6 +748,90 @@ function NewCallForm() {
                       </p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* ── PRESCRIBED DOCTOR AUTO-POPULATE (WHEN CHEMIST IS SELECTED) ── */}
+              {selected.type === "CHEMIST" && (
+                <div className="pt-3 border-t border-slate-200/80 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Stethoscope size={14} className="text-emerald-600" />
+                      <span>Prescribed Doctor Linkage {chemistDoctors.length > 1 ? `(${chemistDoctors.length} Tagged)` : ""}</span>
+                    </label>
+                    {selectedChemistDoctor && !isChemistDoctorOptionOpen && chemistDoctors.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsChemistDoctorOptionOpen(true)}
+                        className="text-[11px] font-semibold text-emerald-700 hover:underline"
+                      >
+                        Change Doctor
+                      </button>
+                    )}
+                  </div>
+
+                  {loadingChemistDoctors ? (
+                    <div className="text-xs text-emerald-700 py-2 flex items-center gap-2 bg-emerald-50/60 px-3 rounded-xl border border-emerald-100">
+                      <RefreshCw size={13} className="animate-spin text-emerald-600" />
+                      <span>Auto-discovering prescribing doctors tagged to this chemist...</span>
+                    </div>
+                  ) : selectedChemistDoctor && !isChemistDoctorOptionOpen ? (
+                    <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900">Dr. {selectedChemistDoctor.fullName}</span>
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-200 text-emerald-800 uppercase">
+                            Auto-Populated
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 mt-0.5">
+                          {selectedChemistDoctor.primarySpecialty || "General Medicine"}
+                          {selectedChemistDoctor.clinicAddress ? ` • ${selectedChemistDoctor.clinicAddress}` : ""}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsChemistDoctorOptionOpen(true)}
+                        className="text-xs font-semibold text-emerald-700 hover:underline"
+                      >
+                        Options
+                      </button>
+                    </div>
+                  ) : chemistDoctors.length > 0 ? (
+                    <div className="bg-purple-50/50 border border-purple-200 rounded-xl p-3 space-y-2">
+                      <p className="text-[11px] text-purple-900 font-medium">
+                        {chemistDoctors.length > 1
+                          ? "Multiple prescribing doctors tagged to this chemist's beat — select primary prescriber:"
+                          : "Select prescribing doctor:"}
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
+                        {chemistDoctors.map((doc) => {
+                          const active = selectedChemistDoctor?.id === doc.id;
+                          return (
+                            <button
+                              key={doc.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedChemistDoctor(doc);
+                                setIsChemistDoctorOptionOpen(false);
+                              }}
+                              className={`p-2 rounded-lg border text-left transition flex items-center justify-between gap-2 ${
+                                active
+                                  ? "bg-purple-100 border-purple-400 text-purple-950 font-bold"
+                                  : "bg-white hover:bg-purple-50 border-slate-200 text-slate-800"
+                              }`}
+                            >
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold truncate">Dr. {doc.fullName}</p>
+                                <p className="text-[10px] text-slate-500 truncate">{doc.primarySpecialty || "Specialist"}</p>
+                              </div>
+                              {active && <Check size={13} className="text-purple-700 shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               )}
 
