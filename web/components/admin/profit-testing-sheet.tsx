@@ -60,7 +60,7 @@ export function ProfitTestingSheet() {
   const [assumptions, setAssumptions] = useState<ProfitTestingAssumptions>(
     DEFAULT_PROFIT_TESTING_ASSUMPTIONS
   );
-  const [rows, setRows] = useState<ProfitTestingRowInput[]>(() => buildReferenceSheetRows([], 10));
+  const [rows, setRows] = useState<ProfitTestingRowInput[]>(() => buildReferenceSheetRows([], 0));
   const [catalog, setCatalog] = useState<CatalogProductOption[]>([]);
   const [catalogLoading, setCatalogLoading] = useState<boolean>(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -171,18 +171,18 @@ export function ProfitTestingSheet() {
 
   const handleLoadReferencePreset = () => {
     setAssumptions(DEFAULT_PROFIT_TESTING_ASSUMPTIONS);
-    setRows(buildReferenceSheetRows(catalog, 10));
+    setRows(buildReferenceSheetRows(catalog, 0));
     setActivePreset("REFERENCE");
   };
 
   const handleLoadLiveCatalog = () => {
     if (catalog.length === 0) return;
-    setRows(buildRowsFromCatalogProducts(catalog, 10, 5, 10));
+    setRows(buildRowsFromCatalogProducts(catalog, 10, 5, 0));
     setActivePreset("CATALOG");
   };
 
   const handleClearBlank = () => {
-    setRows(Array.from({ length: 10 }, (_, idx) => createBlankTestingRow(idx + 1)));
+    setRows([createBlankTestingRow(1)]);
     setActivePreset("BLANK");
   };
 
@@ -843,7 +843,7 @@ export function ProfitTestingSheet() {
                 <th className="px-3 py-3 text-right border-r border-slate-700 bg-emerald-950/50 min-w-[96px] whitespace-nowrap">
                   Net Margin
                 </th>
-                <th className="px-2 py-3 text-center w-14 min-w-[56px]">Clear</th>
+                <th className="px-2 py-3 text-center w-16 min-w-[64px]">Remove</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -1112,10 +1112,10 @@ export function ProfitTestingSheet() {
                   <td className="px-2 py-2 text-center min-w-[56px]">
                     <button
                       type="button"
-                      aria-label={`Clear row ${r.no}`}
-                      onClick={() => updateRow(r.id, { ...createBlankTestingRow(r.no), id: r.id })}
+                      aria-label={`Remove row ${r.no}`}
+                      onClick={() => setRows((prev) => prev.filter((x) => x.id !== r.id))}
                       className="p-1 text-slate-400 hover:text-rose-600 rounded"
-                      title="Clear row"
+                      title="Remove row"
                     >
                       <Trash2 size={13} />
                     </button>

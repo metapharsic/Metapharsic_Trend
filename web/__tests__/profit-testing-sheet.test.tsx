@@ -141,18 +141,20 @@ describe("Profit Testing Sheet calculation engine & UI", () => {
     );
   });
 
-  it("builds rows cleanly from live catalog products", () => {
+  it("builds rows cleanly from live catalog products without trailing empty rows", () => {
+    const refRows = buildReferenceSheetRows([]);
+    expect(refRows).toHaveLength(7);
+
     const catalogRows = buildRowsFromCatalogProducts(
       MOCK_CATALOG_PRODUCTS.map((p) => ({ ...p, marginStructure: null })),
       10,
-      2,
-      10
+      2
     );
-    expect(catalogRows).toHaveLength(10);
+    expect(catalogRows).toHaveLength(2);
     expect(catalogRows[0].item).toBe("Metamox-CV");
     expect(catalogRows[0].billedQty).toBe(10);
     expect(catalogRows[0].freeQty).toBe(2);
-    expect(catalogRows[9].item).toBe("");
+    expect(catalogRows[1].item).toBe("Metace-P");
   });
 
   it("renders Profit Testing Sheet UI, syncs live catalog read-only, and recalculates on input changes", async () => {
@@ -160,6 +162,8 @@ describe("Profit Testing Sheet calculation engine & UI", () => {
 
     expect(await screen.findByText("Profit Testing Sheet")).toBeInTheDocument();
     expect(mockedGet).toHaveBeenCalledWith("/api/products?limit=100");
+    // Only the 7 active reference rows render by default (no empty rows 8, 9, 10)
+    expect(screen.queryByLabelText("Item name row 8")).not.toBeInTheDocument();
 
     // Reference sheet initial net profit displayed
     expect(screen.getByTestId("summary-net-profit-hero")).toHaveTextContent("(₹6,859.32)");

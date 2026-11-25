@@ -147,12 +147,12 @@ export function createBlankTestingRow(idx: number): ProfitTestingRowInput {
 }
 
 /**
- * Builds 10 rows using the exact reference preset and enriches catalogPurchaseRate/productId
+ * Builds rows using the reference preset and enriches catalogPurchaseRate/productId
  * when matching SKUs exist in the live database catalog.
  */
 export function buildReferenceSheetRows(
   catalog: CatalogProductOption[] = [],
-  minRows = 10
+  minRows = 0
 ): ProfitTestingRowInput[] {
   const catalogByNormalizedName = new Map<string, CatalogProductOption>();
   for (const p of catalog) {
@@ -200,12 +200,12 @@ export function buildReferenceSheetRows(
   return rows;
 }
 
-/** Builds rows strictly from the live PostgreSQL Product catalog, padded up to 10 lines. */
+/** Builds rows strictly from the live PostgreSQL Product catalog without blank placeholder rows. */
 export function buildRowsFromCatalogProducts(
   catalog: CatalogProductOption[],
   defaultBilledQty = 10,
   defaultFreeQty = 5,
-  minRows = 10
+  minRows = 0
 ): ProfitTestingRowInput[] {
   const rows: ProfitTestingRowInput[] = catalog.map((p, idx) => {
     const basis = costBasis({
