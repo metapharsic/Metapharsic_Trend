@@ -7,8 +7,8 @@
   "autoPullSchedule": "TWICE_WEEKLY",
   "autoSyncOnPull": false,
   "lastCheckedAt": "2026-10-13T17:07:13.056Z",
-  "lastPulledAt": "2026-11-10T13:28:50.423Z",
-  "lastPullStatus": "SUCCESS",
+  "lastPulledAt": "2026-11-22T21:30:01.111Z",
+  "lastPullStatus": "FAILED",
   "lastPulledFiles": [
     {
       "filename": ".gitignore",
@@ -51,6 +51,90 @@
     }
   ],
   "pullHistory": [
+    {
+      "timestamp": "2026-11-22T21:30:01.111Z",
+      "type": "AUTO",
+      "branch": "main",
+      "beforeHash": "28b1c6fb",
+      "afterHash": "28b1c6fb",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": ".gitignore",
+          "status": "modified",
+          "additions": 8,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 28b1c6fb..49abdf08\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/gst-invoice-integration.test.ts\n\tweb/__tests__/mr-complete-call-parity.test.ts\n\tweb/app/(dashboard)/admin/mr-activity/page.tsx\n\tweb/app/(dashboard)/admin/system-config/page.tsx\n\tweb/app/(dashboard)/collections/page.tsx\n\tweb/app/(dashboard)/mr/calls/new/page.tsx\n\tweb/app/(dashboard)/mr/calls/page.tsx\n\tweb/app/(dashboard)/mr/page.tsx\n\tweb/app/(dashboard)/mr/reports/page.tsx\n\tweb/app/(dashboard)/orders/page.tsx\n\tweb/app/(dashboard)/tour-plans/new/page.tsx\n\tweb/app/(dashboard)/tour-plans/page.tsx\n\tweb/app/api/invoices/[id]/route.ts\n\tweb/app/api/manager/mrs/route.ts\n\tweb/app/api/manager/visits/summary/route.ts\n\tweb/app/api/mr/collections/route.ts\n\tweb/app/api/mr/entities/route.ts\n\tweb/app/api/mr/reports/calls/route.ts\n\tweb/app/api/mr/reports/deal-closure/route.ts\n\tweb/",
+      "id": "pull-1795383001113-oimfo"
+    },
+    {
+      "timestamp": "2026-11-18T21:30:01.128Z",
+      "type": "AUTO",
+      "branch": "main",
+      "beforeHash": "28b1c6fb",
+      "afterHash": "28b1c6fb",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": ".gitignore",
+          "status": "modified",
+          "additions": 8,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 28b1c6fb..49abdf08\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/gst-invoice-integration.test.ts\n\tweb/__tests__/mr-complete-call-parity.test.ts\n\tweb/app/(dashboard)/admin/mr-activity/page.tsx\n\tweb/app/(dashboard)/admin/system-config/page.tsx\n\tweb/app/(dashboard)/collections/page.tsx\n\tweb/app/(dashboard)/mr/calls/new/page.tsx\n\tweb/app/(dashboard)/mr/calls/page.tsx\n\tweb/app/(dashboard)/mr/page.tsx\n\tweb/app/(dashboard)/mr/reports/page.tsx\n\tweb/app/(dashboard)/orders/page.tsx\n\tweb/app/(dashboard)/tour-plans/new/page.tsx\n\tweb/app/(dashboard)/tour-plans/page.tsx\n\tweb/app/api/invoices/[id]/route.ts\n\tweb/app/api/manager/mrs/route.ts\n\tweb/app/api/manager/visits/summary/route.ts\n\tweb/app/api/mr/collections/route.ts\n\tweb/app/api/mr/entities/route.ts\n\tweb/app/api/mr/reports/calls/route.ts\n\tweb/app/api/mr/reports/deal-closure/route.ts\n\tweb/",
+      "id": "pull-1795037401136-ristg"
+    },
+    {
+      "timestamp": "2026-11-15T21:30:00.955Z",
+      "type": "AUTO",
+      "branch": "main",
+      "beforeHash": "28b1c6fb",
+      "afterHash": "28b1c6fb",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": ".gitignore",
+          "status": "modified",
+          "additions": 8,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 28b1c6fb..49abdf08\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/gst-invoice-integration.test.ts\n\tweb/__tests__/mr-complete-call-parity.test.ts\n\tweb/app/(dashboard)/admin/mr-activity/page.tsx\n\tweb/app/(dashboard)/admin/system-config/page.tsx\n\tweb/app/(dashboard)/collections/page.tsx\n\tweb/app/(dashboard)/mr/calls/new/page.tsx\n\tweb/app/(dashboard)/mr/calls/page.tsx\n\tweb/app/(dashboard)/mr/page.tsx\n\tweb/app/(dashboard)/mr/reports/page.tsx\n\tweb/app/(dashboard)/orders/page.tsx\n\tweb/app/(dashboard)/tour-plans/new/page.tsx\n\tweb/app/(dashboard)/tour-plans/page.tsx\n\tweb/app/api/invoices/[id]/route.ts\n\tweb/app/api/manager/mrs/route.ts\n\tweb/app/api/manager/visits/summary/route.ts\n\tweb/app/api/mr/collections/route.ts\n\tweb/app/api/mr/entities/route.ts\n\tweb/app/api/mr/reports/calls/route.ts\n\tweb/app/api/mr/reports/deal-closure/route.ts\n\tweb/",
+      "id": "pull-1794778200957-u2etx"
+    },
+    {
+      "timestamp": "2026-11-11T21:30:00.886Z",
+      "type": "AUTO",
+      "branch": "main",
+      "beforeHash": "28b1c6fb",
+      "afterHash": "28b1c6fb",
+      "status": "FAILED",
+      "filesCount": 0,
+      "files": [
+        {
+          "filename": ".gitignore",
+          "status": "modified",
+          "additions": 8,
+          "deletions": 0,
+          "impactedComponent": "Core Application Platform"
+        }
+      ],
+      "commits": [],
+      "logMessage": "Updating 28b1c6fb..49abdf08\n\nFrom https://github.com/metapharsic/Metapharsic_Trend\n * branch              main       -> FETCH_HEAD\nerror: Your local changes to the following files would be overwritten by merge:\n\tweb/__tests__/gst-invoice-integration.test.ts\n\tweb/__tests__/mr-complete-call-parity.test.ts\n\tweb/app/(dashboard)/admin/mr-activity/page.tsx\n\tweb/app/(dashboard)/admin/system-config/page.tsx\n\tweb/app/(dashboard)/collections/page.tsx\n\tweb/app/(dashboard)/mr/calls/new/page.tsx\n\tweb/app/(dashboard)/mr/calls/page.tsx\n\tweb/app/(dashboard)/mr/page.tsx\n\tweb/app/(dashboard)/mr/reports/page.tsx\n\tweb/app/(dashboard)/orders/page.tsx\n\tweb/app/(dashboard)/tour-plans/new/page.tsx\n\tweb/app/(dashboard)/tour-plans/page.tsx\n\tweb/app/api/invoices/[id]/route.ts\n\tweb/app/api/manager/mrs/route.ts\n\tweb/app/api/manager/visits/summary/route.ts\n\tweb/app/api/mr/collections/route.ts\n\tweb/app/api/mr/entities/route.ts\n\tweb/app/api/mr/reports/calls/route.ts\n\tweb/app/api/mr/reports/deal-closure/route.ts\n\tweb/",
+      "id": "pull-1794432600888-6vagq"
+    },
     {
       "timestamp": "2026-11-10T13:27:40.590Z",
       "type": "MANUAL",

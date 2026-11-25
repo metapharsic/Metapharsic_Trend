@@ -125,7 +125,7 @@ async function createOrder(req: AuthedRequest) {
     const parsed = CreateOrderSchema.safeParse(body);
     if (!parsed.success) return badRequest("Validation error", parsed.error.flatten());
 
-    const { chemistId, distributorId, items, lrNo, lrDate, cases, dueDate, transport, vehicleNo } = parsed.data;
+    const { chemistId, distributorId, doctorId, items, lrNo, lrDate, cases, dueDate, transport, vehicleNo } = parsed.data;
 
     const [chemist, distributor] = await Promise.all([
       db.chemist.findUnique({ where: { id: chemistId } }),
@@ -242,6 +242,7 @@ async function createOrder(req: AuthedRequest) {
         data: {
           chemistId,
           distributorId,
+          doctorId: doctorId || null,
           employeeId: bookingEmployee?.id ?? null,
           items: { create: orderItemsData },
         },

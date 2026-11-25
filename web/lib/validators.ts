@@ -138,6 +138,7 @@ export const TourPlanDecisionSchema = z.object({
 export const CreateOrderSchema = z.object({
   chemistId: z.string().uuid(),
   distributorId: z.string().uuid(),
+  doctorId: z.string().uuid().nullable().optional(),
   items: z.array(
     z.object({
       productId: z.string().uuid(),

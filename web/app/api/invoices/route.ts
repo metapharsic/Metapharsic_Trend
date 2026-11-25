@@ -120,6 +120,13 @@ async function getInvoices(req: AuthedRequest) {
     const paidParam = searchParams.get("paid");
     const from = searchParams.get("from") || undefined;
     const to = searchParams.get("to") || undefined;
+    const territoryId = searchParams.get("territoryId") || undefined;
+    const subArea = searchParams.get("subArea") || undefined;
+    const employeeId = searchParams.get("employeeId") || undefined;
+    const cadence = searchParams.get("cadence")?.toLowerCase() || undefined; // "daily" | "monthly" | "quarterly"
+    const dateParam = searchParams.get("date") || undefined;
+    const monthParam = searchParams.get("month") || undefined;
+    const quarterParam = searchParams.get("quarter") || undefined;
 
     const isManager =
       req.user.role === Role.ASM ||
@@ -194,6 +201,53 @@ async function getInvoices(req: AuthedRequest) {
     }
     if (createdAt.gte || createdAt.lte) filters.push({ createdAt });
 
+    if (territoryId) {
+      filters.push({ order: { chemist: { territoryId } } });
+    }
+    if (subArea) {
+      filters.push({ order: { chemist: { subArea: { equals: subArea, mode: "insensitive" } } } });
+    }
+    if (employeeId && isManager) {
+      filters.push({ order: { employeeId } });
+    }
+
+    if (!from && !to && cadence) {
+      if (cadence === "daily" && dateParam) {
+        filters.push({
+          createdAt: {
+            gte: new Date(`${dateParam}T00:00:00.000Z`),
+            lte: new Date(`${dateParam}T23:59:59.999Z`),
+          },
+        });
+      } else if (cadence === "monthly" && monthParam) {
+        const [yStr, mStr] = monthParam.split("-");
+        const y = parseInt(yStr, 10);
+        const m = parseInt(mStr, 10) - 1;
+        filters.push({
+          createdAt: {
+            gte: new Date(Date.UTC(y, m, 1, 0, 0, 0)),
+            lte: new Date(Date.UTC(y, m + 1, 0, 23, 59, 59, 999)),
+          },
+        });
+      } else if (cadence === "quarterly" && quarterParam) {
+        let qStr = quarterParam;
+        let y = new Date().getFullYear();
+        if (qStr.includes("-")) {
+          const parts = qStr.split("-");
+          y = parseInt(parts[0], 10) || y;
+          qStr = parts[1];
+        }
+        const qNum = parseInt(qStr.replace(/\D/g, ""), 10) || 1;
+        const startMonth = (qNum - 1) * 3;
+        filters.push({
+          createdAt: {
+            gte: new Date(Date.UTC(y, startMonth, 1, 0, 0, 0)),
+            lte: new Date(Date.UTC(y, startMonth + 3, 0, 23, 59, 59, 999)),
+          },
+        });
+      }
+    }
+
     const where: Prisma.InvoiceWhereInput = filters.length ? { AND: filters } : {};
 
     // Run paged query and count concurrently
@@ -205,6 +259,29 @@ async function getInvoices(req: AuthedRequest) {
             select: {
               id: true,
               status: true,
+              employeeId: true,
+              employee: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  user: {
+                    select: {
+                      role: true,
+                    },
+                  },
+                },
+              },
+              doctorId: true,
+              doctor: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  primarySpecialty: true,
+                  clinicAddress: true,
+                  registrationNo: true,
+                },
+              },
               chemist: {
                 select: {
                   id: true,
