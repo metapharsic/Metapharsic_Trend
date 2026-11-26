@@ -13,6 +13,7 @@
  */
 
 import ExcelJS from "exceljs";
+import { appendCsvWatermark, applyWorkbookWatermark } from "./watermark";
 
 // ============================================================================
 // AGENT 1: WORKBOOK DESIGN SYSTEM & STYLING AGENT
@@ -1039,6 +1040,8 @@ export async function generateProfessionalExcelWorkbook(options: ExcelDashboardE
     buildCallLogsSheet(workbook, options);
   }
 
+  applyWorkbookWatermark(workbook, { documentTitle: options.reportTitle });
+
   const buffer = await workbook.xlsx.writeBuffer();
   return buffer;
 }
@@ -1114,7 +1117,7 @@ export function generateExcelReportWithDashboard(options: ExcelDashboardExportOp
     lines.push(row.map(formatForCsv).join(","));
   }
 
-  return BOM + lines.join("\r\n");
+  return appendCsvWatermark(BOM + lines.join("\r\n"), { documentTitle: options.reportTitle });
 }
 
 export function generateExcelCsv(headers: string[], rows: (string | number)[][], title?: string): string {

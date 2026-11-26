@@ -46,6 +46,7 @@ import {
   Lock,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { buildWatermarkMetadata } from "@/lib/watermark";
 import { SearchableSelect } from "@/components/searchable-select";
 
 interface AgentStatus {
@@ -631,7 +632,11 @@ export default function MultiAgentMrReportPage() {
 
   const downloadJson = () => {
     if (!currentReport) return;
-    const blob = new Blob([JSON.stringify(currentReport, null, 2)], { type: "application/json" });
+    const payload = {
+      _watermark: buildWatermarkMetadata({ documentTitle: `MR Council Report - ${currentReport.fullName}` }),
+      ...currentReport,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

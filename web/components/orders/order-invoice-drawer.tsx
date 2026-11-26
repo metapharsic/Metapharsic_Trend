@@ -17,6 +17,7 @@ import {
   Package,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { DocumentWatermark } from "@/components/ui/document-watermark";
 
 interface OrderInvoiceDrawerProps {
   orderId: string;
@@ -173,7 +174,9 @@ export function OrderInvoiceDrawer({
         </div>
 
         {/* Drawer Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        <div className="relative flex-1 overflow-y-auto p-6 space-y-5">
+          <DocumentWatermark subtitle="COMMERCIAL INVOICE & AUDIT COPY" variant="subtle" />
+          <div className="relative z-10 space-y-5">
           {loading ? (
             <div className="flex justify-center py-20">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
@@ -399,6 +402,7 @@ export function OrderInvoiceDrawer({
               )}
             </>
           )}
+          </div>
         </div>
 
         {/* Sticky Footer Actions */}

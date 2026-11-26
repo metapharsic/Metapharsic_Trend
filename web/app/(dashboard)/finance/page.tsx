@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { appendCsvWatermark } from "@/lib/watermark";
 
 interface PendingPayrollEmployee {
   employeeId: string;
@@ -105,7 +106,10 @@ export default function FinanceDashboard() {
       ["Fraud Alerts", data.kpis.fraudAlerts],
       ["Payroll Readiness %", data.kpis.payrollReadiness],
     ];
-    const csv = lines.map((row) => (Array.isArray(row) ? row.join(",") : row)).join("\n");
+    const csv = appendCsvWatermark(
+      lines.map((row) => (Array.isArray(row) ? row.join(",") : row)).join("\n"),
+      { documentTitle: `Finance Report ${data.payrollMonth}` }
+    );
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

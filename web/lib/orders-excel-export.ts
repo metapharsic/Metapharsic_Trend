@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { ExcelDesignSystem } from "@/lib/excel-export";
+import { applyWorkbookWatermark } from "@/lib/watermark";
 
 export interface OrdersWorkbookInput {
   cadence: string;
@@ -309,6 +310,8 @@ export async function downloadOrdersInvoicingExcel(input: OrdersWorkbookInput): 
   }
   formatRupeeColumns(wsDim, 3, [4, 5, 6, 8]);
   autoSizeSheet(wsDim);
+
+  applyWorkbookWatermark(wb, { documentTitle: `Orders & Invoicing (${input.cadence})` });
 
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], {

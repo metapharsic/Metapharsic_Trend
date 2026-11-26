@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { systemHealth, SystemErrorRecord } from "@/lib/system-health";
 import { apiClient } from "@/lib/api-client";
+import { buildWatermarkMetadata } from "@/lib/watermark";
 
 interface DiagnosticsResponse {
   status: string;
@@ -102,7 +103,16 @@ export function SystemDiagnosticsModal({
   };
 
   const downloadReportJson = () => {
-    const data = JSON.stringify({ exportedAt: new Date().toISOString(), errors, health: healthData }, null, 2);
+    const data = JSON.stringify(
+      {
+        _watermark: buildWatermarkMetadata({ documentTitle: "System Diagnostics Log" }),
+        exportedAt: new Date().toISOString(),
+        errors,
+        health: healthData,
+      },
+      null,
+      2
+    );
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

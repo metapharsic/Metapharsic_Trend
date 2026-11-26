@@ -41,6 +41,7 @@ import {
 import { apiClient } from "@/lib/api-client";
 import { SearchableSelect } from "@/components/searchable-select";
 import { ScrollSearchBar } from "@/components/ui/scroll-search-bar";
+import { injectHtmlWatermark } from "@/lib/watermark";
 import {
   AgentTelemetry,
   DailyTourPlanEntry,
@@ -545,7 +546,10 @@ export default function TourPlansDashboard() {
 </body>
 </html>`;
 
-    const blob = new Blob([htmlContent], { type: "text/html" });
+    const watermarkedHtml = injectHtmlWatermark(htmlContent, {
+      documentTitle: `MR Field Schedule - ${selectedEvaluation.employeeName}`,
+    });
+    const blob = new Blob([watermarkedHtml], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

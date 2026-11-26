@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import SearchableSelect, { SearchableOption } from "@/components/searchable-select";
+import { applyWorkbookWatermark } from "@/lib/watermark";
 
 interface DayVisit {
   id: string;
@@ -459,6 +460,8 @@ export default function MrActivityPage() {
         { width: 34 },
         { width: 22 },
       ];
+
+      applyWorkbookWatermark(wb, { documentTitle: `MR Activity - ${currentMonthKey}` });
 
       const buf = await wb.xlsx.writeBuffer();
       const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });

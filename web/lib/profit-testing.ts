@@ -1,5 +1,6 @@
 import type ExcelJS from "exceljs";
 import { costBasis, type CostBasisSource } from "@/lib/pricing";
+import { appendCsvWatermark, applyWorkbookWatermark, buildWatermarkMetadata, injectHtmlWatermark } from "@/lib/watermark";
 
 export type TaxTreatment = "RECOVERABLE_ITC" | "NON_RECOVERABLE";
 export type CostBasisMode = "PTR" | "CATALOG_PURCHASE_RATE" | "CATALOG_PTS";
@@ -676,7 +677,7 @@ export function buildProfitTestingCsv(
     push([m.label, m.isPct ? `${m.value.toFixed(1)}%` : m.value.toFixed(2)]);
   }
 
-  return "\uFEFF" + lines.join("\r\n");
+  return appendCsvWatermark("\uFEFF" + lines.join("\r\n"), { documentTitle: "Profit Testing Sheet" });
 }
 
 export function downloadProfitTestingCsv(
@@ -698,6 +699,7 @@ export function buildProfitTestingJson(
 ): string {
   return JSON.stringify(
     {
+      _watermark: buildWatermarkMetadata({ documentTitle: "Profit Testing Sheet" }),
       reportTitle: "Profit Testing Sheet — Trend MR Pharma OS",
       exportedAt: new Date().toISOString(),
       assumptions,
@@ -781,7 +783,8 @@ export function buildProfitTestingHtml(
       </div>`
     : "";
 
-  return `<!DOCTYPE html>
+  return injectHtmlWatermark(
+    `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -854,7 +857,9 @@ export function buildProfitTestingHtml(
     ${compHtml}
   </div>
 </body>
-</html>`;
+</html>`,
+    { documentTitle: "Profit Testing Sheet" }
+  );
 }
 
 export function downloadProfitTestingHtml(
@@ -1940,6 +1945,8 @@ export async function downloadProfitTestingExcel(
   [42, 22, 14, 24, 20, 44].forEach((w, idx) => {
     wsExec.getColumn(idx + 1).width = w;
   });
+
+  applyWorkbookWatermark(wb, { documentTitle: "Profit Testing Sheet" });
 
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], {

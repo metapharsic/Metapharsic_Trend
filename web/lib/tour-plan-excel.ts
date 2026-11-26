@@ -7,6 +7,7 @@
 
 import ExcelJS from "exceljs";
 import { ExcelDesignSystem } from "@/lib/excel-export";
+import { applyWorkbookWatermark } from "@/lib/watermark";
 import type { DailyTourPlanEntry, TourPlanEvaluation } from "@/services/tour-plan-agents.service";
 
 export interface TourPlanExcelExportOptions {
@@ -478,6 +479,11 @@ export async function generateTourPlanExcelBuffer(
       cell.alignment = { horizontal: colNum === 4 ? "left" : "center", vertical: "middle", wrapText: true };
       cell.border = ExcelDesignSystem.borders.thin;
     });
+  });
+
+  applyWorkbookWatermark(workbook, {
+    documentTitle: `Field Call Schedule - ${evaluation.employeeName}`,
+    preserveExistingFooter: true,
   });
 
   const buffer = await workbook.xlsx.writeBuffer();

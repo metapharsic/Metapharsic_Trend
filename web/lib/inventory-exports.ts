@@ -1,4 +1,5 @@
 import { computeShelfLife, getMedicineReference, type ClinicalReference, type ShelfLifeStatus } from "./medicine-reference";
+import { appendCsvWatermark, applyWorkbookWatermark, buildWatermarkMetadata, injectHtmlWatermark } from "./watermark";
 
 export interface ExportableProduct {
   id: string;
@@ -281,7 +282,10 @@ export function buildInventoryCsv(products: ExportableProduct[], isAdmin: boolea
     ];
   });
 
-  return "\uFEFF" + [headers.map(csvCell).join(","), ...rows.map((r) => r.map(csvCell).join(","))].join("\r\n");
+  return appendCsvWatermark(
+    "\uFEFF" + [headers.map(csvCell).join(","), ...rows.map((r) => r.map(csvCell).join(","))].join("\r\n"),
+    { documentTitle: "Central Product Inventory" }
+  );
 }
 
 export function downloadInventoryCsv(products: ExportableProduct[], isAdmin: boolean): void {
@@ -292,6 +296,7 @@ export function downloadInventoryCsv(products: ExportableProduct[], isAdmin: boo
 
 export function buildInventoryJson(products: ExportableProduct[], isAdmin: boolean): string {
   const payload = {
+    _watermark: buildWatermarkMetadata({ documentTitle: "Central Product Inventory" }),
     generatedAt: new Date().toISOString(),
     billingBasis: "PTR Only (PTS removed)",
     scope: isAdmin ? "ADMIN_FULL_PROFIT" : "CATALOG_CLINICAL_ONLY",
@@ -383,7 +388,8 @@ export function buildInventoryHtml(products: ExportableProduct[], isAdmin: boole
     )
     .join("");
 
-  return `<!DOCTYPE html>
+  return injectHtmlWatermark(
+    `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -451,7 +457,9 @@ export function buildInventoryHtml(products: ExportableProduct[], isAdmin: boole
     }
   </table>
 </body>
-</html>`;
+</html>`,
+    { documentTitle: "Central Product Inventory" }
+  );
 }
 
 export function downloadInventoryHtml(products: ExportableProduct[], isAdmin: boolean): void {
@@ -740,6 +748,8 @@ export async function downloadInventoryExcel(products: ExportableProduct[], isAd
     wsClin.getColumn(idx + 1).width = w;
   });
 
+  applyWorkbookWatermark(wb, { documentTitle: "Central Product Inventory" });
+
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -773,7 +783,8 @@ export function buildSingleMedicineHtml(
     )
     .join("");
 
-  return `<!DOCTYPE html>
+  return injectHtmlWatermark(
+    `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -842,7 +853,9 @@ export function buildSingleMedicineHtml(
       : ""
   }
 </body>
-</html>`;
+</html>`,
+    { documentTitle: `${product.name} (${product.sku}) Dossier` }
+  );
 }
 
 export function downloadSingleMedicineHtml(
@@ -885,8 +898,22 @@ export function downloadSingleMedicineJson(
   const clinicalProfile = intel?.clinicalProfile ?? getMedicineReference(product);
   const shelfLife = intel?.shelfLife ?? computeShelfLife(product.currentExpDate);
   const payload = isAdmin
-    ? { generatedAt: new Date().toISOString(), product, clinicalProfile, shelfLife, intelligence: intel }
-    : { generatedAt: new Date().toISOString(), name: product.name, sku: product.sku, clinicalProfile, shelfLife };
+    ? {
+        _watermark: buildWatermarkMetadata({ documentTitle: `${product.name} (${product.sku}) Medicine Dossier` }),
+        generatedAt: new Date().toISOString(),
+        product,
+        clinicalProfile,
+        shelfLife,
+        intelligence: intel,
+      }
+    : {
+        _watermark: buildWatermarkMetadata({ documentTitle: `${product.name} (${product.sku}) Clinical Dossier` }),
+        generatedAt: new Date().toISOString(),
+        name: product.name,
+        sku: product.sku,
+        clinicalProfile,
+        shelfLife,
+      };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8;" });
   triggerBlobDownload(blob, `${product.sku}_Dossier_${new Date().toISOString().slice(0, 10)}.json`);
 }
@@ -1035,6 +1062,8 @@ export async function downloadSingleMedicineExcel(
       wsCh.getColumn(idx + 1).width = w;
     });
   }
+
+  applyWorkbookWatermark(wb, { documentTitle: `${product.name} (${product.sku}) Dossier` });
 
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], {

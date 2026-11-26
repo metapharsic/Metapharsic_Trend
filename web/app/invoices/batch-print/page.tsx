@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Printer, ArrowLeft, Layers } from "lucide-react";
 import QRCode from "qrcode";
 import { apiClient } from "@/lib/api-client";
+import { DocumentWatermark } from "@/components/ui/document-watermark";
 import { computeLineTotalsWithSplit, determineTaxSplit, taxClassSummaryWithSplit } from "@/lib/gst";
 
 function formatMoney(v: number | string): string {
@@ -92,6 +93,10 @@ function BatchPrintContent() {
             size: A4 portrait;
             margin: 10mm;
           }
+          body {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           .batch-invoice-sheet {
             page-break-after: always;
           }
@@ -153,8 +158,16 @@ function BatchPrintContent() {
             return (
               <div
                 key={order.id}
-                className="batch-invoice-sheet bg-white border-2 border-slate-900 p-5 text-slate-900 text-xs shadow-md print:shadow-none"
+                className="batch-invoice-sheet relative overflow-hidden bg-white border-2 border-slate-900 p-5 text-slate-900 text-xs shadow-md print:shadow-none"
               >
+                <DocumentWatermark
+                  companyName={company?.name}
+                  logoUrl={company?.logoUrl}
+                  subtitle="OFFICIAL GST TAX INVOICE • BULK PRINT COPY"
+                  showCenterSeal
+                  variant="invoice"
+                />
+                <div className="relative z-10">
                 <div className="border-b-2 border-slate-900 pb-3 flex justify-between items-start gap-4">
                   <div>
                     <h1 className="text-base font-black uppercase">{company?.name || "METAPHARSIC LIFESCIENCES"}</h1>
@@ -254,6 +267,7 @@ function BatchPrintContent() {
                       </p>
                     </div>
                   </div>
+                </div>
                 </div>
               </div>
             );

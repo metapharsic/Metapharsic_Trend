@@ -7,6 +7,7 @@ import QRCode from "qrcode";
 import { apiClient } from "@/lib/api-client";
 import { SearchableSelect } from "@/components/searchable-select";
 import { EditInvoiceModal } from "@/components/edit-invoice-modal";
+import { DocumentWatermark } from "@/components/ui/document-watermark";
 import { computeLineTotals, computeLineTotalsWithSplit, determineTaxSplit, taxClassSummaryWithSplit, computeFreeStripsValue } from "@/lib/gst";
 
 // ============================================================================
@@ -241,29 +242,14 @@ function SingleInvoiceCard({
       } relative bg-white border-2 border-slate-900 text-slate-900 leading-tight flex flex-col justify-between w-full`}
       style={{ boxSizing: "border-box" }}
     >
-      {/* 1. Senior Accountant Diagonal Watermark (Anti-Counterfeit Background) */}
-      <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none select-none overflow-hidden">
-        <div className="invoice-watermark opacity-[0.12] -rotate-25 text-center flex flex-col items-center justify-center text-slate-900 pointer-events-none select-none">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={company?.logoUrl || "/logo.png"}
-            alt="Watermark Logo"
-            className={`${isSingle ? "w-40 h-40 mb-1" : "w-28 h-28 mb-1"} object-contain grayscale opacity-60`}
-            onError={(e) => {
-              const target = e.currentTarget;
-              if (target.src !== window.location.origin + "/logo.png") {
-                target.src = "/logo.png";
-              }
-            }}
-          />
-          <span className={`${isSingle ? "text-3xl" : "text-xl"} font-serif font-black tracking-widest uppercase`}>
-            {company?.name || "METAPHARSIC LIFESCIENCES"}
-          </span>
-          <span className="text-[9px] font-mono font-bold tracking-widest mt-0.5 uppercase text-slate-800">
-            OFFICIAL GST TAX INVOICE • STATUTORY COMMERCIAL COPY
-          </span>
-        </div>
-      </div>
+      {/* 1. Senior Accountant Diagonal Watermark (Anti-Counterfeit Background + Tiled Layer) */}
+      <DocumentWatermark
+        companyName={company?.name}
+        logoUrl={company?.logoUrl}
+        subtitle="OFFICIAL GST TAX INVOICE • STATUTORY COMMERCIAL COPY"
+        showCenterSeal
+        variant="invoice"
+      />
 
       {/* Main Document Content Container */}
       <div className="relative z-10 flex flex-col justify-between h-full space-y-1">

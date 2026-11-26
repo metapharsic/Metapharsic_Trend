@@ -42,6 +42,7 @@ import {
   Activity,
   Folder,
 } from "lucide-react";
+import { DocumentWatermark } from "@/components/ui/document-watermark";
 
 import { apiClient } from "@/lib/api-client";
 import { exportCurrentPageToExcel } from "@/lib/excel-export";
@@ -674,6 +675,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         />
 
         <main className="relative flex-1 p-4 sm:p-6 overflow-y-auto bg-gray-50/50">
+          <DocumentWatermark variant="print-only" subtitle="OFFICIAL PRINTED RECORD • TREND MR" />
           <img
             src="/uploads/company/logo.png"
             onError={(e) => {
