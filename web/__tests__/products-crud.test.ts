@@ -11,6 +11,7 @@ import {
 import { GET as getProducts, POST as createProduct } from "../app/api/products/route";
 import { PUT as updateProduct, DELETE as deleteProduct } from "../app/api/products/[id]/route";
 import { GET as getMovements } from "../app/api/products/[id]/movements/route";
+import { GET as getIntelligence } from "../app/api/products/[id]/intelligence/route";
 
 describe("Products CRUD operations", () => {
   let fx: TestFixture;
@@ -228,5 +229,88 @@ describe("Products CRUD operations", () => {
     });
     const delRes = await deleteProduct(delReq, { params: { id: fx.productId } });
     expect(delRes.status).toBe(403);
+  });
+
+  it("exposes realized invoice profit & unit profit to ADMIN only and strips commercial fields for MD", async () => {
+    const adminToken = tokenFor(fx.adminUserId, Role.ADMIN);
+    const mdToken = tokenFor(mdUserId, Role.MD);
+
+    const createdRes = await createProduct(
+      jsonRequest("/api/products", {
+        method: "POST",
+        token: adminToken,
+        body: {
+          name: "Test Profit Telemetry SKU",
+          sku: "TEST-PROFIT-1",
+          price: 100,
+          mrp: 125,
+          ptr: 100,
+          purchaseRate: 40,
+          stockQty: 200,
+        },
+      }),
+      noParams
+    );
+    expect(createdRes.status).toBe(201);
+    const createdBody = await readJson(createdRes);
+    const createdId = createdBody.data.product.id;
+
+    try {
+      const adminRes = await getProducts(
+        jsonRequest("/api/products?limit=100", { method: "GET", token: adminToken }),
+        noParams
+      );
+      expect(adminRes.status).toBe(200);
+      const adminBody = await readJson(adminRes);
+      const adminProd = adminBody.data.products.find((p: any) => p.sku === "TEST-PROFIT-1");
+      expect(adminProd).toBeDefined();
+      expect(adminProd.stockBoxes).toBe(20);
+      expect(adminProd.unitProfit).toBe(60);
+      expect(adminProd.potentialStockProfit).toBe(12000);
+      expect(adminProd.profitAnalytics).toMatchObject({
+        invoicedCount: 0,
+        invoicedBilledQty: 0,
+        invoicedFreeQty: 0,
+        realizedProfit: 0,
+      });
+
+      const mdRes = await getProducts(
+        jsonRequest("/api/products?limit=100", { method: "GET", token: mdToken }),
+        noParams
+      );
+      expect(mdRes.status).toBe(200);
+      const mdBody = await readJson(mdRes);
+      const mdProd = mdBody.data.products.find((p: any) => p.sku === "TEST-PROFIT-1");
+      expect(mdProd).toBeDefined();
+      expect(mdProd.profitAnalytics).toBeUndefined();
+      expect(mdProd.unitProfit).toBeUndefined();
+      expect(mdProd.potentialStockProfit).toBeUndefined();
+      expect(mdProd.purchaseRate).toBeUndefined();
+
+      // Verify /api/products/[id]/intelligence endpoint returns 360° telemetry to ADMIN & clinical-only to MD
+      const intelAdminRes = await getIntelligence(
+        jsonRequest(`/api/products/${createdId}/intelligence`, { method: "GET", token: adminToken }),
+        { params: { id: createdId } }
+      );
+      expect(intelAdminRes.status).toBe(200);
+      const intelAdminBody = await readJson(intelAdminRes);
+      expect(intelAdminBody.data.clinicalProfile.therapeuticClass).toBeDefined();
+      expect(Array.isArray(intelAdminBody.data.monthlyTrend)).toBe(true);
+      expect(Array.isArray(intelAdminBody.data.topChemists)).toBe(true);
+      expect(Array.isArray(intelAdminBody.data.mrBreakdown)).toBe(true);
+      expect(Array.isArray(intelAdminBody.data.schemeMix)).toBe(true);
+
+      const intelMdRes = await getIntelligence(
+        jsonRequest(`/api/products/${createdId}/intelligence`, { method: "GET", token: mdToken }),
+        { params: { id: createdId } }
+      );
+      expect(intelMdRes.status).toBe(200);
+      const intelMdBody = await readJson(intelMdRes);
+      expect(intelMdBody.data.clinicalProfile.therapeuticClass).toBeDefined();
+      expect(intelMdBody.data.commercialRestricted).toBe(true);
+      expect(intelMdBody.data.topChemists).toBeUndefined();
+    } finally {
+      await testDb.product.delete({ where: { id: createdId } });
+    }
   });
 });

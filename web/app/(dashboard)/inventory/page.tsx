@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Search,
   Plus,
@@ -12,6 +12,7 @@ import {
   Trash2,
   History,
   TrendingDown,
+  TrendingUp,
   Calculator,
   Percent,
   ShieldCheck,
@@ -19,10 +20,30 @@ import {
   CheckCircle2,
   Sparkles,
   ArrowRight,
+  Eye,
+  Layers,
+  Download,
+  ChevronDown,
+  Printer,
+  FileText,
+  FileSpreadsheet,
+  FileJson,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { SearchableSelect } from "@/components/searchable-select";
 import { costBasis, type CostBasisSource } from "@/lib/pricing";
+import { getMedicineReference, computeShelfLife, type ClinicalReference, type ShelfLifeStatus } from "@/lib/medicine-reference";
+import {
+  downloadInventoryExcel,
+  downloadInventoryHtml,
+  downloadInventoryCsv,
+  downloadInventoryJson,
+  printInventoryPdf,
+  downloadSingleMedicineExcel,
+  downloadSingleMedicineHtml,
+  downloadSingleMedicineJson,
+  printSingleMedicinePdf,
+} from "@/lib/inventory-exports";
 import { ProductPricingAgentsService } from "@/services/product-pricing-agents.service";
 
 interface ProductMarginSettings {
@@ -53,6 +74,24 @@ interface Product {
   /** Which field the cost came from, so the UI can flag an estimate. */
   costBasisSource?: CostBasisSource;
   stockValueAtCost?: number | null;
+  unitProfit?: number;
+  potentialStockProfit?: number;
+  stockBoxes?: number;
+  earliestStockQty?: number;
+  mrSampleQty?: number;
+  profitAnalytics?: {
+    invoicedCount: number;
+    invoicedBilledQty: number;
+    invoicedFreeQty: number;
+    freeRatioPct: number;
+    realizedRevenue: number;
+    realizedCost: number;
+    billedCostOnly: number;
+    freeCostBurden: number;
+    realizedProfit: number;
+    realizedMarginPct: number | null;
+    exactCost: boolean;
+  };
   hsnCode?: string | null;
   gstPct?: number | null;
   stockQty: number;
@@ -63,6 +102,10 @@ interface Product {
   stockValue?: number;
   lastMovementAt?: string;
   forecast?: { burnRatePerDay: number; daysRemaining: number | null };
+}
+
+function currencyExact(v: number) {
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 }
 
 /**
@@ -101,18 +144,171 @@ function currency(v: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v);
 }
 
+interface DownloadFormatDropdownProps {
+  buttonLabel: string;
+  scopeNote: string;
+  compact?: boolean;
+  onExcel: () => Promise<void> | void;
+  onCsv?: () => void;
+  onHtml: () => void;
+  onPdf: () => void;
+  onJson: () => void;
+}
+
+function DownloadFormatDropdown({
+  buttonLabel,
+  scopeNote,
+  compact = false,
+  onExcel,
+  onCsv,
+  onHtml,
+  onPdf,
+  onJson,
+}: DownloadFormatDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    const handleMouseDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("mousedown", handleMouseDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("mousedown", handleMouseDown);
+    };
+  }, [open]);
+
+  const runAction = async (fn: () => Promise<void> | void) => {
+    setOpen(false);
+    setBusy(true);
+    try {
+      await fn();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const options: Array<{
+    label: string;
+    hint: string;
+    icon: React.ReactNode;
+    accent: string;
+    action: () => void;
+  }> = [
+    {
+      label: "Excel Workbook (.xlsx)",
+      hint: "Live formulas, Stock & Profit sheets",
+      icon: <FileSpreadsheet size={15} />,
+      accent: "text-emerald-600 bg-emerald-50",
+      action: () => void runAction(onExcel),
+    },
+    ...(onCsv
+      ? [
+          {
+            label: "CSV Spreadsheet (.csv)",
+            hint: "Flat UTF-8 table for Excel / Sheets",
+            icon: <FileText size={15} />,
+            accent: "text-indigo-600 bg-indigo-50",
+            action: () => void runAction(onCsv),
+          },
+        ]
+      : []),
+    {
+      label: "Styled HTML Report (.html)",
+      hint: "Executive report openable in any browser",
+      icon: <FileText size={15} />,
+      accent: "text-sky-600 bg-sky-50",
+      action: () => void runAction(onHtml),
+    },
+    {
+      label: "Print / Save as PDF",
+      hint: "Print-formatted A4 landscape summary",
+      icon: <Printer size={15} />,
+      accent: "text-amber-600 bg-amber-50",
+      action: () => void runAction(onPdf),
+    },
+    {
+      label: "JSON Audit Snapshot (.json)",
+      hint: "Structured backup & clinical payload",
+      icon: <FileJson size={15} />,
+      accent: "text-slate-600 bg-slate-100",
+      action: () => void runAction(onJson),
+    },
+  ];
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        type="button"
+        disabled={busy}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        className={`bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-lg shadow-emerald-600/20 ${
+          compact ? "px-3 py-1.5" : "px-3.5 py-2.5"
+        }`}
+        title={scopeNote}
+      >
+        <Download size={compact ? 13 : 15} />
+        <span>{busy ? "Preparing..." : buttonLabel}</span>
+        <ChevronDown size={compact ? 12 : 14} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 mt-2 w-72 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 overflow-hidden"
+        >
+          <div className="px-3.5 py-2 border-b border-slate-100 bg-slate-50/80">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Export Format</p>
+            <p className="text-[11px] font-medium text-slate-600 mt-0.5">{scopeNote}</p>
+          </div>
+          <div className="py-1">
+            {options.map((opt) => (
+              <button
+                key={opt.label}
+                type="button"
+                role="menuitem"
+                onClick={opt.action}
+                className="w-full px-3.5 py-2.5 text-left hover:bg-slate-50 transition-colors flex items-start gap-2.5 cursor-pointer"
+              >
+                <span className={`p-1.5 rounded-lg shrink-0 ${opt.accent}`}>{opt.icon}</span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-bold text-slate-800 leading-tight">{opt.label}</span>
+                  <span className="block text-[10px] text-slate-500 mt-0.5">{opt.hint}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function InventoryPage() {
   const [role, setRole] = useState<string | null>(null);
   const canManage = role === "ADMIN" || role === "MD" || role === "ASM" || role === "WAREHOUSE" || (role !== "MR" && role !== "DOCTOR" && role !== "DISTRIBUTOR");
   // Purchase rate, margins, stock value/level, forecast, batch & audit are commercially
   // confidential -- only ADMIN sees them here, in both the header and every row.
   const isAdmin = role === "ADMIN";
-  const tableColSpan = 5 + (isAdmin ? 8 : 0) + (canManage ? 1 : 0);
+  const tableColSpan = 4 + (isAdmin ? 8 : 0) + (canManage ? 1 : 0);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
+  const [inspectProduct, setInspectProduct] = useState<Product | null>(null);
+  const [catalogView, setCatalogView] = useState<"cards" | "table">("cards");
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -142,7 +338,6 @@ export default function InventoryPage() {
     packSize: string;
     mrp: number;
     ptr: number;
-    pts: number;
     purchaseRate: number;
     chemistMarginPct: number;
     stockistMarginPct: number;
@@ -166,10 +361,9 @@ export default function InventoryPage() {
     packSize: "",
     mrp: 97.22,
     ptr: 77.78,
-    pts: 70,
     purchaseRate: 50,
     chemistMarginPct: 20,
-    stockistMarginPct: 10,
+    stockistMarginPct: 0,
     companyMarginPct: 40,
     autoCalculate: true,
     anchorMode: "PURCHASE_RATE",
@@ -192,7 +386,7 @@ export default function InventoryPage() {
       const chemistMarginPct = pct;
       const mrp = Number(prev.mrp) || 0;
       const ptr = mrp > 0 ? round2(mrp * (1 - pct / 100)) : prev.ptr;
-      return { ...prev, chemistMarginPct, ptr, pts: ptr };
+      return { ...prev, chemistMarginPct, ptr };
     });
   };
 
@@ -333,10 +527,9 @@ export default function InventoryPage() {
     setEditingProduct(p);
     const mrp = Number(p.mrp || 0);
     const ptr = Number(p.ptr || 0);
-    const pts = Number(p.pts || 0);
 
     let chemistMarginPct = 20;
-    let stockistMarginPct = 10;
+    const stockistMarginPct = 0;
     let companyMarginPct = 40;
     let purchaseRate = Number(p.purchaseRate || 0);
     let autoCalculate = true;
@@ -344,7 +537,6 @@ export default function InventoryPage() {
 
     if (p.marginSettings) {
       chemistMarginPct = p.marginSettings.chemistMarginPct;
-      stockistMarginPct = p.marginSettings.stockistMarginPct;
       companyMarginPct = p.marginSettings.companyMarginPct;
       purchaseRate = p.marginSettings.purchaseRate || purchaseRate;
       autoCalculate = p.marginSettings.autoCalculate !== false;
@@ -353,7 +545,6 @@ export default function InventoryPage() {
       try {
         const ms = JSON.parse(p.marginStructure);
         chemistMarginPct = Number(ms.chemistMarginPct) || 20;
-        stockistMarginPct = Number(ms.stockistMarginPct) || 10;
         companyMarginPct = Number(ms.companyMarginPct) || 40;
         purchaseRate = Number(ms.purchaseRate) || purchaseRate;
         autoCalculate = ms.autoCalculate !== false;
@@ -363,17 +554,14 @@ export default function InventoryPage() {
       }
     }
 
-    if (!purchaseRate && pts > 0) {
-      purchaseRate = round2(pts / (1 + companyMarginPct / 100));
+    if (!purchaseRate && ptr > 0) {
+      purchaseRate = round2(ptr / (1 + companyMarginPct / 100));
     }
 
-    if (purchaseRate > 0 && pts > 0) {
-      companyMarginPct = round2(((pts - purchaseRate) / purchaseRate) * 100);
+    if (purchaseRate > 0 && ptr > 0) {
+      companyMarginPct = round2(((ptr - purchaseRate) / purchaseRate) * 100);
     }
 
-    if (ptr > 0 && pts > 0 && pts <= ptr) {
-      stockistMarginPct = round2(((ptr - pts) / ptr) * 100);
-    }
     if (mrp > 0 && ptr > 0) {
       chemistMarginPct = round2(((mrp - ptr) / mrp) * 100);
     }
@@ -386,7 +574,6 @@ export default function InventoryPage() {
       packSize: p.packSize || "",
       mrp,
       ptr,
-      pts,
       purchaseRate,
       chemistMarginPct,
       stockistMarginPct,
@@ -419,8 +606,7 @@ export default function InventoryPage() {
       packSize: "",
       purchaseRate: 50,
       companyMarginPct: 40,
-      pts: 70,
-      stockistMarginPct: 10,
+      stockistMarginPct: 0,
       ptr: 77.78,
       chemistMarginPct: 20,
       mrp: 97.22,
@@ -450,7 +636,7 @@ export default function InventoryPage() {
         anchorMode: formData.anchorMode,
         purchaseRate: Number(formData.purchaseRate) || 0,
         companyMarginPct: Number(formData.companyMarginPct) || 40,
-        stockistMarginPct: Number(formData.stockistMarginPct) || 10,
+        stockistMarginPct: 0,
         chemistMarginPct: Number(formData.chemistMarginPct) || 20,
         autoCalculate: formData.autoCalculate,
         calculationMode: formData.autoCalculate ? "PERCENTAGE" : "MANUAL",
@@ -465,7 +651,7 @@ export default function InventoryPage() {
         packSize: formData.packSize.trim() || null,
         mrp: Number(formData.mrp) || 0,
         ptr: Number(formData.ptr) || 0,
-        pts: Number(formData.pts) || 0,
+        pts: Number(formData.ptr) || 0,
         purchaseRate: Number(formData.purchaseRate) || 0,
         marginStructure,
         hsnCode: formData.hsnCode.trim() || null,
@@ -521,36 +707,132 @@ export default function InventoryPage() {
     );
   });
 
+  const portfolioSummary = isAdmin
+    ? products.reduce(
+        (acc, p) => {
+          const cost = Number(p.stockValueAtCost ?? (p.stockQty * rowCost(p).value));
+          const stockVal = Number(p.stockValue ?? (p.stockQty * Number(p.ptr || p.price || 0)));
+          const potentialProfit = Number(p.potentialStockProfit ?? stockVal - cost);
+          const pa = p.profitAnalytics;
+          acc.totalStrips += p.stockQty;
+          acc.totalBoxes += Number(p.stockBoxes ?? p.stockQty / 10);
+          acc.totalSamples += Number(p.mrSampleQty ?? 0);
+          acc.totalStockCost += cost;
+          acc.totalStockValue += stockVal;
+          acc.totalPotentialProfit += potentialProfit;
+          acc.realizedRevenue += Number(pa?.realizedRevenue ?? 0);
+          acc.realizedCost += Number(pa?.realizedCost ?? 0);
+          acc.realizedProfit += Number(pa?.realizedProfit ?? 0);
+          acc.totalBilledSold += Number(pa?.invoicedBilledQty ?? 0);
+          acc.totalFreeGiven += Number(pa?.invoicedFreeQty ?? 0);
+          if (p.stockQty <= 50) acc.lowStockCount += 1;
+          return acc;
+        },
+        {
+          totalStrips: 0,
+          totalBoxes: 0,
+          totalSamples: 0,
+          totalStockCost: 0,
+          totalStockValue: 0,
+          totalPotentialProfit: 0,
+          realizedRevenue: 0,
+          realizedCost: 0,
+          realizedProfit: 0,
+          totalBilledSold: 0,
+          totalFreeGiven: 0,
+          lowStockCount: 0,
+        }
+      )
+    : null;
+
+  const exportProductsList = filteredProducts.length > 0 ? filteredProducts : products;
+
   return (
     <div className="space-y-6">
       {/* Top bar */}
-      <div className="bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-white">
-        <div className="flex items-center gap-3">
-          <div className="bg-indigo-600 p-2.5 rounded-xl text-white">
-            <Package size={22} />
+      <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/90 rounded-2xl p-6 shadow-lg border border-slate-800 text-white space-y-4">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="bg-indigo-600 p-3 rounded-xl text-white shadow-lg shadow-indigo-600/30 shrink-0">
+              <Package size={22} />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-display font-bold tracking-tight">Central Product Inventory</h1>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-200 border border-indigo-400/30">
+                  PTR Billing Only
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1">
+                Know every medicine&apos;s formula, stock (strips &amp; boxes), PTR pricing, and real profit after free schemes.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-display font-bold">Central Product Inventory</h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Manage product formulas, pricing structures, and central warehouse stock levels.
-            </p>
+
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:justify-end">
+            <button
+              type="button"
+              onClick={fetchProducts}
+              className="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-100 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Refresh inventory list"
+            >
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+            {products.length > 0 && (
+              <DownloadFormatDropdown
+                buttonLabel="Download Report"
+                scopeNote={
+                  isAdmin
+                    ? `${exportProductsList.length} medicine${exportProductsList.length === 1 ? "" : "s"} · Full Stock, Clinical & Profit Analysis`
+                    : `${exportProductsList.length} medicine${exportProductsList.length === 1 ? "" : "s"} · Catalog & Clinical Dossier`
+                }
+                onExcel={() => downloadInventoryExcel(exportProductsList, isAdmin)}
+                onCsv={() => downloadInventoryCsv(exportProductsList, isAdmin)}
+                onHtml={() => downloadInventoryHtml(exportProductsList, isAdmin)}
+                onPdf={() => printInventoryPdf(exportProductsList, isAdmin)}
+                onJson={() => downloadInventoryJson(exportProductsList, isAdmin)}
+              />
+            )}
+            {canManage && (
+              <button
+                type="button"
+                onClick={handleOpenAdd}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-lg shadow-indigo-600/25"
+              >
+                <Plus size={16} /> Add Product
+              </button>
+            )}
           </div>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            onClick={fetchProducts}
-            className="p-2.5 bg-slate-850 hover:bg-slate-800 text-white rounded-xl transition-colors cursor-pointer"
-            title="Refresh inventory list"
-          >
-            <RefreshCw size={16} />
-          </button>
-          {canManage && (
-            <button
-              onClick={handleOpenAdd}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-lg shadow-indigo-600/20 w-full sm:w-auto"
-            >
-              <Plus size={16} /> Add Product
-            </button>
+
+        {/* Crisp live banner status strip */}
+        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-800/80 text-[11px]">
+          <span className="px-2.5 py-1 rounded-lg bg-slate-800/90 border border-slate-700/80 text-slate-200 font-semibold">
+            {products.length} Active Medicine{products.length === 1 ? "" : "s"}
+          </span>
+          {searchQuery.trim() && (
+            <span className="px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 font-semibold">
+              Filtered View: {filteredProducts.length} shown (exports match filter)
+            </span>
+          )}
+          {isAdmin && portfolioSummary && (
+            <>
+              <span className="px-2.5 py-1 rounded-lg bg-slate-800/90 border border-slate-700/80 text-slate-200 font-semibold">
+                {portfolioSummary.totalStrips.toLocaleString("en-IN")} Strips ({portfolioSummary.totalBoxes.toFixed(1)} Boxes)
+              </span>
+              <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold">
+                Realized Profit: {currency(portfolioSummary.realizedProfit)}
+              </span>
+              <span className="px-2.5 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 font-bold">
+                Potential Stock Profit @ PTR: {currency(portfolioSummary.totalPotentialProfit)}
+              </span>
+              {portfolioSummary.lowStockCount > 0 && (
+                <span className="px-2.5 py-1 rounded-lg bg-rose-500/20 border border-rose-500/30 text-rose-200 font-bold">
+                  {portfolioSummary.lowStockCount} Low Stock Alert{portfolioSummary.lowStockCount === 1 ? "" : "s"}
+                </span>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -628,135 +910,143 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Admin/ASM: give stock to an MR */}
-      {(role === "ASM" || role === "ADMIN" || role === "MD") && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-            <h2 className="text-xs font-bold text-slate-800">Give Stock to MR</h2>
-          </div>
-          <form onSubmit={handleAllocate} className="p-4 flex flex-col sm:flex-row gap-3 items-end">
-            <div className="flex-1 w-full space-y-1">
-              <label className="text-xs font-semibold text-slate-600">MR</label>
-              <SearchableSelect
-                value={allocEmployeeId}
-                onChange={(e) => setAllocEmployeeId(e.target.value)}
-                placeholder="Select MR"
-                searchPlaceholder="Search MR..."
-                allowClear
-              >
-                <option value="">Select MR</option>
-                {mrList.map((m) => (
-                  <option key={m.employeeId} value={m.employeeId}>{m.firstName} {m.lastName}</option>
-                ))}
-              </SearchableSelect>
-            </div>
-            <div className="flex-1 w-full space-y-1">
-              <label className="text-xs font-semibold text-slate-600">Product</label>
-              <SearchableSelect
-                value={allocProductId}
-                onChange={(e) => setAllocProductId(e.target.value)}
-                placeholder="Select product"
-                searchPlaceholder="Search product..."
-                allowClear
-              >
-                <option value="">Select product</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </SearchableSelect>
-            </div>
-            <div className="w-full sm:w-28 space-y-1">
-              <label className="text-xs font-semibold text-slate-600">Qty</label>
-              <input
-                type="number"
-                min={1}
-                value={allocQty}
-                onChange={(e) => setAllocQty(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={allocSubmitting}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-50 w-full sm:w-auto"
-            >
-              {allocSubmitting ? "Giving..." : "Give Stock"}
-            </button>
-          </form>
-          {allocError && <p className="px-4 pb-3 text-xs text-rose-600">{allocError}</p>}
-          {allocSuccess && <p className="px-4 pb-3 text-xs text-emerald-600">{allocSuccess}</p>}
-        </div>
-      )}
-
-      {/* Admin/ASM: per-MR stock value across the field force */}
-      {(role === "ASM" || role === "ADMIN" || role === "MD") && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-            <h2 className="text-xs font-bold text-slate-800">MR Sample Stock &amp; Estimated Value</h2>
-            <span className="text-[11px] font-semibold text-slate-500">
-              {mrStock.length} rep{mrStock.length === 1 ? "" : "s"} · {currency(mrStock.reduce((s, r) => s + r.totalEstimatedValue, 0))} total
-            </span>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {mrStockLoading ? (
-              <div className="px-4 py-8 text-center text-slate-400">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500 mx-auto" />
+      {/* Admin/MD Portfolio Profit Strip & Central Product Inventory appear first (MR allocation panels sit cleanly below) */}
+      {/* Admin Executive Profit & Valuation Overview */}
+      {isAdmin && portfolioSummary && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span>Warehouse Stock</span>
+                <Layers size={14} className="text-indigo-500" />
               </div>
-            ) : mrStock.length === 0 ? (
-              <div className="px-4 py-8 text-center text-slate-400 font-medium text-xs">No MR carrying stock currently.</div>
-            ) : (
-              mrStock.map((rep) => (
-                <div key={rep.employeeId}>
-                  <button
-                    onClick={() => setExpandedRep(expandedRep === rep.employeeId ? null : rep.employeeId)}
-                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
-                  >
-                    <span className="font-bold text-slate-800 text-xs">{rep.employeeName}</span>
-                    <span className="flex items-center gap-3 text-xs">
-                      <span className="text-slate-400">{rep.items.length} product{rep.items.length === 1 ? "" : "s"}</span>
-                      <span className="font-bold text-indigo-700">{currency(rep.totalEstimatedValue)}</span>
-                    </span>
-                  </button>
-                  {expandedRep === rep.employeeId && (
-                    <table className="w-full text-left text-xs border-collapse bg-slate-50/50">
-                      <tbody className="divide-y divide-slate-100">
-                        {rep.items.map((it) => (
-                          <tr key={it.productId}>
-                            <td className="px-4 py-2 pl-8 text-slate-600">{it.productName}</td>
-                            <td className="px-4 py-2 text-right text-slate-500">Qty {it.quantity}</td>
-                            <td className="px-4 py-2 text-right text-slate-500">{currency(it.unitValue)}/u</td>
-                            <td className="px-4 py-2 text-right font-semibold text-slate-700">{currency(it.estimatedValue)}</td>
-                            <td className="px-4 py-2 text-right text-slate-400 text-[10px]">
-                              {new Date(it.lastGivenAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}{" "}
-                              {new Date(it.lastGivenAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                            </td>
-                            <td className="px-4 py-2 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <button
-                                  onClick={() => handleOpenStockEdit(rep, it)}
-                                  className="p-1.5 hover:bg-slate-200 hover:text-indigo-600 rounded-lg transition-colors cursor-pointer text-slate-400"
-                                  title="Edit quantity"
-                                >
-                                  <Edit2 size={12} />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteStockRow(it)}
-                                  className="p-1.5 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors cursor-pointer text-slate-400"
-                                  title="Remove from MR's stock"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              ))
-            )}
+              <p className="text-xl font-black text-slate-900 mt-1 tabular-nums">
+                {portfolioSummary.totalStrips.toLocaleString("en-IN")} <span className="text-xs font-semibold text-slate-500">strips</span>
+              </p>
+              <p className="text-[11px] text-slate-500 mt-1">
+                {portfolioSummary.totalBoxes.toFixed(1)} boxes · MR samples: {portfolioSummary.totalSamples.toLocaleString("en-IN")}
+                {portfolioSummary.lowStockCount > 0 && (
+                  <span className="ml-1.5 text-rose-600 font-bold">· {portfolioSummary.lowStockCount} low</span>
+                )}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span>Stock Cost Outlay</span>
+                <Package size={14} className="text-slate-500" />
+              </div>
+              <p className="text-xl font-black text-slate-900 mt-1 tabular-nums">
+                {currencyExact(portfolioSummary.totalStockCost)}
+              </p>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Capital at purchase cost
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-emerald-200/80 bg-emerald-50/30 p-4 shadow-sm">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                <span>Stock Profit (@ PTR)</span>
+                <TrendingUp size={14} className="text-emerald-600" />
+              </div>
+              <p className="text-xl font-black text-emerald-700 mt-1 tabular-nums">
+                {currencyExact(portfolioSummary.totalPotentialProfit)}
+              </p>
+              <p className="text-[11px] text-emerald-700/80 mt-1 tabular-nums">
+                Sell Value @ PTR: {currencyExact(portfolioSummary.totalStockValue)}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span>Invoiced Sales (Excl. GST)</span>
+                <Calculator size={14} className="text-indigo-500" />
+              </div>
+              <p className="text-xl font-black text-slate-900 mt-1 tabular-nums">
+                {currencyExact(portfolioSummary.realizedRevenue)}
+              </p>
+              <p className="text-[11px] text-slate-500 mt-1 tabular-nums">
+                {portfolioSummary.totalBilledSold.toLocaleString("en-IN")} billed + {portfolioSummary.totalFreeGiven.toLocaleString("en-IN")} free strips
+              </p>
+            </div>
+
+            <div className="bg-slate-900 text-white rounded-2xl border border-slate-800 p-4 shadow-sm">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+                <span>Realized Net Profit</span>
+                <Sparkles size={14} className="text-amber-400" />
+              </div>
+              <p className={`text-xl font-black mt-1 tabular-nums ${
+                portfolioSummary.realizedProfit >= 0 ? "text-emerald-400" : "text-rose-400"
+              }`}>
+                {currencyExact(portfolioSummary.realizedProfit)}
+              </p>
+              <p className="text-[11px] text-slate-300 mt-1 tabular-nums">
+                Margin:{" "}
+                <strong className="text-white">
+                  {portfolioSummary.realizedRevenue > 0
+                    ? `${((portfolioSummary.realizedProfit / portfolioSummary.realizedRevenue) * 100).toFixed(1)}%`
+                    : "0.0%"}
+                </strong>{" "}
+                (after free schemes)
+              </p>
+            </div>
           </div>
+
+          {/* Profit Contribution Leaderboard Strip across all Medicines */}
+          {portfolioSummary.realizedProfit > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                  Realized Profit Leaderboard by Medicine (Click any SKU to inspect)
+                </span>
+                <span className="text-[11px] font-semibold text-slate-500">
+                  Total Realized: {currencyExact(portfolioSummary.realizedProfit)} across {products.length} medicines
+                </span>
+              </div>
+              {(() => {
+                const palette = ["bg-indigo-600", "bg-emerald-500", "bg-cyan-500", "bg-violet-500", "bg-amber-500", "bg-rose-500", "bg-slate-500"];
+                const ranked = [...products]
+                  .filter((p) => (p.profitAnalytics?.realizedProfit ?? 0) > 0)
+                  .sort((a, b) => (b.profitAnalytics?.realizedProfit ?? 0) - (a.profitAnalytics?.realizedProfit ?? 0));
+                return (
+                  <>
+                    <div className="h-2.5 w-full rounded-full overflow-hidden flex bg-slate-100">
+                      {ranked.map((p, idx) => {
+                        const pct = ((p.profitAnalytics?.realizedProfit ?? 0) / portfolioSummary.realizedProfit) * 100;
+                        return (
+                          <div
+                            key={p.id}
+                            style={{ width: `${Math.max(1.5, pct)}%` }}
+                            className={`${palette[idx % palette.length]} h-full transition-all`}
+                            title={`${p.name}: ${currencyExact(p.profitAnalytics?.realizedProfit ?? 0)} (${pct.toFixed(1)}%)`}
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {ranked.map((p, idx) => {
+                        const val = p.profitAnalytics?.realizedProfit ?? 0;
+                        const share = (val / portfolioSummary.realizedProfit) * 100;
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setInspectProduct(p)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 text-[11px] transition-colors cursor-pointer"
+                          >
+                            <span className={`w-2 h-2 rounded-full ${palette[idx % palette.length]}`} />
+                            <span className="font-bold text-slate-800">{p.name}</span>
+                            <span className="font-bold text-emerald-700 tabular-nums">{currencyExact(val)}</span>
+                            <span className="text-[10px] text-slate-400 tabular-nums">({share.toFixed(1)}%)</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </div>
       )}
 
@@ -766,8 +1056,8 @@ export default function InventoryPage() {
         <div className={`bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col ${
           editingProduct || isAdding ? "lg:col-span-8" : "lg:col-span-12"
         }`}>
-          {/* Table Search */}
-          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center gap-3">
+          {/* Table Search & View Switcher */}
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-wrap justify-between items-center gap-3">
             <div className="relative w-full max-w-xs">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 pointer-events-none">
                 <Search size={14} />
@@ -780,11 +1070,258 @@ export default function InventoryPage() {
                 className="bg-white border border-slate-200 text-xs rounded-xl pl-9 pr-4 py-2 w-full text-slate-800 focus:outline-none focus:border-indigo-500"
               />
             </div>
-            <span className="text-[11px] font-semibold text-slate-500">
-              Showing {filteredProducts.length} of {products.length} Products
-            </span>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="inline-flex rounded-xl border border-slate-200 bg-white p-0.5 text-[11px] font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setCatalogView("cards")}
+                  className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                    catalogView === "cards"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  Medicine Cards
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCatalogView("table")}
+                  className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                    catalogView === "table"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  Full Table
+                </button>
+              </div>
+              <span className="text-[11px] font-semibold text-slate-500">
+                Showing {filteredProducts.length} of {products.length} Products
+              </span>
+            </div>
           </div>
 
+          {catalogView === "cards" ? (
+            <div className="p-4">
+              {loading ? (
+                <div className="py-12 text-center text-slate-400">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500 mx-auto mb-2" />
+                  Loading products...
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 font-medium text-xs">
+                  No products found.
+                </div>
+              ) : (
+                <div className={`grid grid-cols-1 gap-4 ${
+                  editingProduct || isAdding ? "md:grid-cols-2" : "md:grid-cols-2 xl:grid-cols-3"
+                }`}>
+                  {filteredProducts.map((p) => {
+                    const cost = rowCost(p);
+                    const ptrValue = Number(p.ptr || p.price || 0);
+                    const mrpValue = Number(p.mrp || 0);
+                    const unitProfit = p.unitProfit ?? (ptrValue > 0 && cost.value > 0 ? Math.round((ptrValue - cost.value) * 100) / 100 : 0);
+                    const grossMarginOnPtrPct = ptrValue > 0 && cost.value > 0 ? Math.round(((ptrValue - cost.value) / ptrValue) * 1000) / 10 : null;
+                    const boxesEq = p.stockBoxes ?? Math.round((p.stockQty / 10) * 10) / 10;
+                    const stockCost = Number(p.stockValueAtCost ?? Math.round(p.stockQty * cost.value * 100) / 100);
+                    const stockVal = Number(p.stockValue ?? Math.round(p.stockQty * ptrValue * 100) / 100);
+                    const potentialProfit = Number(p.potentialStockProfit ?? Math.round((stockVal - stockCost) * 100) / 100);
+                    const pa = p.profitAnalytics;
+                    const shareOfProfitPct =
+                      portfolioSummary && portfolioSummary.realizedProfit > 0 && pa
+                        ? Math.round((pa.realizedProfit / portfolioSummary.realizedProfit) * 1000) / 10
+                        : null;
+                    const clinical = getMedicineReference(p);
+                    const shelf = computeShelfLife(p.currentExpDate);
+
+                    return (
+                      <div
+                        key={p.id}
+                        className="rounded-2xl border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md transition-all p-4 flex flex-col justify-between gap-3"
+                      >
+                        {/* Header & Medicine Identity */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <h3 className="text-sm font-black text-slate-900">{p.name}</h3>
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 text-indigo-700">
+                                  {p.therapySegment || "General"}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 mt-0.5">
+                                SKU: <span className="font-semibold text-slate-700">{p.sku}</span> · Pack:{" "}
+                                <span className="font-semibold text-slate-700">{p.packSize || "N/A"}</span>
+                                {p.gstPct != null && ` · GST ${Number(p.gstPct)}%`}
+                                {p.hsnCode && ` · HSN ${p.hsnCode}`}
+                              </p>
+                            </div>
+                            {isAdmin && (
+                              <span
+                                className={`shrink-0 px-2 py-0.5 rounded-lg text-[10px] font-bold tabular-nums ${
+                                  p.stockQty <= 20
+                                    ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                    : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                }`}
+                              >
+                                {p.stockQty.toLocaleString("en-IN")} strips
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="bg-slate-50 rounded-xl px-2.5 py-2 border border-slate-100 space-y-1">
+                            <p className="text-xs font-medium text-slate-700">
+                              {p.composition || "Composition not set"}
+                              {p.strength ? ` (${p.strength})` : ""}
+                            </p>
+                            <p className="text-[10px] font-semibold text-indigo-700">
+                              {clinical.therapeuticClass}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                              {clinical.targetSpecialties.slice(0, 3).map((spec) => (
+                                <span
+                                  key={spec}
+                                  className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-[9px] font-semibold text-slate-600"
+                                >
+                                  {spec}
+                                </span>
+                              ))}
+                              {shelf.status !== "UNKNOWN" && (
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                    shelf.status === "EXPIRED" || shelf.status === "EXPIRING_SOON"
+                                      ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                      : shelf.status === "WATCH"
+                                      ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                      : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  }`}
+                                >
+                                  Exp: {shelf.label}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Pricing & Margin Ladder */}
+                        <div className="grid grid-cols-3 gap-1.5 text-center bg-slate-50/70 rounded-xl p-2 border border-slate-100">
+                          <div>
+                            <span className="text-[9px] font-bold uppercase text-slate-400 block">MRP</span>
+                            <span className="text-xs font-bold text-slate-700 tabular-nums">₹{mrpValue.toFixed(2)}</span>
+                          </div>
+                          <div className="border-x border-slate-200">
+                            <span className="text-[9px] font-bold uppercase text-indigo-600 block">PTR (Sell)</span>
+                            <span className="text-xs font-black text-slate-900 tabular-nums">₹{ptrValue.toFixed(2)}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] font-bold uppercase text-emerald-700 block">
+                              {isAdmin ? "Cost / +Profit" : "Pack"}
+                            </span>
+                            {isAdmin ? (
+                              <span className="text-xs font-bold text-emerald-700 tabular-nums">
+                                ₹{cost.value.toFixed(2)} / +₹{unitProfit.toFixed(2)}
+                              </span>
+                            ) : (
+                              <span className="text-xs font-semibold text-slate-600">{p.packSize || "—"}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Admin Stock + Realized Profit Box */}
+                        {isAdmin && (
+                          <div className="space-y-2 text-xs">
+                            <div className="flex items-center justify-between text-[11px] text-slate-600 px-0.5 tabular-nums">
+                              <span>
+                                Stock: <strong className="text-slate-900">{boxesEq.toFixed(1)} boxes</strong>
+                                {p.mrSampleQty ? ` · MR ${p.mrSampleQty}` : ""}
+                                {p.earliestStockQty != null ? ` (from ${p.earliestStockQty.toLocaleString("en-IN")}u)` : ""}
+                              </span>
+                              <span>
+                                {p.currentBatchNo ? `Batch ${p.currentBatchNo}` : "No batch"}
+                                {p.forecast?.daysRemaining != null ? ` · ${p.forecast.daysRemaining}d left` : ""}
+                              </span>
+                            </div>
+
+                            <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-2.5 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                  Realized Profit ({pa?.invoicedCount ?? 0} inv)
+                                </span>
+                                {shareOfProfitPct !== null && (
+                                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">
+                                    {shareOfProfitPct}% share
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-baseline justify-between gap-2 tabular-nums">
+                                <span className={`text-base font-black ${(pa?.realizedProfit ?? 0) >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                                  {currencyExact(pa?.realizedProfit ?? 0)}
+                                </span>
+                                <span className="text-[11px] font-semibold text-slate-600">
+                                  {pa?.realizedMarginPct != null ? `${pa.realizedMarginPct.toFixed(1)}% net` : `${grossMarginOnPtrPct?.toFixed(1) ?? "0.0"}% PTR`}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between text-[10px] text-slate-600 pt-1 border-t border-emerald-200/60 tabular-nums">
+                                <span>
+                                  Sold: {pa?.invoicedBilledQty ?? 0} + {pa?.invoicedFreeQty ?? 0} free (Burden {currency(pa?.freeCostBurden ?? 0)})
+                                </span>
+                                <span className="font-semibold text-slate-800">
+                                  Stock Profit: {currency(potentialProfit)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setInspectProduct(p)}
+                            className="flex-1 py-1.5 px-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <Eye size={13} /> {isAdmin ? "Know Medicine & Profit" : "Know Medicine"}
+                          </button>
+                          <div className="flex items-center gap-1">
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => setHistoryProduct(p)}
+                                className="p-1.5 hover:bg-slate-100 hover:text-indigo-600 rounded-lg transition-colors cursor-pointer text-slate-400"
+                                title="View stock movement audit trail"
+                              >
+                                <History size={14} />
+                              </button>
+                            )}
+                            {canManage && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEdit(p)}
+                                  className="p-1.5 hover:bg-slate-100 hover:text-indigo-600 rounded-lg transition-colors cursor-pointer text-slate-500"
+                                  title="Edit Product details / stock"
+                                >
+                                  <Edit2 size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(p.id, p.name)}
+                                  className="p-1.5 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors cursor-pointer text-slate-500"
+                                  title="Delete Product"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
@@ -793,17 +1330,16 @@ export default function InventoryPage() {
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Molecule / Segment</th>
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">MRP</th>
                   <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">PTR</th>
-                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">PTS</th>
                   {isAdmin && (
                     <>
-                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Purchase Rate (cost)</th>
-                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-center">Gross Margin (% of PTR)</th>
-                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Stock level</th>
-                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Stock Value</th>
-                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Last Updated</th>
-                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Forecast</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Cost &amp; Unit Profit</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-center">Margin %</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Warehouse Stock</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Stock Value &amp; Profit</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Realized Sales Profit</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Forecast / Updated</th>
                       <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Current Batch</th>
-                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-center">Audit</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-center">Know / Audit</th>
                     </>
                   )}
                   {canManage && <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-center">Actions</th>}
@@ -826,96 +1362,159 @@ export default function InventoryPage() {
                 ) : (
                   filteredProducts.map((p) => {
                     const cost = rowCost(p);
-                    // Gross margin here is a MARGIN ON THE SELLING PRICE (PTR),
-                    // i.e. (PTR - cost) / PTR. It is NOT the markup on cost that
-                    // drives the pricing ladder - the two are different numbers.
                     const ptrValue = Number(p.ptr || 0);
+                    const unitProfit = p.unitProfit ?? (ptrValue > 0 && cost.value > 0 ? Math.round((ptrValue - cost.value) * 100) / 100 : 0);
                     const grossMarginOnPtrPct =
                       ptrValue > 0 && cost.value > 0
                         ? Math.round(((ptrValue - cost.value) / ptrValue) * 1000) / 10
                         : null;
+                    const boxesEq = p.stockBoxes ?? Math.round((p.stockQty / 10) * 10) / 10;
+                    const potentialProfit =
+                      p.potentialStockProfit ??
+                      (p.stockValue !== undefined && p.stockValueAtCost !== undefined && p.stockValueAtCost !== null
+                        ? Math.round((p.stockValue - p.stockValueAtCost) * 100) / 100
+                        : null);
+                    const pa = p.profitAnalytics;
                     return (
                     <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-4 py-3">
-                        <p className="font-bold text-slate-800 leading-tight">{p.name}</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">SKU: {p.sku} | Pack: {p.packSize || "N/A"}</p>
+                        {isAdmin ? (
+                          <button
+                            type="button"
+                            onClick={() => setInspectProduct(p)}
+                            className="text-left group cursor-pointer"
+                            title="Inspect medicine details & profit breakdown"
+                          >
+                            <p className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors leading-tight underline decoration-dotted decoration-slate-300 underline-offset-2">
+                              {p.name}
+                            </p>
+                          </button>
+                        ) : (
+                          <p className="font-bold text-slate-800 leading-tight">{p.name}</p>
+                        )}
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          SKU: {p.sku} · Pack: {p.packSize || "N/A"}
+                          {p.gstPct != null && ` · GST ${Number(p.gstPct)}%`}
+                        </p>
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-semibold text-slate-700 leading-tight">{p.composition || "-"}</p>
-                        <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 text-indigo-700">
-                          {p.therapySegment || "General"}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1 mt-1">
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 text-indigo-700">
+                            {p.therapySegment || "General"}
+                          </span>
+                          {p.hsnCode && (
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 text-slate-500">
+                              HSN {p.hsnCode}
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-right font-medium text-slate-700">₹{Number(p.mrp || 0).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right font-medium text-slate-700">₹{Number(p.ptr || 0).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right font-medium text-slate-700">₹{Number(p.pts || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right font-medium text-slate-700 tabular-nums">₹{Number(p.mrp || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-slate-900 tabular-nums">₹{Number(p.ptr || 0).toFixed(2)}</td>
                       {isAdmin && (
                         <>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-600">
+                        <td className="px-4 py-3 text-right tabular-nums">
                           {cost.value > 0 ? (
                             <>
-                              ₹{cost.value.toFixed(2)}
-                              {!cost.exact && (
-                                <span
-                                  className="ml-1 inline-block px-1 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 align-middle"
-                                  title={`Estimated: no purchase rate is recorded, so this uses ${cost.source} as a proxy for cost.`}
-                                >
-                                  est.
-                                </span>
-                              )}
+                              <p className="font-semibold text-slate-700">
+                                ₹{cost.value.toFixed(2)}
+                                {!cost.exact && (
+                                  <span
+                                    className="ml-1 inline-block px-1 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 align-middle"
+                                    title={`Estimated: no purchase rate is recorded, so this uses ${cost.source} as a proxy for cost.`}
+                                  >
+                                    est.
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-[10px] font-bold text-emerald-700 mt-0.5">
+                                +₹{unitProfit.toFixed(2)}/strip
+                              </p>
                             </>
                           ) : (
-                            <span className="text-slate-300" title="No purchase rate, PTS, PTR or price is set for this product.">—</span>
+                            <span className="text-slate-300" title="No purchase rate, PTR or price is set for this product.">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {grossMarginOnPtrPct === null ? (
                             <span className="text-slate-300" title="Needs a PTR and a cost basis.">—</span>
                           ) : (
-                            <span
-                              className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                                cost.exact
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                  : "bg-amber-50 text-amber-700 border-amber-200"
-                              }`}
-                              title={
-                                cost.exact
-                                  ? "(PTR - purchase rate) / PTR - margin on the PTR selling price."
-                                  : `Estimate: (PTR - ${cost.source}) / PTR. No purchase rate is recorded for this product.`
-                              }
-                            >
-                              {grossMarginOnPtrPct.toFixed(1)}%{cost.exact ? "" : " est."}
-                            </span>
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                  cost.exact
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : "bg-amber-50 text-amber-700 border-amber-200"
+                                }`}
+                                title={
+                                  cost.exact
+                                    ? "(PTR - purchase rate) / PTR - gross margin before free scheme goods."
+                                    : `Estimate: (PTR - ${cost.source}) / PTR. No purchase rate is recorded for this product.`
+                                }
+                              >
+                                {grossMarginOnPtrPct.toFixed(1)}% PTR{cost.exact ? "" : " est."}
+                              </span>
+                              {pa && pa.realizedMarginPct !== null && (
+                                <span
+                                  className="text-[10px] font-semibold text-indigo-700"
+                                  title="Net realized profit margin across raised invoices after free scheme cost"
+                                >
+                                  {pa.realizedMarginPct.toFixed(1)}% Net
+                                </span>
+                              )}
+                            </div>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-right tabular-nums">
                           <span className={`inline-block font-bold text-xs ${
                             p.stockQty <= 20 ? "text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg" : "text-emerald-700"
                           }`}>
-                            {p.stockQty}
+                            {p.stockQty.toLocaleString("en-IN")} strips
                           </span>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            {boxesEq.toFixed(1)} boxes{p.mrSampleQty ? ` · MR ${p.mrSampleQty}` : ""}
+                          </p>
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-700">
-                          {p.stockValue !== undefined ? `₹${p.stockValue.toLocaleString("en-IN")}` : "—"}
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          <p className="font-semibold text-slate-700">
+                            {p.stockValue !== undefined ? currency(p.stockValue) : "—"}
+                          </p>
+                          {potentialProfit !== null && (
+                            <p className="text-[10px] font-bold text-emerald-700 mt-0.5" title="Potential gross profit if current warehouse stock sells at PTR">
+                              Profit {currency(potentialProfit)}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          {pa && pa.invoicedCount > 0 ? (
+                            <>
+                              <p className={`font-bold text-xs ${pa.realizedProfit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                                {currencyExact(pa.realizedProfit)}
+                              </p>
+                              <p className="text-[10px] text-slate-500 mt-0.5" title={`${pa.invoicedCount} invoices · ${pa.invoicedBilledQty} billed + ${pa.invoicedFreeQty} free strips`}>
+                                {pa.invoicedCount} inv · {pa.invoicedBilledQty}+{pa.invoicedFreeQty}u
+                              </p>
+                            </>
+                          ) : (
+                            <span className="text-[10px] text-slate-300">No invoices yet</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-slate-500">
-                          {p.lastMovementAt ? (
-                            <>
-                              <p className="text-slate-700">{new Date(p.lastMovementAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
-                              <p className="text-[10px] text-slate-400">{new Date(p.lastMovementAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>
-                            </>
-                          ) : "—"}
-                        </td>
-                        <td className="px-4 py-3">
                           {p.forecast?.daysRemaining !== null && p.forecast?.daysRemaining !== undefined ? (
-                            <span className={`inline-flex items-center gap-1 text-xs font-bold ${
+                            <p className={`inline-flex items-center gap-1 text-xs font-bold ${
                               p.forecast.daysRemaining <= 7 ? "text-rose-600" : p.forecast.daysRemaining <= 21 ? "text-amber-600" : "text-slate-600"
                             }`}>
                               <TrendingDown size={12} />
                               {p.forecast.daysRemaining}d left
-                            </span>
+                            </p>
                           ) : (
-                            <span className="text-[10px] text-slate-300">No recent sales</span>
+                            <p className="text-[10px] text-slate-300">No 30d burn</p>
+                          )}
+                          {p.lastMovementAt && (
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {new Date(p.lastMovementAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                            </p>
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -931,13 +1530,24 @@ export default function InventoryPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => setHistoryProduct(p)}
-                            className="p-1.5 hover:bg-slate-100 hover:text-indigo-600 rounded-lg transition-colors cursor-pointer text-slate-400"
-                            title="View stock movement audit trail"
-                          >
-                            <History size={14} />
-                          </button>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setInspectProduct(p)}
+                              className="p-1.5 hover:bg-indigo-50 text-indigo-600 rounded-lg transition-colors cursor-pointer"
+                              title="Know medicine & full profit dossier"
+                            >
+                              <Eye size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setHistoryProduct(p)}
+                              className="p-1.5 hover:bg-slate-100 hover:text-indigo-600 rounded-lg transition-colors cursor-pointer text-slate-400"
+                              title="View stock movement audit trail"
+                            >
+                              <History size={14} />
+                            </button>
+                          </div>
                         </td>
                         </>
                       )}
@@ -966,6 +1576,7 @@ export default function InventoryPage() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
 
         {/* Add/Edit Side Form */}
@@ -1121,7 +1732,7 @@ export default function InventoryPage() {
                       step="0.01"
                       required
                       value={formData.ptr || ""}
-                      onChange={(e) => setFormData({ ...formData, ptr: Number(e.target.value), pts: Number(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, ptr: Number(e.target.value) })}
                       placeholder="0.00"
                       className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-right font-black text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
                     />
@@ -1345,6 +1956,154 @@ export default function InventoryPage() {
         )}
       </div>
 
+      {/* Admin/ASM: give stock to an MR */}
+      {(role === "ASM" || role === "ADMIN" || role === "MD") && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+            <h2 className="text-xs font-bold text-slate-800">Give Stock to MR</h2>
+          </div>
+          <form onSubmit={handleAllocate} className="p-4 flex flex-col sm:flex-row gap-3 items-end">
+            <div className="flex-1 w-full space-y-1">
+              <label className="text-xs font-semibold text-slate-600">MR</label>
+              <SearchableSelect
+                value={allocEmployeeId}
+                onChange={(e) => setAllocEmployeeId(e.target.value)}
+                placeholder="Select MR"
+                searchPlaceholder="Search MR..."
+                allowClear
+              >
+                <option value="">Select MR</option>
+                {mrList.map((m) => (
+                  <option key={m.employeeId} value={m.employeeId}>{m.firstName} {m.lastName}</option>
+                ))}
+              </SearchableSelect>
+            </div>
+            <div className="flex-1 w-full space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Product</label>
+              <SearchableSelect
+                value={allocProductId}
+                onChange={(e) => setAllocProductId(e.target.value)}
+                placeholder="Select product"
+                searchPlaceholder="Search product..."
+                allowClear
+              >
+                <option value="">Select product</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </SearchableSelect>
+            </div>
+            <div className="w-full sm:w-28 space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Qty</label>
+              <input
+                type="number"
+                min={1}
+                value={allocQty}
+                onChange={(e) => setAllocQty(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={allocSubmitting}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-50 w-full sm:w-auto"
+            >
+              {allocSubmitting ? "Giving..." : "Give Stock"}
+            </button>
+          </form>
+          {allocError && <p className="px-4 pb-3 text-xs text-rose-600">{allocError}</p>}
+          {allocSuccess && <p className="px-4 pb-3 text-xs text-emerald-600">{allocSuccess}</p>}
+        </div>
+      )}
+
+      {/* Admin/ASM: per-MR stock value across the field force */}
+      {(role === "ASM" || role === "ADMIN" || role === "MD") && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+            <h2 className="text-xs font-bold text-slate-800">MR Sample Stock &amp; Estimated Value</h2>
+            <span className="text-[11px] font-semibold text-slate-500">
+              {mrStock.length} rep{mrStock.length === 1 ? "" : "s"} · {currency(mrStock.reduce((s, r) => s + r.totalEstimatedValue, 0))} total
+            </span>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {mrStockLoading ? (
+              <div className="px-4 py-8 text-center text-slate-400">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500 mx-auto" />
+              </div>
+            ) : mrStock.length === 0 ? (
+              <div className="px-4 py-8 text-center text-slate-400 font-medium text-xs">No MR carrying stock currently.</div>
+            ) : (
+              mrStock.map((rep) => (
+                <div key={rep.employeeId}>
+                  <button
+                    onClick={() => setExpandedRep(expandedRep === rep.employeeId ? null : rep.employeeId)}
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
+                  >
+                    <span className="font-bold text-slate-800 text-xs">{rep.employeeName}</span>
+                    <span className="flex items-center gap-3 text-xs">
+                      <span className="text-slate-400">{rep.items.length} product{rep.items.length === 1 ? "" : "s"}</span>
+                      <span className="font-bold text-indigo-700">{currency(rep.totalEstimatedValue)}</span>
+                    </span>
+                  </button>
+                  {expandedRep === rep.employeeId && (
+                    <table className="w-full text-left text-xs border-collapse bg-slate-50/50">
+                      <tbody className="divide-y divide-slate-100">
+                        {rep.items.map((it) => (
+                          <tr key={it.productId}>
+                            <td className="px-4 py-2 pl-8 text-slate-600">{it.productName}</td>
+                            <td className="px-4 py-2 text-right text-slate-500">Qty {it.quantity}</td>
+                            <td className="px-4 py-2 text-right text-slate-500">{currency(it.unitValue)}/u</td>
+                            <td className="px-4 py-2 text-right font-semibold text-slate-700">{currency(it.estimatedValue)}</td>
+                            <td className="px-4 py-2 text-right text-slate-400 text-[10px]">
+                              {new Date(it.lastGivenAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}{" "}
+                              {new Date(it.lastGivenAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => handleOpenStockEdit(rep, it)}
+                                  className="p-1.5 hover:bg-slate-200 hover:text-indigo-600 rounded-lg transition-colors cursor-pointer text-slate-400"
+                                  title="Edit quantity"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteStockRow(it)}
+                                  className="p-1.5 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors cursor-pointer text-slate-400"
+                                  title="Remove from MR's stock"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {inspectProduct && (
+        <MedicineDetailModal
+          product={inspectProduct}
+          products={products}
+          isAdmin={isAdmin}
+          canManage={canManage}
+          onSelectProduct={(next) => setInspectProduct(next)}
+          onClose={() => setInspectProduct(null)}
+          onEdit={() => {
+            const p = inspectProduct;
+            setInspectProduct(null);
+            handleOpenEdit(p);
+          }}
+        />
+      )}
+
       {historyProduct && (
         <StockHistoryModal product={historyProduct} onClose={() => setHistoryProduct(null)} />
       )}
@@ -1402,73 +2161,791 @@ const MOVEMENT_LABEL: Record<Movement["type"], string> = {
   RESTOCK: "Restock",
 };
 
-function StockHistoryModal({ product, onClose }: { product: Product; onClose: () => void }) {
+function MovementLedgerBody({ productId }: { productId: string }) {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     apiClient
-      .get(`/api/products/${product.id}/movements`)
+      .get(`/api/products/${productId}/movements`)
       .then((res) => setMovements(res.data.data.movements ?? []))
       .catch((err) => console.error("Failed to load stock history:", err))
       .finally(() => setLoading(false));
-  }, [product.id]);
+  }, [productId]);
 
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500" />
+      </div>
+    );
+  }
+  if (movements.length === 0) {
+    return <p className="text-center text-slate-400 text-sm py-12">No stock movements recorded yet.</p>;
+  }
+
+  return (
+    <table className="w-full text-xs">
+      <thead>
+        <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 sticky top-0">
+          <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">Date/Time</th>
+          <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">Type</th>
+          <th className="px-4 py-2 text-right font-semibold uppercase tracking-wider text-[10px]">Change</th>
+          <th className="px-4 py-2 text-right font-semibold uppercase tracking-wider text-[10px]">Balance</th>
+          <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">By</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-50">
+        {movements.map((m) => (
+          <tr key={m.id}>
+            <td className="px-4 py-2.5 text-slate-600">
+              {new Date(m.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}{" "}
+              {new Date(m.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+            </td>
+            <td className="px-4 py-2.5">
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  m.type === "ORDER_DEDUCTION"
+                    ? "bg-blue-50 text-blue-700"
+                    : m.type === "RESTOCK"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-amber-50 text-amber-700"
+                }`}
+              >
+                {MOVEMENT_LABEL[m.type]}
+              </span>
+              {m.note && <p className="text-[10px] text-slate-400 mt-0.5">{m.note}</p>}
+            </td>
+            <td className={`px-4 py-2.5 text-right font-bold tabular-nums ${m.delta < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+              {m.delta > 0 ? "+" : ""}
+              {m.delta}
+            </td>
+            <td className="px-4 py-2.5 text-right font-semibold text-slate-700 tabular-nums">{m.quantityAfter}</td>
+            <td className="px-4 py-2.5 text-slate-500">
+              {m.employee ? `${m.employee.firstName} ${m.employee.lastName}` : "System"}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function StockHistoryModal({ product, onClose }: { product: Product; onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
         <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <div>
             <h2 className="text-sm font-bold text-slate-800">Stock Audit — {product.name}</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Current leftover: {product.stockQty} units</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Current leftover: {product.stockQty.toLocaleString("en-IN")} strips ({(product.stockBoxes ?? product.stockQty / 10).toFixed(1)} boxes)
+            </p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500"><X size={16} /></button>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500">
+            <X size={16} />
+          </button>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500" />
+          <MovementLedgerBody productId={product.id} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface MedicineIntelligencePayload {
+  clinicalProfile?: ClinicalReference;
+  shelfLife?: ShelfLifeStatus;
+  monthlyTrend?: Array<{
+    month: string;
+    invoicesCount: number;
+    billedQty: number;
+    freeQty: number;
+    revenue: number;
+    cost: number;
+    profit: number;
+    marginPct: number | null;
+  }>;
+  topChemists?: Array<{
+    chemistId: string;
+    chemistName: string;
+    area: string;
+    invoicesCount: number;
+    billedQty: number;
+    freeQty: number;
+    totalUnits: number;
+    revenue: number;
+    profit: number;
+    marginPct: number | null;
+    lastOrderDate: string;
+  }>;
+  mrBreakdown?: Array<{
+    employeeId: string;
+    mrName: string;
+    invoicesCount: number;
+    billedQty: number;
+    freeQty: number;
+    sampleQtyHeld: number;
+    lastSampleGivenAt: string | null;
+    revenue: number;
+    profit: number;
+    marginPct: number | null;
+  }>;
+  schemeMix?: Array<{
+    ratioLabel: string;
+    linesCount: number;
+    billedQty: number;
+    freeQty: number;
+    revenue: number;
+    cost: number;
+    profit: number;
+    marginPct: number | null;
+  }>;
+  recentInvoices?: Array<{
+    invoiceNo: string;
+    date: string;
+    partyName: string;
+    area: string;
+    mrName: string;
+    billedQty: number;
+    freeQty: number;
+    unitRate: number;
+    lineRevenue: number;
+    lineCost: number;
+    lineProfit: number;
+    lineMarginPct: number | null;
+  }>;
+}
+
+function MedicineDetailModal({
+  product,
+  products,
+  isAdmin,
+  canManage,
+  onSelectProduct,
+  onClose,
+  onEdit,
+}: {
+  product: Product;
+  products: Product[];
+  isAdmin: boolean;
+  canManage: boolean;
+  onSelectProduct: (p: Product) => void;
+  onClose: () => void;
+  onEdit: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<"overview" | "clinical" | "market" | "ledger">(
+    isAdmin ? "overview" : "clinical"
+  );
+  const [docPctSim, setDocPctSim] = useState<number>(0);
+  const [intel, setIntel] = useState<MedicineIntelligencePayload | null>(null);
+  const [intelLoading, setIntelLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIntelLoading(true);
+    apiClient
+      .get(`/api/products/${product.id}/intelligence`)
+      .then((res) => {
+        if (!cancelled) {
+          setIntel(res.data?.data ?? null);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load medicine intelligence:", err);
+        if (!cancelled) setIntel(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIntelLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [product.id]);
+
+  const cost = rowCost(product);
+  const ptrVal = Number(product.ptr || product.price || 0);
+  const mrpVal = Number(product.mrp || 0);
+  const unitProfit = product.unitProfit ?? Math.round((ptrVal - cost.value) * 100) / 100;
+  const grossMarginPct = ptrVal > 0 && cost.value > 0 ? Math.round(((ptrVal - cost.value) / ptrVal) * 1000) / 10 : 0;
+  const chemistMarginPct = mrpVal > 0 && ptrVal > 0 ? Math.round(((mrpVal - ptrVal) / mrpVal) * 1000) / 10 : 0;
+  const stockCost = Number(product.stockValueAtCost ?? Math.round(product.stockQty * cost.value * 100) / 100);
+  const stockPtrVal = Number(product.stockValue ?? Math.round(product.stockQty * ptrVal * 100) / 100);
+  const potentialProfit = Number(product.potentialStockProfit ?? Math.round((stockPtrVal - stockCost) * 100) / 100);
+  const boxesEq = product.stockBoxes ?? Math.round((product.stockQty / 10) * 10) / 10;
+  const pa = product.profitAnalytics;
+
+  const clinical = intel?.clinicalProfile ?? getMedicineReference(product);
+  const shelf = intel?.shelfLife ?? computeShelfLife(product.currentExpDate);
+
+  const curIdx = products.findIndex((x) => x.id === product.id);
+  const prevProd = curIdx > 0 ? products[curIdx - 1] : null;
+  const nextProd = curIdx >= 0 && curIdx < products.length - 1 ? products[curIdx + 1] : null;
+
+  const tabs: Array<{ id: "overview" | "clinical" | "market" | "ledger"; label: string }> = isAdmin
+    ? [
+        { id: "overview", label: "Overview & Profit" },
+        { id: "clinical", label: "Clinical & Detailing" },
+        { id: "market", label: "Chemists, MRs & Sales" },
+        { id: "ledger", label: "Stock Ledger" },
+      ]
+    : [{ id: "clinical", label: "Clinical & Detailing" }];
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+        {/* Header with Quick Switcher */}
+        <div className="p-5 border-b border-slate-800 bg-slate-900 text-white space-y-3">
+          <div className="flex flex-wrap justify-between items-start gap-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-bold text-white">{product.name}</h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                  {product.therapySegment || "General"}
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                  SKU: {product.sku}
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  {clinical.therapeuticClass}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1">
+                {product.composition || "Composition not set"}
+                {product.strength ? ` · ${product.strength}` : ""} · Pack: {product.packSize || "N/A"}
+                {product.hsnCode ? ` · HSN ${product.hsnCode}` : ""}
+                {product.gstPct != null ? ` · GST ${Number(product.gstPct)}%` : ""}
+              </p>
             </div>
-          ) : movements.length === 0 ? (
-            <p className="text-center text-slate-400 text-sm py-12">No stock movements recorded yet.</p>
-          ) : (
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 sticky top-0">
-                  <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">Date/Time</th>
-                  <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">Type</th>
-                  <th className="px-4 py-2 text-right font-semibold uppercase tracking-wider text-[10px]">Change</th>
-                  <th className="px-4 py-2 text-right font-semibold uppercase tracking-wider text-[10px]">Balance</th>
-                  <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">By</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {movements.map((m) => (
-                  <tr key={m.id}>
-                    <td className="px-4 py-2.5 text-slate-600">
-                      {new Date(m.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
-                      {" "}
-                      {new Date(m.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        m.type === "ORDER_DEDUCTION" ? "bg-blue-50 text-blue-700" : m.type === "RESTOCK" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                      }`}>
-                        {MOVEMENT_LABEL[m.type]}
-                      </span>
-                      {m.note && <p className="text-[10px] text-slate-400 mt-0.5">{m.note}</p>}
-                    </td>
-                    <td className={`px-4 py-2.5 text-right font-bold ${m.delta < 0 ? "text-rose-600" : "text-emerald-600"}`}>
-                      {m.delta > 0 ? "+" : ""}{m.delta}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-slate-700">{m.quantityAfter}</td>
-                    <td className="px-4 py-2.5 text-slate-500">
-                      {m.employee ? `${m.employee.firstName} ${m.employee.lastName}` : "System"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="flex flex-wrap items-center gap-2">
+              {products.length > 1 && (
+                <div className="inline-flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-xl p-1 text-xs">
+                  <button
+                    type="button"
+                    disabled={!prevProd}
+                    onClick={() => prevProd && onSelectProduct(prevProd)}
+                    className="px-2 py-1 rounded-lg hover:bg-slate-700 disabled:opacity-40 text-slate-200 cursor-pointer"
+                    title="Previous medicine"
+                  >
+                    Prev
+                  </button>
+                  <select
+                    aria-label="Switch medicine"
+                    value={product.id}
+                    onChange={(e) => {
+                      const found = products.find((x) => x.id === e.target.value);
+                      if (found) onSelectProduct(found);
+                    }}
+                    className="bg-slate-900 text-white text-xs font-semibold rounded-lg px-2 py-1 border border-slate-700 focus:outline-none"
+                  >
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!nextProd}
+                    onClick={() => nextProd && onSelectProduct(nextProd)}
+                    className="px-2 py-1 rounded-lg hover:bg-slate-700 disabled:opacity-40 text-slate-200 cursor-pointer"
+                    title="Next medicine"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+              <DownloadFormatDropdown
+                compact
+                buttonLabel="Download Dossier"
+                scopeNote={
+                  isAdmin
+                    ? `${product.name} · Clinical, Profit, Scheme & Monthly Ledger`
+                    : `${product.name} · Clinical & Detailing Dossier`
+                }
+                onExcel={() => downloadSingleMedicineExcel(product, intel, isAdmin, docPctSim)}
+                onHtml={() => downloadSingleMedicineHtml(product, intel, isAdmin, docPctSim)}
+                onPdf={() => printSingleMedicinePdf(product, intel, isAdmin, docPctSim)}
+                onJson={() => downloadSingleMedicineJson(product, intel, isAdmin)}
+              />
+              {canManage && isAdmin && (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Edit2 size={13} /> Edit Medicine / Stock
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-2 hover:bg-slate-800 rounded-xl text-slate-300 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Modal Navigation Tabs */}
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                  activeTab === tab.id
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* TAB 1: OVERVIEW & PROFIT (Admin) */}
+          {activeTab === "overview" && isAdmin && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Unit Economics / Strip</p>
+                  <p className="text-lg font-black text-emerald-700 mt-1 tabular-nums">+₹{unitProfit.toFixed(2)}</p>
+                  <p className="text-[11px] text-slate-600 mt-1 tabular-nums">
+                    PTR ₹{ptrVal.toFixed(2)} − Cost ₹{cost.value.toFixed(2)} ({grossMarginPct.toFixed(1)}%{cost.exact ? "" : " est."})
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Realized Profit (Invoices)</p>
+                  <p className={`text-lg font-black mt-1 tabular-nums ${(pa?.realizedProfit ?? 0) >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                    {currencyExact(pa?.realizedProfit ?? 0)}
+                  </p>
+                  <p className="text-[11px] text-emerald-800/80 mt-1 tabular-nums">
+                    {pa?.invoicedCount ?? 0} invoices ·{" "}
+                    {pa?.realizedMarginPct !== null && pa?.realizedMarginPct !== undefined
+                      ? `${pa.realizedMarginPct.toFixed(1)}% net margin`
+                      : "No sales yet"}
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Warehouse Stock Profit (@ PTR)</p>
+                  <p className="text-lg font-black text-slate-900 mt-1 tabular-nums">{currencyExact(potentialProfit)}</p>
+                  <p className="text-[11px] text-slate-600 mt-1 tabular-nums">
+                    {product.stockQty.toLocaleString("en-IN")} strips ({boxesEq.toFixed(1)} boxes) · Cost {currency(stockCost)}
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Batch, Shelf Life &amp; Burn</p>
+                  <p className="text-sm font-black text-slate-800 mt-1">
+                    {product.currentBatchNo || "No batch set"} · <span className="text-emerald-700">{shelf.label}</span>
+                  </p>
+                  <p className="text-[11px] text-slate-600 mt-1">
+                    MR stock: {product.mrSampleQty ?? 0}
+                    {product.forecast?.daysRemaining != null ? ` · ${product.forecast.daysRemaining}d stock left` : ""}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-slate-200 p-4 bg-white space-y-2.5">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-2">
+                    Strip &amp; Box Pricing Structure (Invoicing on PTR Only)
+                  </h3>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Purchase Cost</span>
+                      <p className="text-sm font-black text-slate-900 mt-0.5 tabular-nums">₹{cost.value.toFixed(2)}</p>
+                      <span className="text-[10px] text-slate-400">Box ₹{(cost.value * 10).toFixed(2)}</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-200">
+                      <span className="text-[10px] font-bold text-indigo-700 uppercase">PTR (Sell Rate)</span>
+                      <p className="text-sm font-black text-indigo-900 mt-0.5 tabular-nums">₹{ptrVal.toFixed(2)}</p>
+                      <span className="text-[10px] text-indigo-600">Box ₹{(ptrVal * 10).toFixed(2)}</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">MRP</span>
+                      <p className="text-sm font-black text-slate-900 mt-0.5 tabular-nums">₹{mrpVal.toFixed(2)}</p>
+                      <span className="text-[10px] text-slate-400">Chemist {chemistMarginPct.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-xs pt-1 text-slate-600">
+                    <span>Stock Selling Value (@ PTR)</span>
+                    <strong className="text-slate-900 tabular-nums">{currencyExact(stockPtrVal)}</strong>
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-600">
+                    <span>Stock Purchase Cost Outlay</span>
+                    <strong className="text-slate-900 tabular-nums">{currencyExact(stockCost)}</strong>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 p-4 bg-white space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                      Realized Invoice P&amp;L ({pa?.invoicedCount ?? 0} Invoices · Excl. GST)
+                    </h3>
+                    <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 p-0.5 text-[10px] font-bold">
+                      {[
+                        { pct: 0, label: "0% Gross" },
+                        { pct: 15, label: "15% Doc" },
+                        { pct: 20, label: "20% Doc" },
+                      ].map((opt) => (
+                        <button
+                          key={opt.pct}
+                          type="button"
+                          onClick={() => setDocPctSim(opt.pct)}
+                          className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                            docPctSim === opt.pct ? "bg-indigo-600 text-white shadow-sm" : "text-slate-600 hover:bg-white"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Units Dispatched (Billed + Free Scheme)</span>
+                      <strong className="text-slate-800 tabular-nums">
+                        {(pa?.invoicedBilledQty ?? 0).toLocaleString("en-IN")} billed + {(pa?.invoicedFreeQty ?? 0).toLocaleString("en-IN")} free ({pa?.freeRatioPct ?? 0}%)
+                      </strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Realized Invoiced Sales (Excl. GST)</span>
+                      <strong className="text-slate-900 tabular-nums">{currencyExact(pa?.realizedRevenue ?? 0)}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Less: Cost of Billed Strips</span>
+                      <span className="text-slate-700 tabular-nums">({currencyExact(pa?.billedCostOnly ?? 0)})</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Less: Free Scheme Strip Cost Burden</span>
+                      <span className="text-rose-600 font-medium tabular-nums">({currencyExact(pa?.freeCostBurden ?? 0)})</span>
+                    </div>
+                    {(() => {
+                      const rev = pa?.realizedRevenue ?? 0;
+                      const gross = pa?.realizedProfit ?? 0;
+                      const docCost = Math.round(((rev * docPctSim) / 100) * 100) / 100;
+                      const netAfterDoc = Math.round((gross - docCost) * 100) / 100;
+                      const netPct = rev > 0 ? Math.round((netAfterDoc / rev) * 1000) / 10 : null;
+                      return (
+                        <>
+                          {docPctSim > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-slate-600">Less: Doctor Commission ({docPctSim}% simulated)</span>
+                              <span className="text-rose-600 font-medium tabular-nums">({currencyExact(docCost)})</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between pt-2 border-t border-slate-200 font-bold text-sm">
+                            <span className="text-slate-900">
+                              {docPctSim > 0 ? `Est. Net Profit (After ${docPctSim}% Doc)` : "Net Realized Profit (Before Doc / Overheads)"}
+                            </span>
+                            <span className={`tabular-nums ${netAfterDoc >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                              {currencyExact(netAfterDoc)}
+                              {netPct !== null ? ` (${netPct.toFixed(1)}%)` : ""}
+                            </span>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* TAB 2: CLINICAL & DETAILING PROFILE (Available to ALL roles including MR) */}
+          {activeTab === "clinical" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-slate-200 p-4 bg-white space-y-3">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">Therapeutic Classification</span>
+                    <h3 className="text-sm font-black text-slate-900 mt-0.5">{clinical.therapeuticClass}</h3>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Active Formula / Composition</span>
+                    <p className="text-xs font-semibold text-slate-800 mt-0.5 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+                      {product.composition || "Composition not recorded"}{product.strength ? ` · ${product.strength}` : ""}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">How It Works (Mechanism of Action)</span>
+                    <p className="text-xs text-slate-700 leading-relaxed mt-0.5">{clinical.mechanismOfAction}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Standard Adult Dosing Guidance</span>
+                    <p className="text-xs font-medium text-slate-800 mt-0.5 bg-indigo-50/50 px-3 py-2 rounded-lg border border-indigo-100">
+                      {clinical.standardDosage}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 p-4 bg-white space-y-3">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Primary Clinical Indications</span>
+                    <ul className="mt-1 space-y-1 text-xs text-slate-700 list-disc pl-4">
+                      {clinical.indications.map((ind) => (
+                        <li key={ind}>{ind}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Target Doctor Specialties</span>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {clinical.targetSpecialties.map((spec) => (
+                        <span
+                          key={spec}
+                          className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100"
+                        >
+                          {spec}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Field Detailing Highlights (USP)</span>
+                    <ul className="mt-1 space-y-1 text-xs text-slate-700 list-disc pl-4">
+                      {clinical.detailingHighlights.map((hl) => (
+                        <li key={hl}>{hl}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-0.5 max-w-2xl">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800">Safety Precautions &amp; Storage Conditions</span>
+                  <p className="text-xs text-amber-950">{clinical.precautionsAndStorage}</p>
+                </div>
+                <div className="text-right text-xs">
+                  <p className="font-bold text-slate-800">
+                    MRP ₹{mrpVal.toFixed(2)} · PTR ₹{ptrVal.toFixed(2)}
+                  </p>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    Pack: {product.packSize || "N/A"} · Shelf Life: <strong>{shelf.label}</strong>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: CHEMISTS, MRs, MONTHLY SALES & SCHEMES (Admin) */}
+          {activeTab === "market" && isAdmin && (
+            <div className="space-y-4">
+              {intelLoading ? (
+                <div className="py-12 text-center text-slate-400">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500 mx-auto mb-2" />
+                  Loading per-medicine chemist, MR &amp; sales analytics...
+                </div>
+              ) : (
+                <>
+                  {/* Monthly Trend + Scheme Mix */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Monthly Sales &amp; Profit Trajectory</h3>
+                      </div>
+                      {!intel?.monthlyTrend?.length ? (
+                        <p className="p-4 text-xs text-slate-400">No monthly invoice sales recorded yet.</p>
+                      ) : (
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-slate-50/70 text-slate-500 border-b border-slate-100 text-[10px] uppercase">
+                              <th className="px-3 py-2 text-left">Month</th>
+                              <th className="px-3 py-2 text-right">Inv</th>
+                              <th className="px-3 py-2 text-right">Billed+Free</th>
+                              <th className="px-3 py-2 text-right">Revenue</th>
+                              <th className="px-3 py-2 text-right">Profit</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 tabular-nums">
+                            {intel.monthlyTrend.map((m) => (
+                              <tr key={m.month}>
+                                <td className="px-3 py-2 font-semibold text-slate-800">{m.month}</td>
+                                <td className="px-3 py-2 text-right text-slate-600">{m.invoicesCount}</td>
+                                <td className="px-3 py-2 text-right text-slate-600">{m.billedQty}+{m.freeQty}</td>
+                                <td className="px-3 py-2 text-right font-medium text-slate-800">{currencyExact(m.revenue)}</td>
+                                <td className={`px-3 py-2 text-right font-bold ${m.profit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                                  {currencyExact(m.profit)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Scheme Ratio Mix on Invoices</h3>
+                      </div>
+                      {!intel?.schemeMix?.length ? (
+                        <p className="p-4 text-xs text-slate-400">No scheme line-items recorded yet.</p>
+                      ) : (
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-slate-50/70 text-slate-500 border-b border-slate-100 text-[10px] uppercase">
+                              <th className="px-3 py-2 text-left">Scheme</th>
+                              <th className="px-3 py-2 text-right">Lines</th>
+                              <th className="px-3 py-2 text-right">Units (B+F)</th>
+                              <th className="px-3 py-2 text-right">Profit</th>
+                              <th className="px-3 py-2 text-right">Margin</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 tabular-nums">
+                            {intel.schemeMix.map((sc) => (
+                              <tr key={sc.ratioLabel}>
+                                <td className="px-3 py-2 font-bold text-indigo-700">{sc.ratioLabel}</td>
+                                <td className="px-3 py-2 text-right text-slate-600">{sc.linesCount}</td>
+                                <td className="px-3 py-2 text-right text-slate-600">{sc.billedQty}+{sc.freeQty}</td>
+                                <td className="px-3 py-2 text-right font-bold text-emerald-700">{currencyExact(sc.profit)}</td>
+                                <td className="px-3 py-2 text-right text-slate-700">
+                                  {sc.marginPct != null ? `${sc.marginPct.toFixed(1)}%` : "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Top Chemists & MR Breakdown */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Top Buying Chemists / Medical Halls</h3>
+                      </div>
+                      {!intel?.topChemists?.length ? (
+                        <p className="p-4 text-xs text-slate-400">No chemist purchases recorded yet.</p>
+                      ) : (
+                        <div className="max-h-60 overflow-y-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-slate-50/70 text-slate-500 border-b border-slate-100 text-[10px] uppercase sticky top-0">
+                                <th className="px-3 py-2 text-left">Chemist</th>
+                                <th className="px-3 py-2 text-right">Inv</th>
+                                <th className="px-3 py-2 text-right">Units (B+F)</th>
+                                <th className="px-3 py-2 text-right">Profit</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 tabular-nums">
+                              {intel.topChemists.slice(0, 12).map((ch) => (
+                                <tr key={ch.chemistId}>
+                                  <td className="px-3 py-2">
+                                    <p className="font-semibold text-slate-800">{ch.chemistName}</p>
+                                    <p className="text-[10px] text-slate-400">{ch.area}</p>
+                                  </td>
+                                  <td className="px-3 py-2 text-right text-slate-600">{ch.invoicesCount}</td>
+                                  <td className="px-3 py-2 text-right text-slate-600">{ch.billedQty}+{ch.freeQty}</td>
+                                  <td className="px-3 py-2 text-right font-bold text-emerald-700">{currencyExact(ch.profit)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">MR Sales &amp; Field Sample Allocation</h3>
+                      </div>
+                      {!intel?.mrBreakdown?.length ? (
+                        <p className="p-4 text-xs text-slate-400">No MR sales or sample allocations recorded.</p>
+                      ) : (
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-slate-50/70 text-slate-500 border-b border-slate-100 text-[10px] uppercase">
+                              <th className="px-3 py-2 text-left">MR Name</th>
+                              <th className="px-3 py-2 text-right">Sold (B+F)</th>
+                              <th className="px-3 py-2 text-right">Profit</th>
+                              <th className="px-3 py-2 text-right">Samples</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 tabular-nums">
+                            {intel.mrBreakdown.map((mr) => (
+                              <tr key={mr.employeeId}>
+                                <td className="px-3 py-2 font-semibold text-slate-800">{mr.mrName}</td>
+                                <td className="px-3 py-2 text-right text-slate-600">{mr.billedQty}+{mr.freeQty} ({mr.invoicesCount} inv)</td>
+                                <td className="px-3 py-2 text-right font-bold text-emerald-700">{currencyExact(mr.profit)}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-indigo-700">{mr.sampleQtyHeld}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Recent Invoices for this Medicine */}
+                  {Boolean(intel?.recentInvoices?.length) && (
+                    <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Recent Invoices for {product.name}</h3>
+                        <span className="text-[10px] text-slate-500">Latest {intel!.recentInvoices!.length} entries</span>
+                      </div>
+                      <div className="max-h-56 overflow-y-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-slate-50/70 text-slate-500 border-b border-slate-100 text-[10px] uppercase sticky top-0">
+                              <th className="px-3 py-2 text-left">Invoice / Date</th>
+                              <th className="px-3 py-2 text-left">Party / MR</th>
+                              <th className="px-3 py-2 text-right">Qty (B+F)</th>
+                              <th className="px-3 py-2 text-right">Rate</th>
+                              <th className="px-3 py-2 text-right">Line Profit</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 tabular-nums">
+                            {intel!.recentInvoices!.map((inv, idx) => (
+                              <tr key={`${inv.invoiceNo}-${idx}`}>
+                                <td className="px-3 py-2">
+                                  <p className="font-semibold text-slate-800">{inv.invoiceNo}</p>
+                                  <p className="text-[10px] text-slate-400">
+                                    {new Date(inv.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                                  </p>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <p className="text-slate-700 font-medium">{inv.partyName}</p>
+                                  <p className="text-[10px] text-slate-400">{inv.mrName}</p>
+                                </td>
+                                <td className="px-3 py-2 text-right text-slate-700">{inv.billedQty}+{inv.freeQty}</td>
+                                <td className="px-3 py-2 text-right text-slate-700">₹{inv.unitRate.toFixed(2)}</td>
+                                <td className="px-3 py-2 text-right font-bold text-emerald-700">{currencyExact(inv.lineProfit)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: STOCK MOVEMENT AUDIT LEDGER (Admin / CanManage) */}
+          {activeTab === "ledger" && isAdmin && (
+            <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+              <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Stock Movement &amp; Reconciliation Ledger</h3>
+                <span className="text-[11px] text-slate-500">Live audit trail</span>
+              </div>
+              <div className="max-h-96 overflow-y-auto">
+                <MovementLedgerBody productId={product.id} />
+              </div>
+            </div>
           )}
         </div>
       </div>

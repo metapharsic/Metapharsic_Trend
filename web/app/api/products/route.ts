@@ -4,7 +4,7 @@ import { withAuth, AuthedRequest } from "@/lib/with-auth";
 import { ok, created, badRequest, conflict, apiError } from "@/lib/api-response";
 import { PaginationSchema } from "@/lib/validators";
 import { z } from "zod";
-import { costBasis, type CostBasisSource } from "@/lib/pricing";
+import { costBasis, profitFor, round2, type CostBasisSource } from "@/lib/pricing";
 import { ProductPricingAgentsService } from "@/services/product-pricing-agents.service";
 
 
@@ -70,7 +70,9 @@ async function getProducts(req: AuthedRequest) {
     // as-of timestamp instead of looking like a static number.
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const productIds = products.map((p) => p.id);
-    const [recentDeductions, lastMovements] = await Promise.all([
+    const isAdminReq = req.user.role === Role.ADMIN;
+
+    const [recentDeductions, lastMovements, firstMovements, invoicedOrderItems, sampleTotals] = await Promise.all([
       db.inventoryMovement.groupBy({
         by: ["productId"],
         where: { productId: { in: productIds }, type: "ORDER_DEDUCTION", createdAt: { gte: thirtyDaysAgo } },
@@ -82,9 +84,39 @@ async function getProducts(req: AuthedRequest) {
         distinct: ["productId"],
         select: { productId: true, createdAt: true },
       }),
+      isAdminReq && productIds.length > 0
+        ? db.inventoryMovement.findMany({
+            where: { productId: { in: productIds } },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            distinct: ["productId"],
+            select: { productId: true, delta: true, quantityAfter: true, createdAt: true },
+          })
+        : Promise.resolve([]),
+      isAdminReq && productIds.length > 0
+        ? db.orderItem.findMany({
+            where: { productId: { in: productIds }, order: { invoice: { isNot: null } } },
+            select: { productId: true, orderId: true, quantity: true, freeQty: true, price: true },
+          })
+        : Promise.resolve([]),
+      isAdminReq && productIds.length > 0
+        ? db.sampleInventory.groupBy({
+            by: ["productId"],
+            where: { productId: { in: productIds } },
+            _sum: { quantity: true },
+          })
+        : Promise.resolve([]),
     ]);
     const burnByProduct = new Map(recentDeductions.map((r) => [r.productId, Math.abs(r._sum.delta ?? 0) / 30]));
     const lastMovementByProduct = new Map(lastMovements.map((m) => [m.productId, m.createdAt]));
+    const firstMovementByProduct = new Map(firstMovements.map((m) => [m.productId, m]));
+    const sampleQtyByProduct = new Map(sampleTotals.map((s) => [s.productId, s._sum.quantity ?? 0]));
+
+    const itemsByProduct = new Map<string, typeof invoicedOrderItems>();
+    for (const item of invoicedOrderItems) {
+      const list = itemsByProduct.get(item.productId) ?? [];
+      list.push(item);
+      itemsByProduct.set(item.productId, list);
+    }
 
     const enriched = products.map((p) => {
       const rate = burnByProduct.get(p.id) ?? 0;
@@ -104,8 +136,36 @@ async function getProducts(req: AuthedRequest) {
       // Whether the number above is a real paid cost or a derivation, so the
       // UI can label an estimate instead of presenting a guess as fact.
       const costBasisExact = dbPurchaseRate != null && dbPurchaseRate > 0;
-      const costBasisSource: CostBasisSource = costBasisExact ? "purchaseRate" : costBasis(p).source;
+      const costInfo = costBasis(p);
+      const costBasisSource: CostBasisSource = costBasisExact ? "purchaseRate" : costInfo.source;
       const grossMarginPct = unitValue > 0 ? Math.round(((unitValue - purchaseRate) / unitValue) * 1000) / 10 : 0;
+
+      const stockValue = Math.round(p.stockQty * unitValue * 100) / 100;
+      const stockValueAtCost = Math.round(p.stockQty * purchaseRate * 100) / 100;
+      const unitProfit = round2(unitValue - purchaseRate);
+      const potentialStockProfit = round2(stockValue - stockValueAtCost);
+      const stockBoxes = round2(p.stockQty / 10);
+      const mrSampleQty = sampleQtyByProduct.get(p.id) ?? 0;
+
+      const productInvItems = itemsByProduct.get(p.id) ?? [];
+      const invOrderSet = new Set(productInvItems.map((it) => it.orderId));
+      const invoicedBilledQty = productInvItems.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+      const invoicedFreeQty = productInvItems.reduce((s, it) => s + (Number(it.freeQty) || 0), 0);
+      const totalDispatched = invoicedBilledQty + invoicedFreeQty;
+      const realizedProfitCalc = profitFor(
+        productInvItems.map((it) => ({
+          quantity: it.quantity,
+          freeQty: it.freeQty,
+          price: it.price,
+          product: p,
+        }))
+      );
+      const effectiveCostPerUnit = costInfo.value;
+      const freeCostBurden = round2(invoicedFreeQty * effectiveCostPerUnit);
+      const billedCostOnly = round2(Math.max(0, realizedProfitCalc.cost - freeCostBurden));
+
+      const firstMove = firstMovementByProduct.get(p.id);
+      const earliestStockQty = firstMove ? firstMove.quantityAfter - firstMove.delta : p.stockQty;
 
       const full = {
         ...p,
@@ -114,8 +174,26 @@ async function getProducts(req: AuthedRequest) {
         grossMarginPct,
         costBasisExact,
         costBasisSource,
-        stockValue: Math.round(p.stockQty * unitValue * 100) / 100,
-        stockValueAtCost: Math.round(p.stockQty * purchaseRate * 100) / 100,
+        stockValue,
+        stockValueAtCost,
+        unitProfit,
+        potentialStockProfit,
+        stockBoxes,
+        earliestStockQty,
+        mrSampleQty,
+        profitAnalytics: {
+          invoicedCount: invOrderSet.size,
+          invoicedBilledQty,
+          invoicedFreeQty,
+          freeRatioPct: totalDispatched > 0 ? round2((invoicedFreeQty / totalDispatched) * 100) : 0,
+          realizedRevenue: realizedProfitCalc.revenue,
+          realizedCost: realizedProfitCalc.cost,
+          billedCostOnly,
+          freeCostBurden,
+          realizedProfit: realizedProfitCalc.profitAmount,
+          realizedMarginPct: realizedProfitCalc.profitPct,
+          exactCost: realizedProfitCalc.exact,
+        },
         lastMovementAt: lastMovementByProduct.get(p.id) ?? p.updatedAt,
         forecast: {
           burnRatePerDay: Math.round(rate * 100) / 100,
@@ -136,6 +214,12 @@ async function getProducts(req: AuthedRequest) {
           costBasisSource: _costBasisSource,
           stockValue: _stockValue,
           stockValueAtCost: _stockValueAtCost,
+          unitProfit: _unitProfit,
+          potentialStockProfit: _potentialStockProfit,
+          stockBoxes: _stockBoxes,
+          earliestStockQty: _earliestStockQty,
+          mrSampleQty: _mrSampleQty,
+          profitAnalytics: _profitAnalytics,
           lastMovementAt: _lastMovementAt,
           forecast: _forecast,
           currentBatchNo: _currentBatchNo,
