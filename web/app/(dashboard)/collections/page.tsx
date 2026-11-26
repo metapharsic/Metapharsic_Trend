@@ -42,6 +42,7 @@ import {
 import { apiClient } from "@/lib/api-client";
 import { downloadExcelReportWithDashboard } from "@/lib/excel-export";
 import { SearchableSelect } from "@/components/searchable-select";
+import { ScrollSearchBar } from "@/components/ui/scroll-search-bar";
 
 function currency(value: number | string | null | undefined): string {
   if (value == null) return "₹0";
@@ -1602,6 +1603,7 @@ function ChemistDetailModal({
   const [newLimit, setNewLimit] = useState(String(chemist.creditLimit || ""));
   const [savingLimit, setSavingLimit] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [invoiceSearch, setInvoiceSearch] = useState("");
 
   const updateCreditLimit = async () => {
     const lim = newLimit === "" ? null : Number(newLimit);
@@ -1694,48 +1696,79 @@ function ChemistDetailModal({
 
           {(!chemist.openInvoices || chemist.openInvoices.length === 0) ? (
             <p className="text-xs text-slate-400 bg-slate-50 p-3 rounded-xl text-center">No open invoices on file for this account.</p>
-          ) : (
-            <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-56 overflow-y-auto">
-              <table className="w-full text-xs text-left font-mono">
-                <thead className="bg-slate-100 text-slate-700 font-sans font-semibold sticky top-0 border-b border-slate-200">
-                  <tr>
-                    <th className="py-2 px-3">Invoice #</th>
-                    <th className="py-2 px-3">Date</th>
-                    <th className="py-2 px-3 text-center">Age / Bucket</th>
-                    <th className="py-2 px-3 text-right">Billed Amount</th>
-                    <th className="py-2 px-3 text-right">Paid Amount</th>
-                    <th className="py-2 px-3 text-right">Unpaid Balance</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {chemist.openInvoices.map((inv) => (
-                    <tr key={inv.id} className="hover:bg-slate-50">
-                      <td className="py-2 px-3 font-bold text-slate-900">{inv.invoiceNo}</td>
-                      <td className="py-2 px-3 font-sans text-slate-600">
-                        {new Date(inv.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                      </td>
-                      <td className="py-2 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          inv.agingBucket === "90+"
-                            ? "bg-rose-100 text-rose-800"
-                            : inv.agingBucket === "61-90"
-                            ? "bg-orange-100 text-orange-800"
-                            : inv.agingBucket === "31-60"
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-emerald-100 text-emerald-800"
-                        }`}>
-                          {inv.ageDays}d ({inv.agingBucket})
-                        </span>
-                      </td>
-                      <td className="py-2 px-3 text-right text-slate-700">{currency(inv.grandTotal)}</td>
-                      <td className="py-2 px-3 text-right text-emerald-600">{currency(inv.paidAmount)}</td>
-                      <td className="py-2 px-3 text-right font-bold text-rose-600">{currency(inv.unpaidBalance)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          ) : (() => {
+            const q = invoiceSearch.trim().toLowerCase();
+            const filteredInvoices = q
+              ? chemist.openInvoices.filter((inv) => {
+                  const dateLabel = new Date(inv.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }).toLowerCase();
+                  return (
+                    inv.invoiceNo.toLowerCase().includes(q) ||
+                    (inv.agingBucket || "").toLowerCase().includes(q) ||
+                    dateLabel.includes(q)
+                  );
+                })
+              : chemist.openInvoices;
+
+            return (
+              <div className="space-y-2">
+                <ScrollSearchBar
+                  value={invoiceSearch}
+                  onChange={setInvoiceSearch}
+                  placeholder="Search open invoices by #no, date or aging bucket…"
+                  matchedCount={filteredInvoices.length}
+                  totalCount={chemist.openInvoices.length}
+                />
+                <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-56 overflow-y-auto">
+                  <table className="w-full text-xs text-left font-mono">
+                    <thead className="bg-slate-100 text-slate-700 font-sans font-semibold sticky top-0 border-b border-slate-200">
+                      <tr>
+                        <th className="py-2 px-3">Invoice #</th>
+                        <th className="py-2 px-3">Date</th>
+                        <th className="py-2 px-3 text-center">Age / Bucket</th>
+                        <th className="py-2 px-3 text-right">Billed Amount</th>
+                        <th className="py-2 px-3 text-right">Paid Amount</th>
+                        <th className="py-2 px-3 text-right">Unpaid Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredInvoices.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-4 px-3 text-center font-sans text-slate-400">
+                            No open invoices matching &ldquo;{invoiceSearch}&rdquo;
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredInvoices.map((inv) => (
+                          <tr key={inv.id} className="hover:bg-slate-50">
+                            <td className="py-2 px-3 font-bold text-slate-900">{inv.invoiceNo}</td>
+                            <td className="py-2 px-3 font-sans text-slate-600">
+                              {new Date(inv.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                inv.agingBucket === "90+"
+                                  ? "bg-rose-100 text-rose-800"
+                                  : inv.agingBucket === "61-90"
+                                  ? "bg-orange-100 text-orange-800"
+                                  : inv.agingBucket === "31-60"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-emerald-100 text-emerald-800"
+                              }`}>
+                                {inv.ageDays}d ({inv.agingBucket})
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-right text-slate-700">{currency(inv.grandTotal)}</td>
+                            <td className="py-2 px-3 text-right text-emerald-600">{currency(inv.paidAmount)}</td>
+                            <td className="py-2 px-3 text-right font-bold text-rose-600">{currency(inv.unpaidBalance)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Adjust Credit Limit */}

@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { SearchableSelect } from "@/components/searchable-select";
+import { ScrollSearchBar } from "@/components/ui/scroll-search-bar";
 import {
   AgentTelemetry,
   DailyTourPlanEntry,
@@ -247,6 +248,7 @@ export default function TourPlansDashboard() {
   };
 
   const [excelExporting, setExcelExporting] = useState(false);
+  const [evalPreviewSearch, setEvalPreviewSearch] = useState("");
 
   const handlePruneAutoDays = async (tourPlanId: string) => {
     setProvisioning(true);
@@ -3182,47 +3184,82 @@ export default function TourPlansDashboard() {
                 </span>
               </div>
 
-              <div className="max-h-60 overflow-y-auto bg-white rounded-lg border border-slate-200 divide-y divide-slate-100 text-xs">
-                {(downloadMode === "TODAY"
-                  ? selectedEvaluation.days.filter((d) => d.date === targetPrintDate)
-                  : selectedEvaluation.days.filter((d) => !d.isSunday)
-                ).map((entry, idx) => (
-                  <div key={entry.id || idx} className="p-2.5 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <span className="inline-block w-5 h-5 rounded border-2 border-slate-400 text-center text-[10px] font-bold text-emerald-700 bg-white leading-4">
-                        {entry.visitStatus === "DONE" || entry.isCompleted ? "✓" : ""}
-                      </span>
-                      <div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-mono text-slate-400">{entry.date}</span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded uppercase ${entry.entityType === "CHEMIST" ? "bg-purple-100 text-purple-800" : "bg-sky-100 text-sky-800"
-                            }`}>
-                            {entry.entityType || "DOCTOR"}
-                          </span>
-                          <span className="font-bold text-slate-800">
-                            {entry.entityType === "CHEMIST" ? entry.plannedChemistName || "Chemist Visit" : entry.plannedDoctorName || "Doctor Visit"}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          {entry.entityType === "CHEMIST" ? entry.chemistAddress || entry.subArea || "Local Chemist" : entry.doctorClinicAddress || entry.doctorSpecialty || "Clinic / Hospital"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right text-[11px] text-slate-400 font-mono shrink-0">
-                      [____:____ AM/PM]
-                    </div>
-                  </div>
-                ))}
+              {(() => {
+                const baseEntries =
+                  downloadMode === "TODAY"
+                    ? selectedEvaluation.days.filter((d) => d.date === targetPrintDate)
+                    : selectedEvaluation.days.filter((d) => !d.isSunday);
+                const q = evalPreviewSearch.trim().toLowerCase();
+                const filteredEntries = q
+                  ? baseEntries.filter((entry) => {
+                      const name =
+                        entry.entityType === "CHEMIST"
+                          ? entry.plannedChemistName || ""
+                          : entry.plannedDoctorName || "";
+                      const sub =
+                        entry.entityType === "CHEMIST"
+                          ? entry.chemistAddress || entry.subArea || ""
+                          : entry.doctorClinicAddress || entry.doctorSpecialty || "";
+                      return (
+                        entry.date.toLowerCase().includes(q) ||
+                        name.toLowerCase().includes(q) ||
+                        sub.toLowerCase().includes(q) ||
+                        (entry.entityType || "").toLowerCase().includes(q)
+                      );
+                    })
+                  : baseEntries;
 
-                {(downloadMode === "TODAY"
-                  ? selectedEvaluation.days.filter((d) => d.date === targetPrintDate)
-                  : selectedEvaluation.days.filter((d) => !d.isSunday)
-                ).length === 0 && (
-                    <div className="p-6 text-center text-xs text-slate-400 italic">
-                      No scheduled visits found for this selection. Add Day N+1 calls first.
+                return (
+                  <>
+                    {baseEntries.length > 0 && (
+                      <ScrollSearchBar
+                        value={evalPreviewSearch}
+                        onChange={setEvalPreviewSearch}
+                        placeholder="Search schedule by date, doctor/chemist, area or specialty…"
+                        matchedCount={filteredEntries.length}
+                        totalCount={baseEntries.length}
+                      />
+                    )}
+                    <div className="max-h-60 overflow-y-auto bg-white rounded-lg border border-slate-200 divide-y divide-slate-100 text-xs">
+                      {filteredEntries.map((entry, idx) => (
+                        <div key={entry.id || idx} className="p-2.5 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <span className="inline-block w-5 h-5 rounded border-2 border-slate-400 text-center text-[10px] font-bold text-emerald-700 bg-white leading-4">
+                              {entry.visitStatus === "DONE" || entry.isCompleted ? "✓" : ""}
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] font-mono text-slate-400">{entry.date}</span>
+                                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded uppercase ${entry.entityType === "CHEMIST" ? "bg-purple-100 text-purple-800" : "bg-sky-100 text-sky-800"
+                                  }`}>
+                                  {entry.entityType || "DOCTOR"}
+                                </span>
+                                <span className="font-bold text-slate-800">
+                                  {entry.entityType === "CHEMIST" ? entry.plannedChemistName || "Chemist Visit" : entry.plannedDoctorName || "Doctor Visit"}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                {entry.entityType === "CHEMIST" ? entry.chemistAddress || entry.subArea || "Local Chemist" : entry.doctorClinicAddress || entry.doctorSpecialty || "Clinic / Hospital"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right text-[11px] text-slate-400 font-mono shrink-0">
+                            [____:____ AM/PM]
+                          </div>
+                        </div>
+                      ))}
+
+                      {filteredEntries.length === 0 && (
+                        <div className="p-6 text-center text-xs text-slate-400 italic">
+                          {baseEntries.length === 0
+                            ? "No scheduled visits found for this selection. Add Day N+1 calls first."
+                            : `No scheduled visits matching "${evalPreviewSearch}".`}
+                        </div>
+                      )}
                     </div>
-                  )}
-              </div>
+                  </>
+                );
+              })()}
 
               <div className="text-[11px] text-slate-500 flex justify-between items-center pt-1">
                 <span>Formatted with A4 Landscape fit-to-1-page width, repeating headers, cell borders &amp; signature footer.</span>

@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { SearchableSelect } from "@/components/searchable-select";
+import { ScrollSearchBar } from "@/components/ui/scroll-search-bar";
 import { costBasis, type CostBasisSource } from "@/lib/pricing";
 import { getMedicineReference, computeShelfLife, type ClinicalReference, type ShelfLifeStatus } from "@/lib/medicine-reference";
 import {
@@ -2164,8 +2165,10 @@ const MOVEMENT_LABEL: Record<Movement["type"], string> = {
 function MovementLedgerBody({ productId }: { productId: string }) {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ledgerSearch, setLedgerSearch] = useState("");
 
   useEffect(() => {
+    setLedgerSearch("");
     setLoading(true);
     apiClient
       .get(`/api/products/${productId}/movements`)
@@ -2185,50 +2188,85 @@ function MovementLedgerBody({ productId }: { productId: string }) {
     return <p className="text-center text-slate-400 text-sm py-12">No stock movements recorded yet.</p>;
   }
 
+  const q = ledgerSearch.trim().toLowerCase();
+  const filteredMovements = q
+    ? movements.filter((m) => {
+        const typeLabel = MOVEMENT_LABEL[m.type].toLowerCase();
+        const emp = m.employee ? `${m.employee.firstName} ${m.employee.lastName}`.toLowerCase() : "system";
+        const dt = new Date(m.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }).toLowerCase();
+        return (
+          typeLabel.includes(q) ||
+          (m.note || "").toLowerCase().includes(q) ||
+          emp.includes(q) ||
+          dt.includes(q) ||
+          String(m.delta).includes(q)
+        );
+      })
+    : movements;
+
   return (
-    <table className="w-full text-xs">
-      <thead>
-        <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 sticky top-0">
-          <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">Date/Time</th>
-          <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">Type</th>
-          <th className="px-4 py-2 text-right font-semibold uppercase tracking-wider text-[10px]">Change</th>
-          <th className="px-4 py-2 text-right font-semibold uppercase tracking-wider text-[10px]">Balance</th>
-          <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">By</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-slate-50">
-        {movements.map((m) => (
-          <tr key={m.id}>
-            <td className="px-4 py-2.5 text-slate-600">
-              {new Date(m.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}{" "}
-              {new Date(m.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-            </td>
-            <td className="px-4 py-2.5">
-              <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  m.type === "ORDER_DEDUCTION"
-                    ? "bg-blue-50 text-blue-700"
-                    : m.type === "RESTOCK"
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-amber-50 text-amber-700"
-                }`}
-              >
-                {MOVEMENT_LABEL[m.type]}
-              </span>
-              {m.note && <p className="text-[10px] text-slate-400 mt-0.5">{m.note}</p>}
-            </td>
-            <td className={`px-4 py-2.5 text-right font-bold tabular-nums ${m.delta < 0 ? "text-rose-600" : "text-emerald-600"}`}>
-              {m.delta > 0 ? "+" : ""}
-              {m.delta}
-            </td>
-            <td className="px-4 py-2.5 text-right font-semibold text-slate-700 tabular-nums">{m.quantityAfter}</td>
-            <td className="px-4 py-2.5 text-slate-500">
-              {m.employee ? `${m.employee.firstName} ${m.employee.lastName}` : "System"}
-            </td>
+    <div>
+      <div className="p-3 bg-slate-50/70 border-b border-slate-100 sticky top-0 z-20">
+        <ScrollSearchBar
+          value={ledgerSearch}
+          onChange={setLedgerSearch}
+          placeholder="Search stock ledger by note, type, user, or qty…"
+          matchedCount={filteredMovements.length}
+          totalCount={movements.length}
+        />
+      </div>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="bg-slate-50 text-slate-500 border-b border-slate-100">
+            <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">Date/Time</th>
+            <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">Type</th>
+            <th className="px-4 py-2 text-right font-semibold uppercase tracking-wider text-[10px]">Change</th>
+            <th className="px-4 py-2 text-right font-semibold uppercase tracking-wider text-[10px]">Balance</th>
+            <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">By</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody className="divide-y divide-slate-50">
+          {filteredMovements.length === 0 ? (
+            <tr>
+              <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                No stock movements matching &ldquo;{ledgerSearch}&rdquo;
+              </td>
+            </tr>
+          ) : (
+            filteredMovements.map((m) => (
+              <tr key={m.id}>
+                <td className="px-4 py-2.5 text-slate-600">
+                  {new Date(m.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}{" "}
+                  {new Date(m.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                </td>
+                <td className="px-4 py-2.5">
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      m.type === "ORDER_DEDUCTION"
+                        ? "bg-blue-50 text-blue-700"
+                        : m.type === "RESTOCK"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {MOVEMENT_LABEL[m.type]}
+                  </span>
+                  {m.note && <p className="text-[10px] text-slate-400 mt-0.5">{m.note}</p>}
+                </td>
+                <td className={`px-4 py-2.5 text-right font-bold tabular-nums ${m.delta < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                  {m.delta > 0 ? "+" : ""}
+                  {m.delta}
+                </td>
+                <td className="px-4 py-2.5 text-right font-semibold text-slate-700 tabular-nums">{m.quantityAfter}</td>
+                <td className="px-4 py-2.5 text-slate-500">
+                  {m.employee ? `${m.employee.firstName} ${m.employee.lastName}` : "System"}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -2342,8 +2380,12 @@ function MedicineDetailModal({
   const [docPctSim, setDocPctSim] = useState<number>(0);
   const [intel, setIntel] = useState<MedicineIntelligencePayload | null>(null);
   const [intelLoading, setIntelLoading] = useState<boolean>(true);
+  const [chemistSearch, setChemistSearch] = useState("");
+  const [invoiceSearch, setInvoiceSearch] = useState("");
 
   useEffect(() => {
+    setChemistSearch("");
+    setInvoiceSearch("");
     let cancelled = false;
     setIntelLoading(true);
     apiClient
@@ -2824,8 +2866,22 @@ function MedicineDetailModal({
                   {/* Top Chemists & MR Breakdown */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
-                      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 space-y-2">
                         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Top Buying Chemists / Medical Halls</h3>
+                        {Boolean(intel?.topChemists?.length) && (
+                          <ScrollSearchBar
+                            value={chemistSearch}
+                            onChange={setChemistSearch}
+                            placeholder="Search chemist or area…"
+                            matchedCount={
+                              intel!.topChemists!.filter((ch) => {
+                                const q = chemistSearch.trim().toLowerCase();
+                                return !q || ch.chemistName.toLowerCase().includes(q) || ch.area.toLowerCase().includes(q);
+                              }).length
+                            }
+                            totalCount={intel!.topChemists!.length}
+                          />
+                        )}
                       </div>
                       {!intel?.topChemists?.length ? (
                         <p className="p-4 text-xs text-slate-400">No chemist purchases recorded yet.</p>
@@ -2841,17 +2897,22 @@ function MedicineDetailModal({
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 tabular-nums">
-                              {intel.topChemists.slice(0, 12).map((ch) => (
-                                <tr key={ch.chemistId}>
-                                  <td className="px-3 py-2">
-                                    <p className="font-semibold text-slate-800">{ch.chemistName}</p>
-                                    <p className="text-[10px] text-slate-400">{ch.area}</p>
-                                  </td>
-                                  <td className="px-3 py-2 text-right text-slate-600">{ch.invoicesCount}</td>
-                                  <td className="px-3 py-2 text-right text-slate-600">{ch.billedQty}+{ch.freeQty}</td>
-                                  <td className="px-3 py-2 text-right font-bold text-emerald-700">{currencyExact(ch.profit)}</td>
-                                </tr>
-                              ))}
+                              {intel.topChemists
+                                .filter((ch) => {
+                                  const q = chemistSearch.trim().toLowerCase();
+                                  return !q || ch.chemistName.toLowerCase().includes(q) || ch.area.toLowerCase().includes(q);
+                                })
+                                .map((ch) => (
+                                  <tr key={ch.chemistId}>
+                                    <td className="px-3 py-2">
+                                      <p className="font-semibold text-slate-800">{ch.chemistName}</p>
+                                      <p className="text-[10px] text-slate-400">{ch.area}</p>
+                                    </td>
+                                    <td className="px-3 py-2 text-right text-slate-600">{ch.invoicesCount}</td>
+                                    <td className="px-3 py-2 text-right text-slate-600">{ch.billedQty}+{ch.freeQty}</td>
+                                    <td className="px-3 py-2 text-right font-bold text-emerald-700">{currencyExact(ch.profit)}</td>
+                                  </tr>
+                                ))}
                             </tbody>
                           </table>
                         </div>
@@ -2890,11 +2951,31 @@ function MedicineDetailModal({
                   </div>
 
                   {/* Recent Invoices for this Medicine */}
-                  {Boolean(intel?.recentInvoices?.length) && (
+                  {Boolean(intel?.recentInvoices?.length) && (() => {
+                    const q = invoiceSearch.trim().toLowerCase();
+                    const filteredInvoices = q
+                      ? intel!.recentInvoices!.filter(
+                          (inv) =>
+                            inv.invoiceNo.toLowerCase().includes(q) ||
+                            inv.partyName.toLowerCase().includes(q) ||
+                            inv.mrName.toLowerCase().includes(q) ||
+                            inv.area.toLowerCase().includes(q)
+                        )
+                      : intel!.recentInvoices!;
+                    return (
                     <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
-                      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Recent Invoices for {product.name}</h3>
-                        <span className="text-[10px] text-slate-500">Latest {intel!.recentInvoices!.length} entries</span>
+                      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Recent Invoices for {product.name}</h3>
+                          <span className="text-[10px] text-slate-500">Latest {intel!.recentInvoices!.length} entries</span>
+                        </div>
+                        <ScrollSearchBar
+                          value={invoiceSearch}
+                          onChange={setInvoiceSearch}
+                          placeholder="Search invoices by #no, chemist party, MR or area…"
+                          matchedCount={filteredInvoices.length}
+                          totalCount={intel!.recentInvoices!.length}
+                        />
                       </div>
                       <div className="max-h-56 overflow-y-auto">
                         <table className="w-full text-xs">
@@ -2908,28 +2989,37 @@ function MedicineDetailModal({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 tabular-nums">
-                            {intel!.recentInvoices!.map((inv, idx) => (
-                              <tr key={`${inv.invoiceNo}-${idx}`}>
-                                <td className="px-3 py-2">
-                                  <p className="font-semibold text-slate-800">{inv.invoiceNo}</p>
-                                  <p className="text-[10px] text-slate-400">
-                                    {new Date(inv.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                                  </p>
+                            {filteredInvoices.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="px-3 py-6 text-center text-slate-400">
+                                  No invoices matching &ldquo;{invoiceSearch}&rdquo;
                                 </td>
-                                <td className="px-3 py-2">
-                                  <p className="text-slate-700 font-medium">{inv.partyName}</p>
-                                  <p className="text-[10px] text-slate-400">{inv.mrName}</p>
-                                </td>
-                                <td className="px-3 py-2 text-right text-slate-700">{inv.billedQty}+{inv.freeQty}</td>
-                                <td className="px-3 py-2 text-right text-slate-700">₹{inv.unitRate.toFixed(2)}</td>
-                                <td className="px-3 py-2 text-right font-bold text-emerald-700">{currencyExact(inv.lineProfit)}</td>
                               </tr>
-                            ))}
+                            ) : (
+                              filteredInvoices.map((inv, idx) => (
+                                <tr key={`${inv.invoiceNo}-${idx}`}>
+                                  <td className="px-3 py-2">
+                                    <p className="font-semibold text-slate-800">{inv.invoiceNo}</p>
+                                    <p className="text-[10px] text-slate-400">
+                                      {new Date(inv.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                                    </p>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <p className="text-slate-700 font-medium">{inv.partyName}</p>
+                                    <p className="text-[10px] text-slate-400">{inv.mrName}</p>
+                                  </td>
+                                  <td className="px-3 py-2 text-right text-slate-700">{inv.billedQty}+{inv.freeQty}</td>
+                                  <td className="px-3 py-2 text-right text-slate-700">₹{inv.unitRate.toFixed(2)}</td>
+                                  <td className="px-3 py-2 text-right font-bold text-emerald-700">{currencyExact(inv.lineProfit)}</td>
+                                </tr>
+                              ))
+                            )}
                           </tbody>
                         </table>
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
                 </>
               )}
             </div>

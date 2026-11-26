@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { SearchableSelect } from "@/components/searchable-select";
+import { ScrollSearchBar } from "@/components/ui/scroll-search-bar";
 import { Role } from "@prisma/client";
 import {
   ROLES_RESPONSIBILITIES_CATALOG,
@@ -110,6 +111,7 @@ export default function UserManagementPage() {
   const [auditData, setAuditData] = useState<OrganizationAudit | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [territorySearch, setTerritorySearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("ALL");
   const [activeTab, setActiveTab] = useState<"directory" | "roles_catalog">("directory");
 
@@ -1011,6 +1013,23 @@ export default function UserManagementPage() {
                       </div>
                     )}
                   </div>
+                  {territories.length > 0 && (
+                    <ScrollSearchBar
+                      value={territorySearch}
+                      onChange={setTerritorySearch}
+                      placeholder="Search territory or assigned employee…"
+                      matchedCount={
+                        territories.filter((t) => {
+                          const q = territorySearch.trim().toLowerCase();
+                          if (!q) return true;
+                          const empName = t.employee ? `${t.employee.firstName} ${t.employee.lastName}`.toLowerCase() : "";
+                          return t.name.toLowerCase().includes(q) || empName.includes(q);
+                        }).length
+                      }
+                      totalCount={territories.length}
+                      className="mb-2"
+                    />
+                  )}
                   <div className="max-h-48 overflow-y-auto p-2 bg-gray-50 border border-gray-200 rounded-xl space-y-1 divide-y divide-gray-100">
                     {territories.length === 0 ? (
                       <div className="p-3 text-center">
@@ -1018,36 +1037,55 @@ export default function UserManagementPage() {
                         <p className="text-xs text-gray-500">No territories registered in system.</p>
                       </div>
                     ) : (
-                      territories.map((t) => {
-                        const isChecked = formData.selectedTerritoryIds.includes(t.id);
-                        const isAssignedToOther =
-                          t.employee &&
-                          t.employee.id !== (editUser?.employee?.id || "");
-                        return (
-                          <label
-                            key={t.id}
-                            className={`flex items-start gap-2.5 p-2 hover:bg-white rounded-lg text-xs cursor-pointer transition-colors ${
-                              isChecked ? "bg-white shadow-xs border border-primary-200" : ""
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setFormData({
-                                    ...formData,
-                                    selectedTerritoryIds: [...formData.selectedTerritoryIds, t.id],
-                                  });
-                                } else {
-                                  setFormData({
-                                    ...formData,
-                                    selectedTerritoryIds: formData.selectedTerritoryIds.filter(
-                                      (id) => id !== t.id
-                                    ),
-                                  });
-                                }
-                              }}
+                      (() => {
+                        const q = territorySearch.trim().toLowerCase();
+                        const visibleTerritories = q
+                          ? territories.filter((t) => {
+                              const empName = t.employee
+                                ? `${t.employee.firstName} ${t.employee.lastName}`.toLowerCase()
+                                : "";
+                              return t.name.toLowerCase().includes(q) || empName.includes(q);
+                            })
+                          : territories;
+
+                        if (visibleTerritories.length === 0) {
+                          return (
+                            <p className="p-3 text-center text-xs text-gray-500">
+                              No territories matching &ldquo;{territorySearch}&rdquo;
+                            </p>
+                          );
+                        }
+
+                        return visibleTerritories.map((t) => {
+                          const isChecked = formData.selectedTerritoryIds.includes(t.id);
+                          const isAssignedToOther =
+                            t.employee &&
+                            t.employee.id !== (editUser?.employee?.id || "");
+                          return (
+                            <label
+                              key={t.id}
+                              className={`flex items-start gap-2.5 p-2 hover:bg-white rounded-lg text-xs cursor-pointer transition-colors ${
+                                isChecked ? "bg-white shadow-xs border border-primary-200" : ""
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setFormData({
+                                      ...formData,
+                                      selectedTerritoryIds: [...formData.selectedTerritoryIds, t.id],
+                                    });
+                                  } else {
+                                    setFormData({
+                                      ...formData,
+                                      selectedTerritoryIds: formData.selectedTerritoryIds.filter(
+                                        (id) => id !== t.id
+                                      ),
+                                    });
+                                  }
+                                }}
                               className="mt-0.5 rounded text-primary-600 focus:ring-primary-500"
                             />
                             <div className="flex-1 min-w-0">
@@ -1076,8 +1114,9 @@ export default function UserManagementPage() {
                               )}
                             </div>
                           </label>
-                        );
-                      })
+                          );
+                        });
+                      })()
                     )}
                   </div>
                 </div>

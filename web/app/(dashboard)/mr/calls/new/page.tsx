@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { SearchableSelect } from "@/components/searchable-select";
+import { ScrollSearchBar } from "@/components/ui/scroll-search-bar";
 
 interface Entity {
   id: string;
@@ -276,6 +277,7 @@ function NewCallForm() {
   const [prescribedDoctorPhone, setPrescribedDoctorPhone] = useState("");
   const [isChemistDoctorOptionOpen, setIsChemistDoctorOptionOpen] = useState(false);
   const [doctorLockedFixed, setDoctorLockedFixed] = useState(false);
+  const [chemistDoctorSearch, setChemistDoctorSearch] = useState("");
 
   // Hydrate presetDoctorId / presetChemistId from API on mount
   useEffect(() => {
@@ -1312,40 +1314,74 @@ function NewCallForm() {
                           <p className="text-xs text-purple-900 font-semibold">
                             Select the prescribing doctor to fix with this chemist call:
                           </p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-                            {chemistDoctors.map((doc) => {
-                              const active = selectedChemistDoctor?.id === doc.id;
-                              const docPhone = doc.phone || doc.mobile || doc.whatsApp;
-                              return (
-                                <button
-                                  key={doc.id}
-                                  type="button"
-                                  onClick={() => handleSelectPrescribedDoctor(doc)}
-                                  className={`p-2.5 rounded-xl border text-left transition flex items-start justify-between gap-2 ${
-                                    active
-                                      ? "bg-emerald-100 border-emerald-400 text-emerald-950 font-bold"
-                                      : "bg-white hover:bg-purple-50 border-slate-200 text-slate-800"
-                                  }`}
-                                >
-                                  <div className="min-w-0 space-y-0.5">
-                                    <p className="text-xs font-bold truncate">
-                                      {/^dr\.?\s+/i.test(doc.fullName) ? doc.fullName : `Dr. ${doc.fullName}`}
+                          {(() => {
+                            const q = chemistDoctorSearch.trim().toLowerCase();
+                            const filteredChemistDoctors = q
+                              ? chemistDoctors.filter((doc) => {
+                                  const docPhone = doc.phone || doc.mobile || doc.whatsApp || "";
+                                  return (
+                                    doc.fullName.toLowerCase().includes(q) ||
+                                    (doc.primarySpecialty || "").toLowerCase().includes(q) ||
+                                    (doc.subArea || "").toLowerCase().includes(q) ||
+                                    (doc.clinicAddress || "").toLowerCase().includes(q) ||
+                                    docPhone.toLowerCase().includes(q)
+                                  );
+                                })
+                              : chemistDoctors;
+
+                            return (
+                              <>
+                                <ScrollSearchBar
+                                  value={chemistDoctorSearch}
+                                  onChange={setChemistDoctorSearch}
+                                  placeholder="Search doctor name, specialty, area or phone…"
+                                  matchedCount={filteredChemistDoctors.length}
+                                  totalCount={chemistDoctors.length}
+                                  accent="purple"
+                                />
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                                  {filteredChemistDoctors.length === 0 ? (
+                                    <p className="col-span-full text-xs text-slate-500 bg-white border border-slate-200 rounded-xl p-3 text-center">
+                                      No doctors matching &ldquo;{chemistDoctorSearch}&rdquo;
                                     </p>
-                                    <p className="text-[11px] text-slate-600 truncate">
-                                      {doc.primarySpecialty || "Specialist"}
-                                      {doc.subArea ? ` · ${doc.subArea}` : ""}
-                                    </p>
-                                    {docPhone && (
-                                      <p className="text-[11px] font-mono text-emerald-700 flex items-center gap-1">
-                                        <Phone size={10} /> {docPhone}
-                                      </p>
-                                    )}
-                                  </div>
-                                  {active && <Check size={14} className="text-emerald-700 shrink-0 mt-0.5" />}
-                                </button>
-                              );
-                            })}
-                          </div>
+                                  ) : (
+                                    filteredChemistDoctors.map((doc) => {
+                                      const active = selectedChemistDoctor?.id === doc.id;
+                                      const docPhone = doc.phone || doc.mobile || doc.whatsApp;
+                                      return (
+                                        <button
+                                          key={doc.id}
+                                          type="button"
+                                          onClick={() => handleSelectPrescribedDoctor(doc)}
+                                          className={`p-2.5 rounded-xl border text-left transition flex items-start justify-between gap-2 ${
+                                            active
+                                              ? "bg-emerald-100 border-emerald-400 text-emerald-950 font-bold"
+                                              : "bg-white hover:bg-purple-50 border-slate-200 text-slate-800"
+                                          }`}
+                                        >
+                                          <div className="min-w-0 space-y-0.5">
+                                            <p className="text-xs font-bold truncate">
+                                              {/^dr\.?\s+/i.test(doc.fullName) ? doc.fullName : `Dr. ${doc.fullName}`}
+                                            </p>
+                                            <p className="text-[11px] text-slate-600 truncate">
+                                              {doc.primarySpecialty || "Specialist"}
+                                              {doc.subArea ? ` · ${doc.subArea}` : ""}
+                                            </p>
+                                            {docPhone && (
+                                              <p className="text-[11px] font-mono text-emerald-700 flex items-center gap-1">
+                                                <Phone size={10} /> {docPhone}
+                                              </p>
+                                            )}
+                                          </div>
+                                          {active && <Check size={14} className="text-emerald-700 shrink-0 mt-0.5" />}
+                                        </button>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
                       ) : (
                         <p className="text-xs text-slate-400 italic">

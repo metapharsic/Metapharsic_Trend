@@ -3,6 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { Stethoscope, RefreshCw, CheckCircle2, Check } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { ScrollSearchBar } from "@/components/ui/scroll-search-bar";
+
+function formatDoctorName(fullName: string): string {
+  const trimmed = fullName.trim();
+  return /^dr\.?\s+/i.test(trimmed) ? trimmed : `Dr. ${trimmed}`;
+}
 
 export interface PrescribedDoctorOption {
   id: string;
@@ -31,12 +37,14 @@ export function PrescribedDoctorPicker({
   const [selectedDoctor, setSelectedDoctor] = useState<PrescribedDoctorOption | null>(initialDoctor);
   const [wasAutoSelected, setWasAutoSelected] = useState(false);
   const [isOptionOpen, setIsOptionOpen] = useState(false);
+  const [doctorSearch, setDoctorSearch] = useState("");
 
   useEffect(() => {
     setSelectedDoctor(initialDoctor);
   }, [initialDoctor]);
 
   useEffect(() => {
+    setDoctorSearch("");
     if (!chemistId) {
       setDoctors([]);
       setSelectedDoctor(null);
@@ -107,7 +115,7 @@ export function PrescribedDoctorPicker({
             </div>
             <div className="min-w-0 text-left">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-xs font-bold text-slate-900 truncate">Dr. {selectedDoctor.fullName}</span>
+                <span className="text-xs font-bold text-slate-900 truncate">{formatDoctorName(selectedDoctor.fullName)}</span>
                 <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-200 text-emerald-800 uppercase tracking-wider flex items-center gap-0.5">
                   <CheckCircle2 size={9} /> {wasAutoSelected ? "Auto-Populated" : "Prescribed Doctor"}
                 </span>
@@ -145,7 +153,7 @@ export function PrescribedDoctorPicker({
                 }}
                 className="text-[11px] text-purple-700 hover:underline font-semibold"
               >
-                Keep Dr. {selectedDoctor.fullName}
+                Keep {formatDoctorName(selectedDoctor.fullName)}
               </button>
             )}
           </div>
@@ -160,41 +168,84 @@ export function PrescribedDoctorPicker({
             </p>
           )}
 
+          {doctors.length > 0 && (
+            <ScrollSearchBar
+              value={doctorSearch}
+              onChange={setDoctorSearch}
+              placeholder="Search doctor name, specialty, clinic or area…"
+              matchedCount={
+                doctors.filter((doc) => {
+                  const q = doctorSearch.trim().toLowerCase();
+                  if (!q) return true;
+                  return (
+                    doc.fullName.toLowerCase().includes(q) ||
+                    (doc.primarySpecialty || "").toLowerCase().includes(q) ||
+                    (doc.clinicAddress || "").toLowerCase().includes(q) ||
+                    (doc.subArea || "").toLowerCase().includes(q)
+                  );
+                }).length
+              }
+              totalCount={doctors.length}
+              accent="purple"
+            />
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-            {doctors.map((doc) => {
-              const isSelected = doc.id === doctorId;
-              return (
-                <div
-                  key={doc.id}
-                  onClick={() => {
-                    onChange(doc.id);
-                    setSelectedDoctor(doc);
-                    setWasAutoSelected(false);
-                    setIsOptionOpen(false);
-                  }}
-                  className={`p-2.5 rounded-xl cursor-pointer border text-left transition flex items-start justify-between gap-2 ${
-                    isSelected
-                      ? "bg-purple-100/90 border-purple-400 text-purple-950 shadow-xs ring-1 ring-purple-400 font-bold"
-                      : "bg-white hover:bg-purple-50 border-slate-200 text-slate-800"
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold truncate">Dr. {doc.fullName}</p>
-                    <p className="text-[11px] text-slate-500 truncate">{doc.primarySpecialty || "General"}</p>
-                    <p className="text-[10px] text-slate-400 truncate mt-0.5">{doc.clinicAddress || doc.subArea || "Local Clinic"}</p>
+            {(() => {
+              const q = doctorSearch.trim().toLowerCase();
+              const filteredDoctors = q
+                ? doctors.filter(
+                    (doc) =>
+                      doc.fullName.toLowerCase().includes(q) ||
+                      (doc.primarySpecialty || "").toLowerCase().includes(q) ||
+                      (doc.clinicAddress || "").toLowerCase().includes(q) ||
+                      (doc.subArea || "").toLowerCase().includes(q)
+                  )
+                : doctors;
+
+              if (filteredDoctors.length === 0 && doctors.length > 0) {
+                return (
+                  <p className="col-span-full text-xs text-slate-500 bg-white border border-slate-200 rounded-xl p-3 text-center">
+                    No doctors matching &ldquo;{doctorSearch}&rdquo;
+                  </p>
+                );
+              }
+
+              return filteredDoctors.map((doc) => {
+                const isSelected = doc.id === doctorId;
+                return (
+                  <div
+                    key={doc.id}
+                    onClick={() => {
+                      onChange(doc.id);
+                      setSelectedDoctor(doc);
+                      setWasAutoSelected(false);
+                      setIsOptionOpen(false);
+                    }}
+                    className={`p-2.5 rounded-xl cursor-pointer border text-left transition flex items-start justify-between gap-2 ${
+                      isSelected
+                        ? "bg-purple-100/90 border-purple-400 text-purple-950 shadow-xs ring-1 ring-purple-400 font-bold"
+                        : "bg-white hover:bg-purple-50 border-slate-200 text-slate-800"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold truncate">{formatDoctorName(doc.fullName)}</p>
+                      <p className="text-[11px] text-slate-500 truncate">{doc.primarySpecialty || "General"}</p>
+                      <p className="text-[10px] text-slate-400 truncate mt-0.5">{doc.clinicAddress || doc.subArea || "Local Clinic"}</p>
+                    </div>
+                    {isSelected ? (
+                      <span className="p-1 rounded-full bg-purple-200 text-purple-900 shrink-0">
+                        <Check size={12} />
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-purple-600 font-semibold px-2 py-0.5 rounded-md hover:bg-purple-100 shrink-0">
+                        Select
+                      </span>
+                    )}
                   </div>
-                  {isSelected ? (
-                    <span className="p-1 rounded-full bg-purple-200 text-purple-900 shrink-0">
-                      <Check size={12} />
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-purple-600 font-semibold px-2 py-0.5 rounded-md hover:bg-purple-100 shrink-0">
-                      Select
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
 
             <div
               onClick={() => {
